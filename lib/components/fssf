@@ -1,0 +1,81 @@
+
+class RulerPainter extends CustomPainter {
+  final double minValue;
+  final double maxValue;
+  final double step;
+  final double currentValue;
+  final double fadeLength; // length of the fade overlay
+  RulerPainter(this.minValue, this.maxValue, this.step, this.currentValue,
+      {this.fadeLength = 30});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double width = size.width;
+    final double height = size.height;
+    final double midWidth = width / 2;
+    final double triangleHeight = height * .5;
+    final double triangleWidth =
+        triangleHeight * 2 / math.sqrt(3); // height * tan(pi/3)
+    final Path trianglePath = Path()
+      ..moveTo(midWidth - triangleWidth / 2, 0)
+      ..lineTo(midWidth + triangleWidth / 2, 0)
+      ..lineTo(midWidth, -10)
+      ..close();
+
+    final Paint trianglePaint = Paint()..color = Colors.blue[800]!;
+
+    // Draw the modified triangle with margin bottom
+    canvas.drawPath(trianglePath, trianglePaint);
+    canvas.drawLine(
+      Offset(midWidth - width * .15, 0),
+      Offset(midWidth + width * .15, 0),
+      Paint()
+        ..color = Colors.grey.shade300
+        ..strokeWidth = .7,
+    );
+
+    final double fadeStartPosition = midWidth - fadeLength * 5;
+    final double fadeEndPosition = midWidth + fadeLength / 3;
+    const double fadeStartAlpha = 0.0;
+    const double fadeEndAlpha = 1.0;
+
+    // Draw the lines with fade overlay at both ends
+    for (double i = minValue / 1.5; i <= maxValue * 1.2; i += step) {
+      final double x = midWidth +
+          (i - currentValue) * (width / ((maxValue - minValue) / step));
+      final double alpha = _getFadeAlpha(
+          x, fadeStartPosition, fadeEndPosition, fadeStartAlpha, fadeEndAlpha);
+      final bool isLineLong = i % 5 == 0;
+      debugPrint(isLineLong.toString());
+      final Paint linePaint = Paint()
+        ..color = Colors.grey.shade300
+        ..strokeWidth = 1;
+
+      if (alpha > 0) {
+        final double lineHeight = height * 0.9;
+
+        linePaint.color = Colors.grey[350]!.withOpacity(alpha);
+        canvas.drawLine(
+          Offset(x, 0),
+          Offset(x, lineHeight),
+          linePaint,
+        );
+      }
+    }
+  }
+
+  double _getFadeAlpha(double position, double start, double end,
+      double startAlpha, double endAlpha) {
+    if (position < start) {
+      return startAlpha;
+    } else if (position > end) {
+      return endAlpha;
+    } else {
+      return (position - start) / (end - start) * (endAlpha - startAlpha) +
+          startAlpha;
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
