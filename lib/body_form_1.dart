@@ -5,169 +5,220 @@ import 'components/gender_switch.dart';
 import 'dart:math' as math;
 
 class BodyForm extends StatefulWidget {
-  // final VoidCallback nextPage;
+  // final VoidCallback detailsSubmitted;
   final ValueChanged<bool> pageChange;
   final PageController? controller;
+  // final Function(List<Map<String, dynamic>>) onSubmit;
   const BodyForm({
-    super.key,
+    Key? key,
     this.controller,
     required this.pageChange,
-    //  required this.nextPage
-  });
+    // required this.onSubmit,
+    // required this.detailsSubmitted,
+  }) : super(key: key);
 
   @override
   State<BodyForm> createState() => _BodyFormState();
+
+  // List<Map<String, dynamic>> get fields => sendDetails();
+  static TextEditingController ageController =
+      TextEditingController(text: '25');
+  static TextEditingController weightController =
+      TextEditingController(text: '60.0');
+  static double height = 170;
+  static bool isMale = true;
+
+  static List<Map<String, dynamic>> sendDetails() {
+    // in list of maps
+    final List<Map<String, dynamic>> fields = [
+      {
+        'label': 'Age',
+        'controller': ageController,
+      },
+      {
+        'label': 'Weight',
+        'controller': weightController,
+      },
+      {
+        'label': 'Height',
+        'controller':
+            TextEditingController(text: BodyForm.height.toStringAsFixed(0)),
+      },
+      {
+        'label': 'Gender',
+        'controller': TextEditingController(text: isMale ? 'Male' : 'Female'),
+      },
+    ];
+    return fields;
+  }
+
+  static List<Map<String, dynamic>> get fields => sendDetails();
 }
 
 class _BodyFormState extends State<BodyForm> {
-  int age = 25;
-  int weight = 60;
-  double height = 170;
-  bool isMale = true;
-  void calc(calc, title) {
-    setState(() {
-      if (calc == 'add') {
-        if (title == 'age') {
-          age = age + 1;
-        } else {
-          weight = weight + 1;
-        }
-      } else {
-        if (title == 'age') {
-          age = age - 1;
-        } else {
-          weight = weight - 1;
-        }
-      }
-    });
-  }
+  final double minValue = 100; // minimum height value in cms
+  final double maxValue = 220; // maximum height value in cms
+  final double step = 1; // step value for the height picker
+  TextEditingController ageController = BodyForm.ageController;
+  TextEditingController weightController = BodyForm.weightController;
+  bool isInteractingWithPicker = false;
+
+  // make sendDetails() a getter
 
   @override
   Widget build(BuildContext context) {
-    // String gender = isMale ? 'Male' : 'Female';
-    bool isInteractingWithPicker = false;
     final double width = MediaQuery.of(context).size.width;
-    const double minValue = 100; // minimum height value in cms
-    const double maxValue = 220; // maximum height value in cms
-    const double step = 1; // step value for the height picker
-    void setHeight(DragUpdateDetails details) {
-      final double delta = -details.delta.dx;
+    void calc(calc, title) {
       setState(() {
-        height = math.max(
-            minValue,
-            math.min(maxValue,
-                height + delta / (width / ((maxValue - minValue) / step))));
+        if (title == 'age') {
+          if (calc == 'add') {
+            ageController.text = (int.parse(ageController.text) + 1).toString();
+          } else {
+            ageController.text = (int.parse(ageController.text) - 1).toString();
+          }
+        } else {
+          if (calc == 'add') {
+            weightController.text = int.tryParse(weightController.text) != null
+                ? (int.parse(weightController.text) + 1).toString()
+                : (double.parse(weightController.text) + 1).toString();
+          } else {
+            weightController.text =
+                (int.parse(weightController.text) - 1).toString();
+          }
+        }
       });
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xfff5f6fd),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.05,
-            vertical: MediaQuery.of(context).size.height * 0.03,
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  VCard(
-                    value: age.toString(),
-                    title: 'Age',
-                    fn: (oper) {
-                      calc(oper, 'age');
-                    },
-                  ),
-                  VCard(
-                    value: weight.toString(),
-                    title: 'Weight',
-                    fn: (oper) {
-                      calc(oper, 'weight');
-                    },
-                  ),
-                ],
-              ),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-              GestureDetector(
-                // when the user starts touching the height picker or drags it
-                // we set the isInteractingWithPicker to true
-                onTapDown: (TapDownDetails details) {
-                  setState(() {
-                    isInteractingWithPicker = true;
-                    widget.pageChange(isInteractingWithPicker);
-                  });
-                },
-                onPanDown: (DragDownDetails details) {
-                  setState(() {
-                    isInteractingWithPicker = true;
-                    widget.pageChange(isInteractingWithPicker);
-                  });
-                },
-                onPanUpdate: (details) {
-                  isInteractingWithPicker = true;
-                  widget.pageChange(isInteractingWithPicker);
-                  setHeight(details);
-                },
-                onPanEnd: (details) {
-                  isInteractingWithPicker = false;
-                  widget.pageChange(isInteractingWithPicker);
-                },
-                child: HeightPicker(
-                  // setHeight: (DragUpdateDetails details) => setHeight(details),
-                  value: height.toStringAsFixed(0),
-                  minValue: minValue,
-                  step: step,
-                  maxValue: maxValue,
+    void setHeight(DragUpdateDetails details) {
+      final double delta = -details.delta.dx;
+      setState(() {
+        BodyForm.height = math.max(
+            minValue,
+            math.min(
+                maxValue,
+                BodyForm.height +
+                    delta / (width / ((maxValue - minValue) / step))));
+      });
+      // BodyForm.height = height;
+    }
+
+    // String previousValue = '';
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        isInteractingWithPicker = false;
+        widget.pageChange(isInteractingWithPicker);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xfff5f6fd),
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width * 0.05,
+              vertical: MediaQuery.of(context).size.height * 0.03,
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    VCard(
+                      value: ageController.text,
+                      title: 'Age',
+                      fn: (oper) {
+                        if (oper == 'add' || oper == 'sub') {
+                          calc(oper, 'age');
+                        } else {
+                          setState(() {
+                            if (int.parse(ageController.text) > 100 ||
+                                int.parse(ageController.text) < 1) {
+                              ageController.text = '9';
+                            } else {
+                              ageController.text = oper;
+                              ageController.selection =
+                                  TextSelection.fromPosition(TextPosition(
+                                      offset: ageController.text.length));
+                            }
+                          });
+                        }
+                      },
+                      controller: ageController,
+                    ),
+                    VCard(
+                      value: weightController.text,
+                      title: 'Weight',
+                      fn: (oper) {
+                        if (oper == 'add' || oper == 'sub') {
+                          calc(oper, 'weight');
+                        } else {
+                          setState(() {
+                            if (!(RegExp(r'^\d{0,3}(\.\d{0,1})?$')
+                                .hasMatch(weightController.text))) {
+                              weightController.text = weightController.text
+                                  .substring(
+                                      0, weightController.text.length - 1);
+                            } else {
+                              weightController.text = oper;
+                              // previousValue = oper;
+                            }
+                            weightController.selection =
+                                TextSelection.fromPosition(TextPosition(
+                                    offset: weightController.text.length));
+                          });
+                        }
+                      },
+                      controller: weightController,
+                    ),
+                  ],
                 ),
-                // when the user stops touching the height picker or drags it
-                // we set the isInteractingWithPicker to false
-              ),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-              GenderSwitch(
-                onGenderChanged: (bool value) {
-                  setState(() {
-                    isMale = value;
-                  });
-                },
-                isMale: isMale,
-              ),
-              // 3 dots for the page indicator, blue for the current page
-              // SizedBox(height: MediaQuery.of(context).size.height * 0.0),
-              // Row(
-              //   mainAxisAlignment: MainAxisAlignment.center,
-              //   children: [
-              //     Container(
-              //       height: 10,
-              //       width: 10,
-              //       decoration: const BoxDecoration(
-              //         color: Color(0xff3f51b5),
-              //         shape: BoxShape.circle,
-              //       ),
-              //     ),
-              //     const SizedBox(width: 10),
-              //     Container(
-              //       height: 10,
-              //       width: 10,
-              //       decoration: const BoxDecoration(
-              //         color: Color(0xffcfd8dc),
-              //         shape: BoxShape.circle,
-              //       ),
-              //     ),
-              //     const SizedBox(width: 10),
-              //     Container(
-              //       height: 10,
-              //       width: 10,
-              //       decoration: const BoxDecoration(
-              //         color: Color(0xffcfd8dc),
-              //         shape: BoxShape.circle,
-              //       ),
-              //     ),
-              //   ],
-              // ),
-           
-            ],
+                SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                GestureDetector(
+                  // when the user starts touching the height picker or drags it
+                  // we set the isInteractingWithPicker to true
+                  onTapDown: (TapDownDetails details) {
+                    FocusScope.of(context).unfocus();
+
+                    setState(() {
+                      isInteractingWithPicker = true;
+                      widget.pageChange(isInteractingWithPicker);
+                    });
+                  },
+                  onPanDown: (DragDownDetails details) {
+                    setState(() {
+                      isInteractingWithPicker = true;
+                      widget.pageChange(isInteractingWithPicker);
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    isInteractingWithPicker = true;
+                    widget.pageChange(isInteractingWithPicker);
+                    setHeight(details);
+                  },
+                  onPanEnd: (details) {
+                    isInteractingWithPicker = false;
+                    widget.pageChange(isInteractingWithPicker);
+                  },
+                  child: HeightPicker(
+                    // setHeight: (DragUpdateDetails details) => setHeight(details),
+                    value: BodyForm.height.toStringAsFixed(0),
+                    minValue: minValue,
+                    step: step,
+                    maxValue: maxValue,
+                  ),
+                  // when the user stops touching the height picker or drags it
+                  // we set the isInteractingWithPicker to false
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+                GenderSwitch(
+                  onGenderChanged: (bool value) {
+                    setState(() {
+                      BodyForm.isMale = value;
+                    });
+                  },
+                  isMale: BodyForm.isMale,
+                ),
+              ],
+            ),
           ),
         ),
       ),
