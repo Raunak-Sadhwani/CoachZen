@@ -9,7 +9,7 @@ class BodyForm2 extends StatefulWidget {
   @override
   State<BodyForm2> createState() => _BodyForm2State();
 
-  static List<Map<String, dynamic>> fields = [
+  static List<Map<String, dynamic>> get fields => [
     {
       "label": "Total Body Fat",
       "unit": "g",
@@ -42,7 +42,7 @@ class BodyForm2 extends StatefulWidget {
     },
   ];
 
-  static List<Map<String, dynamic>> get allFields => BodyForm.fields + fields;
+  static List<Map<String, dynamic>> get allFields => BodyForm2.fields;
 }
 
 class _BodyForm2State extends State<BodyForm2> {
@@ -50,7 +50,7 @@ class _BodyForm2State extends State<BodyForm2> {
 
   void submitForm() {
     if (formKey.currentState!.validate()) {
-      widget.onSubmit(BodyForm2.allFields);
+      widget.onSubmit(BodyForm2.fields);
     }
   }
 

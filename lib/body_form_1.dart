@@ -28,31 +28,25 @@ class BodyForm extends StatefulWidget {
   static double height = 170;
   static bool isMale = true;
 
-  static List<Map<String, dynamic>> sendDetails() {
-    // in list of maps
-    final List<Map<String, dynamic>> fields = [
-      {
-        'label': 'Age',
-        'controller': ageController,
-      },
-      {
-        'label': 'Weight',
-        'controller': weightController,
-      },
-      {
-        'label': 'Height',
-        'controller':
-            TextEditingController(text: BodyForm.height.toStringAsFixed(0)),
-      },
-      {
-        'label': 'Gender',
-        'controller': TextEditingController(text: isMale ? 'Male' : 'Female'),
-      },
-    ];
-    return fields;
-  }
-
-  static List<Map<String, dynamic>> get fields => sendDetails();
+  static List<Map<String, dynamic>> get allFields => [
+        {
+          'label': 'Age',
+          'controller': ageController,
+        },
+        {
+          'label': 'Weight',
+          'controller': weightController,
+        },
+        {
+          'label': 'Height',
+          'controller':
+              TextEditingController(text: BodyForm.height.toStringAsFixed(0)),
+        },
+        {
+          'label': 'Gender',
+          'controller': TextEditingController(text: isMale ? 'Male' : 'Female'),
+        },
+      ];
 }
 
 class _BodyFormState extends State<BodyForm> {

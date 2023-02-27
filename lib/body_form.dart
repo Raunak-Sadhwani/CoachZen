@@ -24,8 +24,12 @@ class _FormPageState extends State<FormPage> {
   }
 
   void onSubmit(List<Map<String, dynamic>> fields) {
+    List<Map<String, dynamic>> allFields = [
+      ...BodyForm.allFields,
+      ...BodyForm2.allFields,
+    ];
     dynamic data = [];
-    for (var field in fields) {
+    for (var field in allFields) {
       dynamic value = field['controller'].text;
       if (int.tryParse(field['controller'].text) != null) {
         value = int.parse(field['controller'].text);
