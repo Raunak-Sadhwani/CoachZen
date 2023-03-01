@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.slimtrap">
+    package="com.flatrap.slimtrap">
    <application
         android:label="slimtrap"
         android:name="${applicationName}"

@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'card.dart';
+import '../card.dart';
 
 class HeightPicker extends StatefulWidget {
   // final Function(DragUpdateDetails) setHeight;

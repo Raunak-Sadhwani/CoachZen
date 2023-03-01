@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1091415920513",
+    "project_id": "slimtrap-12284",
+    "storage_bucket": "slimtrap-12284.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1091415920513:android:7f3e462b6b79d44b3be280",
+        "android_client_info": {
+          "package_name": "com.flatrap.slimtrap"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1091415920513-qv1tni3bvlaje01uscncjge1b0jmatt8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZApmKzencaF1JAGvW2fgQ-yIGJTXC91s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1091415920513-qv1tni3bvlaje01uscncjge1b0jmatt8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

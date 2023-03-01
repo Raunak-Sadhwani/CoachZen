@@ -1,8 +1,8 @@
-import 'dart:convert';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'body_form_1.dart';
-import 'body_form_2.dart';
+import '../components/body_form/body_form_1.dart';
+import '../components/body_form/body_form_2.dart';
+import '../components/body_form/body_form_3.dart';
 
 class FormPage extends StatefulWidget {
   const FormPage({Key? key}) : super(key: key);
@@ -12,9 +12,10 @@ class FormPage extends StatefulWidget {
 }
 
 class _FormPageState extends State<FormPage> {
-  final controller = PageController();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final PageController controller = PageController();
   int currentPage = 0;
-  int totalPages = 2;
+  int totalPages = 3;
   bool notChangePage = false;
 
   void handleChangePage(bool newValue) {
@@ -23,29 +24,55 @@ class _FormPageState extends State<FormPage> {
     });
   }
 
-  void onSubmit(List<Map<String, dynamic>> fields) {
-    List<Map<String, dynamic>> allFields = [
-      ...BodyForm.allFields,
-      ...BodyForm2.allFields,
-    ];
-    dynamic data = [];
-    for (var field in allFields) {
-      dynamic value = field['controller'].text;
-      if (int.tryParse(field['controller'].text) != null) {
-        value = int.parse(field['controller'].text);
-      } else if (double.tryParse(field['controller'].text) != null) {
-        value = double.parse(field['controller'].text);
-      } else {
-        value = field['controller'].text;
+  void onSubmit(List<Map<String, dynamic>> fields) async {
+    if (formKey.currentState != null) {
+      // if (!formKey.currentState!.validate()) {
+      //   controller.jumpToPage(1);
+      //   return debugPrint('BodyForm2 validation failed');
+      // }
+      List<Map<String, dynamic>> allFields = [
+        ...BodyForm.allFields,
+        ...BodyForm2.allFields,
+        ...BodyForm3.allFields,
+      ];
+      dynamic data = [];
+      for (var field in allFields) {
+        dynamic value = field['controller'].text;
+        if (int.tryParse(field['controller'].text) != null) {
+          value = int.parse(field['controller'].text);
+        } else if (double.tryParse(field['controller'].text) != null) {
+          value = double.parse(field['controller'].text);
+        } else {
+          value = field['controller'].text;
+        }
+        String label = field['label'];
+        if (label.contains(' (optional)') && value.toString().isEmpty) {
+          // remove (optional) from label
+          label = label.substring(0, label.length - 11);
+        }
+        data.add({
+          label: value,
+        });
       }
-      String label = field['label'];
-      // json
-      data.add({
-        label: value,
-      });
+
+      //  convert data to Map<String, dynamic> type
+      data = data.reduce((value, element) => value..addAll(element));
+
+      // add timestamp of firestore
+      data['timestamp'] = FieldValue.serverTimestamp();
+
+      // Create a Firestore document reference
+      final docRef = FirebaseFirestore.instance.collection('body_form').doc();
+
+      // Set data to the document
+      await docRef.set(
+        data,
+      );
+
+      // Success message
+      return debugPrint('Data stored successfully!');
     }
-    data = jsonEncode(data);
-    print(data);
+    return controller.jumpToPage(1);
   }
 
   @override
@@ -56,6 +83,7 @@ class _FormPageState extends State<FormPage> {
         currentPage = controller.page?.round() ?? 0;
       });
     });
+    // jump to next page
   }
 
   @override
@@ -97,7 +125,12 @@ class _FormPageState extends State<FormPage> {
                     handleChangePage(value);
                   },
                 ),
-                BodyForm2(onSubmit: onSubmit)
+                BodyForm2(
+                  formKey: formKey,
+                ),
+                BodyForm3(
+                  onSubmit: onSubmit,
+                )
               ],
             ),
           ),

@@ -1,4 +1,4 @@
-package com.example.slimtrap
+package com.flatrap.slimtrap
 
 import io.flutter.embedding.android.FlutterActivity
 

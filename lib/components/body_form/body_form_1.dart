@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'components/age_weight.dart';
-import 'components/height_picker.dart';
-import 'components/gender_switch.dart';
+import 'age_weight.dart';
+import 'height_picker.dart';
+import 'gender_switch.dart';
 import 'dart:math' as math;
 
 class BodyForm extends StatefulWidget {
