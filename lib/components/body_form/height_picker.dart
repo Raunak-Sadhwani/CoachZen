@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../app_colors.dart';
 import '../card.dart';
 
 class HeightPicker extends StatefulWidget {
@@ -31,7 +32,7 @@ class _HeightPickerState extends State<HeightPicker> {
   Widget build(BuildContext context) {
     double height = MediaQuery.of(context).size.height / 15;
     final cardWidth = MediaQuery.of(context).size.width - 20;
-    const Color prime = Color.fromARGB(255, 88, 90, 107);
+    const Color prime = AppColors.greyText;
     String value = widget.value;
     return UICard(
       width: cardWidth,

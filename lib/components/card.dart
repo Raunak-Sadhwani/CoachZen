@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 class UICard extends StatelessWidget {
-  final double width;
+  final double? width;
   final double? height;
   final List<Widget> children;
-  const UICard(
-      {super.key, required this.width, required this.children, this.height});
+  const UICard({super.key, this.width, required this.children, this.height});
   @override
   Widget build(BuildContext context) {
     return Card(

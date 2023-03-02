@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'form_fields.dart';
+import '../app_colors.dart';
 
-class BodyForm2 extends StatelessWidget {
+// ignore: must_be_immutable
+class BodyForm2 extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   const BodyForm2({
     Key? key,
@@ -9,20 +11,7 @@ class BodyForm2 extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xfff5f6fd),
-      body: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Form(
-            key: formKey,
-            child: FormFields(
-              fields: fields,
-              validator: _validateField,
-            ),
-          )),
-    );
-  }
+  State<BodyForm2> createState() => _BodyForm2State();
 
   static List<Map<String, dynamic>> fields = [
     {
@@ -56,8 +45,33 @@ class BodyForm2 extends StatelessWidget {
       "controller": TextEditingController(),
     },
   ];
+  // create a bool wantKeepAlive with getter and setter
 
+  static bool wantKeepAlive = true;
   static List<Map<String, dynamic>> get allFields => BodyForm2.fields;
+}
+
+class _BodyForm2State extends State<BodyForm2>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => BodyForm2.wantKeepAlive;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Scaffold(
+        backgroundColor: AppColors.background,
+      body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Form(
+            key: widget.formKey,
+            child: FormFields(
+              fields: BodyForm2.fields,
+              validator: _validateField,
+            ),
+          )),
+    );
+  }
 
   String? _validateField(String? value, String label) {
     if (value == null || value.isEmpty) {

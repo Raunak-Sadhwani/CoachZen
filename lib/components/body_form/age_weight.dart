@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:slimtrap/components/app_colors.dart';
 import '../card.dart';
 
 class VCard extends StatefulWidget {
@@ -21,13 +22,11 @@ class VCard extends StatefulWidget {
 }
 
 class _VCardState extends State<VCard> {
-  final Color prime = const Color.fromARGB(255, 88, 90, 107);
+  final Color prime = AppColors.greyText;
   @override
   Widget build(BuildContext context) {
     final isHeight = widget.title == 'Weight';
-    final cardHeight = MediaQuery.of(context).size.width / 2 - 40;
     return UICard(
-      width: cardHeight,
       children: [
         Text(widget.title,
             style: TextStyle(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:slimtrap/body_form/body_form.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'pages/home.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -9,17 +9,14 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  static GlobalKey mtAppKey = GlobalKey();
+  const MyApp({Key? key}) : super(key: key);
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        // title: 'Flutter Demo',
-        // theme: ThemeData(
-        //   primarySwatch: Colors.blue,
-        // ),
-        home: FormPage());
+      debugShowCheckedModeBanner: false,
+      home: HomePage(),
+    );
   }
 }

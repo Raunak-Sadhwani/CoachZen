@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_colors.dart';
 import 'age_weight.dart';
 import 'height_picker.dart';
 import 'gender_switch.dart';
@@ -62,6 +63,7 @@ class _BodyFormState extends State<BodyForm> {
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
+    final double height = MediaQuery.of(context).size.height;
     void calc(calc, title) {
       setState(() {
         if (title == 'age') {
@@ -74,10 +76,11 @@ class _BodyFormState extends State<BodyForm> {
           if (calc == 'add') {
             weightController.text = int.tryParse(weightController.text) != null
                 ? (int.parse(weightController.text) + 1).toString()
-                : (double.parse(weightController.text) + 1).toString();
+                : (double.parse(weightController.text) + 1).toStringAsFixed(1);
           } else {
-            weightController.text =
-                (int.parse(weightController.text) - 1).toString();
+            weightController.text = int.tryParse(weightController.text) != null
+                ? (int.parse(weightController.text) - 1).toString()
+                : (double.parse(weightController.text) - 1).toStringAsFixed(1);
           }
         }
       });
@@ -96,72 +99,116 @@ class _BodyFormState extends State<BodyForm> {
       // BodyForm.height = height;
     }
 
+    void tappedOutside() {
+      FocusScope.of(context).unfocus();
+
+      setState(() {
+        isInteractingWithPicker = true;
+        if (weightController.text.endsWith(".") ||
+            weightController.text.startsWith(".")) {
+          weightController.text = weightController.text
+              .substring(0, weightController.text.length - 1);
+        }
+
+        if (double.tryParse(weightController.text) == null ||
+            double.tryParse(weightController.text)! < 15.0) {
+          weightController.text = '60.0';
+        }
+
+        if (int.tryParse(ageController.text) == null ||
+            int.tryParse(ageController.text)! < 15) {
+          ageController.text = '25';
+        }
+        widget.pageChange(isInteractingWithPicker);
+      });
+    }
+
     // String previousValue = '';
     return GestureDetector(
       onTap: () {
-        FocusScope.of(context).unfocus();
-        isInteractingWithPicker = false;
-        widget.pageChange(isInteractingWithPicker);
+        tappedOutside();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xfff5f6fd),
+        backgroundColor: AppColors.background,
         body: SingleChildScrollView(
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: MediaQuery.of(context).size.width * 0.05,
-              vertical: MediaQuery.of(context).size.height * 0.03,
+              horizontal: width * 0.05,
+              vertical: height * 0.03,
             ),
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    VCard(
-                      value: ageController.text,
-                      title: 'Age',
-                      fn: (oper) {
-                        if (oper == 'add' || oper == 'sub') {
-                          calc(oper, 'age');
-                        } else {
-                          setState(() {
-                            if (int.parse(ageController.text) > 100 ||
-                                int.parse(ageController.text) < 1) {
-                              ageController.text = '9';
-                            } else {
-                              ageController.text = oper;
+                    Expanded(
+                      child: VCard(
+                        value: ageController.text,
+                        title: 'Age',
+                        fn: (oper) {
+                          if ((oper == 'add' || oper == 'sub') &&
+                              !(int.parse(ageController.text) > 100 ||
+                                  int.parse(ageController.text) < 1)) {
+                            calc(oper, 'age');
+                          } else {
+                            setState(() {
+                              if (int.parse(ageController.text) > 100 ||
+                                  int.parse(ageController.text) < 1) {
+                                ageController.text = ageController.text
+                                    .substring(
+                                        0, ageController.text.length - 1);
+                              } else {
+                                ageController.text = oper;
+                              }
                               ageController.selection =
                                   TextSelection.fromPosition(TextPosition(
                                       offset: ageController.text.length));
-                            }
-                          });
-                        }
-                      },
-                      controller: ageController,
+                            });
+                          }
+                        },
+                        controller: ageController,
+                      ),
                     ),
-                    VCard(
-                      value: weightController.text,
-                      title: 'Weight',
-                      fn: (oper) {
-                        if (oper == 'add' || oper == 'sub') {
-                          calc(oper, 'weight');
-                        } else {
-                          setState(() {
-                            if (!(RegExp(r'^\d{0,3}(\.\d{0,1})?$')
-                                .hasMatch(weightController.text))) {
-                              weightController.text = weightController.text
-                                  .substring(
-                                      0, weightController.text.length - 1);
-                            } else {
-                              weightController.text = oper;
-                              // previousValue = oper;
-                            }
-                            weightController.selection =
-                                TextSelection.fromPosition(TextPosition(
-                                    offset: weightController.text.length));
-                          });
-                        }
-                      },
-                      controller: weightController,
+                    SizedBox(width: width * 0.04),
+                    Expanded(
+                      child: VCard(
+                        value: weightController.text.trim(),
+                        title: 'Weight',
+                        fn: (oper) {
+                          String weightText = weightController.text.trim();
+                          if ((oper == 'add' || oper == 'sub') &&
+                              !(double.parse(weightText) < 31 ||
+                                  double.parse(weightText) > 300)) {
+                            calc(oper, 'weight');
+                          } else {
+                            setState(() {
+                              // proper regex for weight
+                              try {
+                                if (!RegExp(r'^\d{0,3}(\.\d{0,1})?$')
+                                        .hasMatch(weightText) ||
+                                    weightText.contains(' ')) {
+                                  weightController.text = weightController.text
+                                      .substring(
+                                          0, weightController.text.length - 1);
+                                } else {
+                                  if ((weightText.isEmpty ||
+                                          double.tryParse(weightText) !=
+                                              null) &&
+                                      (oper != 'add' && oper != 'sub')) {
+                                    weightController.text = oper;
+                                  }
+                                }
+                                weightController.selection =
+                                    TextSelection.fromPosition(TextPosition(
+                                        offset: weightController.text.length));
+                              } catch (e) {
+                                weightController.text = '31';
+                              }
+                            });
+                          }
+                        },
+                        controller: weightController,
+                      ),
                     ),
                   ],
                 ),
@@ -170,12 +217,7 @@ class _BodyFormState extends State<BodyForm> {
                   // when the user starts touching the height picker or drags it
                   // we set the isInteractingWithPicker to true
                   onTapDown: (TapDownDetails details) {
-                    FocusScope.of(context).unfocus();
-
-                    setState(() {
-                      isInteractingWithPicker = true;
-                      widget.pageChange(isInteractingWithPicker);
-                    });
+                    tappedOutside();
                   },
                   onPanDown: (DragDownDetails details) {
                     setState(() {

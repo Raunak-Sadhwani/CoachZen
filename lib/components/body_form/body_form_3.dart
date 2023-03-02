@@ -1,67 +1,15 @@
 import 'package:flutter/material.dart';
 import 'form_fields.dart';
+import '../app_colors.dart';
 
-class BodyForm3 extends StatelessWidget {
-  final Function(List<Map<String, dynamic>>) onSubmit;
-
-  BodyForm3({Key? key, required this.onSubmit}) : super(key: key);
-
-  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
-  void submitForm() {
-    onSubmit(fields);
-    if (formKey.currentState!.validate()) {}
-  }
-
-  String? _validateField(String? value, String label) {
-    if (label == 'Name') {
-      // ^((\b[a-zA-Z]{2,40}\b)\s*){2,3}$ regex for name
-      if (value!.length < 3 ||
-          !value.contains(RegExp(r'^((\b[a-zA-Z]{2,40}\b)\s*){2,3}$'))) {
-        return 'Please enter a valid name';
-      }
-    } else if (label == 'Email (optional)') {
-      // email field can be empty or should be valid email format
-      if (value!.isNotEmpty &&
-          (!RegExp(r'^.+@[a-zA-Z]+\.{1}[a-zA-Z]+(\.{0,1}[a-zA-Z]+)$')
-              .hasMatch(value))) {
-        return 'Please enter a valid email address';
-      }
-    } else if ('label' == 'Phone (+91)') {
-      // check if phone is valid indian number
-      if (!RegExp(r'^[6-9]\d{9}$').hasMatch(value!)) {
-        return 'Please enter a valid phone number';
-      }
-    } else if (label == 'Medical History (optional)') {
-      // medical history field can be empty
-    } else {
-      // other fields should not be empty
-      if (value == null || value.isEmpty) {
-        return 'Please enter a value';
-      }
-    }
-    return null;
-  }
+class BodyForm3 extends StatefulWidget {
+  final VoidCallback onSubmit;
+  final GlobalKey<FormState> formKey;
+  const BodyForm3({Key? key, required this.onSubmit, required this.formKey})
+      : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xfff5f6fd),
-      body: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Form(
-            key: formKey,
-            child: FormFields(
-              fields: fields,
-              validator: _validateField,
-            ),
-          )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: submitForm,
-        child: const Icon(Icons.check),
-      ),
-    );
-  }
+  State<BodyForm3> createState() => _BodyForm3State();
 
   static List<Map<String, dynamic>> fields = [
     {
@@ -85,6 +33,63 @@ class BodyForm3 extends StatelessWidget {
       "controller": TextEditingController(),
     },
   ];
+  static bool wantKeepAlive = true;
 
   static List<Map<String, dynamic>> get allFields => BodyForm3.fields;
+}
+
+class _BodyForm3State extends State<BodyForm3>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => BodyForm3.wantKeepAlive;
+
+  String? _validateField(String? value, String label) {
+    if (label == 'Name') {
+      if (value!.length < 3 ||
+          !value.contains(RegExp(r'^((\b[a-zA-Z]{2,40}\b)\s*){2,3}$'))) {
+        return 'Please enter a valid name';
+      }
+    } else if (label.contains('Email')) {
+      // email field can be empty or should be valid email format
+      if (value!.isNotEmpty &&
+          (!RegExp(r'^.+@[a-zA-Z]+\.{1}[a-zA-Z]+(\.{0,1}[a-zA-Z]+)$')
+              .hasMatch(value))) {
+        return 'Please enter a valid email address';
+      }
+    } else if (label.contains('Phone')) {
+      // check if phone is valid indian number
+      if (!RegExp(r'^[6-9]\d{9}$').hasMatch(value!)) {
+        return 'Please enter a valid Indian phone number';
+      }
+    } else if (label == 'Medical History (optional)') {
+      // medical history field can be empty
+    } else {
+      // other fields should not be empty
+      if (value == null || value.isEmpty) {
+        return 'Please enter a value';
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Form(
+            key: widget.formKey,
+            child: FormFields(
+              fields: BodyForm3.fields,
+              validator: _validateField,
+            ),
+          )),
+      floatingActionButton: FloatingActionButton(
+        onPressed: widget.onSubmit,
+        child: const Icon(Icons.check),
+      ),
+    );
+  }
 }
