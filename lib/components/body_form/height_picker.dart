@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../app_colors.dart';
-import '../card.dart';
+import '../ui/app_colors.dart';
+import '../ui/card.dart';
 
 class HeightPicker extends StatefulWidget {
   // final Function(DragUpdateDetails) setHeight;

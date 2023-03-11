@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../app_colors.dart';
+import '../ui/app_colors.dart';
 import 'age_weight.dart';
 import 'height_picker.dart';
 import 'gender_switch.dart';

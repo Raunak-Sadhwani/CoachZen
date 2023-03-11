@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'form_fields.dart';
-import '../app_colors.dart';
+import '../ui/app_colors.dart';
 
 // ignore: must_be_immutable
 class BodyForm2 extends StatefulWidget {

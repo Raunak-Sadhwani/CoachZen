@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../components/body_form/body_form_1.dart';
 import '../components/body_form/body_form_2.dart';
 import '../components/body_form/body_form_3.dart';
+import '../components/ui/appbar.dart';
 
 class FormPage extends StatefulWidget {
   const FormPage({Key? key}) : super(key: key);
@@ -52,25 +53,15 @@ class _FormPageState extends State<FormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        elevation: 0,
-        leading: IconButton(
+      appBar: MyAppBar(
+        leftIcon: IconButton(
           icon: const Icon(Icons.menu_rounded),
           color: Colors.black26,
           onPressed: () {
             Navigator.pop(context);
           },
         ),
-        title: const Text(
-          'Body Form',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-        backgroundColor: Colors.white,
+        title: 'Body Form',
       ),
       body: Stack(
         children: [
@@ -170,6 +161,9 @@ class _FormPageState extends State<FormPage> {
 
           // add timestamp of firestore
           data['timestamp'] = FieldValue.serverTimestamp();
+
+          // add id of firestore
+          data['id'] = FirebaseFirestore.instance.collection('body_form').doc().id;
 
           // Create a Firestore document reference
           final docRef =

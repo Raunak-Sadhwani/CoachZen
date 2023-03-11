@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../card.dart';
+import '../ui/card.dart';
 
 class GenderSwitch extends StatefulWidget {
   final Function(bool) onGenderChanged;

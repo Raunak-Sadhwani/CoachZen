@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:slimtrap/components/app_colors.dart';
-import '../card.dart';
+import '../ui/app_colors.dart';
+import '../ui/card.dart';
 
 class VCard extends StatefulWidget {
   final String value;

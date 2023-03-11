@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../card.dart';
+import '../ui/card.dart';
 
 class FormFields extends StatelessWidget {
   final List<Map<String, dynamic>> fields;

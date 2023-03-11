@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
-import 'package:slimtrap/components/card.dart';
+import 'package:slimtrap/components/ui/card.dart';
 import 'package:slimtrap/pages/body_form.dart';
+import 'package:slimtrap/pages/body_form_list.dart';
+
+import '../components/ui/appbar.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -11,8 +14,22 @@ class HomePage extends StatelessWidget {
     double height = MediaQuery.of(context).size.height;
     double width = MediaQuery.of(context).size.width;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home Page'),
+      appBar: MyAppBar(
+        leftIcon: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          color: Colors.black26,
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        rightIcons: [
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            color: Colors.black26,
+            onPressed: () {},
+          ),
+        ],
+        title: 'Home',
       ),
       backgroundColor: const Color.fromARGB(255, 83, 98, 210),
       body: SingleChildScrollView(
@@ -50,11 +67,11 @@ class HomePage extends StatelessWidget {
                       child: UICard(children: [
                         Expanded(
                           child: _OpenContainerWrapper(
-                            page: const FormPage(),
+                            page: const BodyFormList(),
                             content: Container(
                               color: Colors.blue,
                               child: const Center(
-                                child: Text('Form'),
+                                child: Text('Form List'),
                               ),
                             ),
                             //  onClosed: null,
@@ -119,7 +136,7 @@ class _OpenContainerWrapper extends StatelessWidget {
           child: content,
         );
       },
-      transitionDuration: const Duration(milliseconds: 600),
+      transitionDuration: const Duration(milliseconds: 450),
     );
   }
 }
