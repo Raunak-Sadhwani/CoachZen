@@ -1,0 +1,127 @@
+import 'package:flutter/material.dart';
+
+class BodyFormCustomer extends StatefulWidget {
+  final String id,
+      name,
+      phone,
+      age,
+      weight,
+      height,
+      medicalHistory,
+      city,
+      email,
+      timeStamp;
+  final bool isMale;
+
+  const BodyFormCustomer({
+    Key? key,
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.age,
+    required this.weight,
+    required this.height,
+    required this.medicalHistory,
+    required this.email,
+    required this.isMale,
+    required this.timeStamp,
+    required this.city,
+  }) : super(key: key);
+
+  @override
+  State<BodyFormCustomer> createState() => _BodyFormCustomerState();
+}
+
+class _BodyFormCustomerState extends State<BodyFormCustomer> {
+  final _formKey = GlobalKey<FormState>();
+  final _controllers = <String, TextEditingController>{
+    'name': TextEditingController(),
+    'phone': TextEditingController(),
+    'age': TextEditingController(),
+    'weight': TextEditingController(),
+    'height': TextEditingController(),
+    'medicalHistory': TextEditingController(),
+    'city': TextEditingController(),
+    'email': TextEditingController(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers.forEach((key, controller) {
+      controller.text = widget.getValueByKey(key);
+    });
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Customer Form'),
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _controllers.keys.map((key) {
+                return TextFormField(
+                  controller: _controllers[key],
+                  decoration: InputDecoration(
+                      labelText: key.toUpperCase(), hintText: 'Enter $key'),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your $key';
+                    }
+                    return null;
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (_formKey.currentState!.validate()) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Processing Data')),
+            );
+            for (var controller in _controllers.values) {
+              print(controller.text);
+            }
+          }
+        },
+        child: const Icon(Icons.save),
+      ),
+    );
+
+    
+  }
+  
+}
+
+extension BodyFormCustomerExtension on BodyFormCustomer {
+  String getValueByKey(String key) {
+    return {
+      'name': name,
+      'phone': phone,
+      'age': age,
+      'weight': weight,
+      'height': height,
+      'medicalHistory': medicalHistory,
+      'city': city,
+      'email': email,
+    }[key]!;
+  }
+}
