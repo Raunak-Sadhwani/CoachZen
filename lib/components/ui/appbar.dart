@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leftIcon;
   final List<Widget>? rightIcons;
-  final String title;
+  final String? title;
+  final Widget? ftitle;
   const MyAppBar({
     super.key,
     this.leftIcon,
     this.rightIcons,
-    required this.title,
+    this.ftitle,
+    this.title,
   });
 
   @override
@@ -17,14 +19,15 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: true,
       elevation: 0,
       leading: leftIcon,
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: Colors.black,
-        ),
-      ),
+      title: ftitle ??
+          Text(
+            title ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
+          ),
       backgroundColor: Colors.white,
       actions: rightIcons,
     );

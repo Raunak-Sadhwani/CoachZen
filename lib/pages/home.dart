@@ -19,7 +19,7 @@ class HomePage extends StatelessWidget {
           icon: const Icon(Icons.menu_rounded),
           color: Colors.black26,
           onPressed: () {
-            Navigator.pop(context);
+            // Navigator.pop(context);
           },
         ),
         rightIcons: [
@@ -86,26 +86,26 @@ class HomePage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: OpenContainer(
-        transitionType: ContainerTransitionType.fade,
-        openBuilder: (BuildContext context, VoidCallback _) {
-          return const FormPage();
-        },
-        closedElevation: 6.0,
-        closedColor: Theme.of(context).colorScheme.secondary,
-        closedBuilder: (BuildContext context, VoidCallback openContainer) {
-          return SizedBox(
-            height: 30,
-            width: 30,
-            child: Center(
-              child: Icon(
-                Icons.add,
-                color: Theme.of(context).colorScheme.onSecondary,
-              ),
-            ),
-          );
-        },
-      ),
+      // floatingActionButton: OpenContainer(
+      //   transitionType: ContainerTransitionType.fade,
+      //   openBuilder: (BuildContext context, VoidCallback _) {
+      //     return const FormPage();
+      //   },
+      //   closedElevation: 6.0,
+      //   closedColor: Theme.of(context).colorScheme.secondary,
+      //   closedBuilder: (BuildContext context, VoidCallback openContainer) {
+      //     return SizedBox(
+      //       height: 30,
+      //       width: 30,
+      //       child: Center(
+      //         child: Icon(
+      //           Icons.add,
+      //           color: Theme.of(context).colorScheme.onSecondary,
+      //         ),
+      //       ),
+      //     );
+      //   },
+      // ),
     );
   }
 }

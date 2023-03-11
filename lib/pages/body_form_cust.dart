@@ -1,22 +1,19 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:slimtrap/components/ui/appbar.dart';
 import '../components/ui/card.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-extension BodyFormCustomerExtension on BodyFormCustomer {
-  String getValueByKey(String key) {
-    return {
-      'name': name,
-      'phone (+91)': phone,
-      'age': age,
-      'weight (kg)': weight,
-      'height (cm)': height,
-      'medicalHistory': medicalHistory,
-      'city': city,
-      'email': email,
-    }[key]!;
-  }
-}
+// make proper variables for weight, height, medical history, city, email
+String bname = 'Name';
+String bphone = 'Phone (+91)';
+String bage = 'Age';
+String bweight = 'Weight (kg)';
+String bheight = 'Height (cm)';
+String bmedicalHistory = 'Medical History';
+String bcity = 'City';
+String bgender = 'Gender';
+String bemail = 'Email';
+String created = 'Created';
 
 class FieldData {
   final TextEditingController controller;
@@ -61,10 +58,27 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
   bool isEditing = false;
   List errorMessage = [];
 
+  final _controllers = <String, FieldData>{
+    bname: FieldData(controller: TextEditingController(), icon: Icons.person),
+    bphone: FieldData(controller: TextEditingController(), icon: Icons.phone),
+    bage: FieldData(controller: TextEditingController(), icon: Icons.cake),
+    bweight:
+        FieldData(controller: TextEditingController(), icon: Icons.line_weight),
+    bheight: FieldData(controller: TextEditingController(), icon: Icons.height),
+    bcity: FieldData(
+        controller: TextEditingController(), icon: Icons.location_city),
+    bgender: FieldData(controller: TextEditingController(), icon: Icons.wc),
+    bemail: FieldData(controller: TextEditingController(), icon: Icons.email),
+    bmedicalHistory:
+        FieldData(controller: TextEditingController(), icon: Icons.history),
+    created: FieldData(
+        controller: TextEditingController(), icon: Icons.calendar_today),
+  };
+
   String? _validateField(String? value, String label) {
     if (label.toLowerCase().contains('name')) {
       if (value!.length < 3 ||
-          !value.contains(RegExp(r'^((\b[a-zA-Z]{2,40}\b)\s*){2,3}$'))) {
+          !value.trim().contains(RegExp(r'^((\b[a-zA-Z]{2,40}\b)\s*){2,3}$'))) {
         errorMessage.add('Please enter a valid name');
         return '';
       }
@@ -125,37 +139,53 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
     return null;
   }
 
-  final _controllers = <String, FieldData>{
-    'name': FieldData(controller: TextEditingController(), icon: Icons.person),
-    'phone (+91)':
-        FieldData(controller: TextEditingController(), icon: Icons.phone),
-    'age': FieldData(controller: TextEditingController(), icon: Icons.cake),
-    'weight (kg)':
-        FieldData(controller: TextEditingController(), icon: Icons.line_weight),
-    'height (cm)':
-        FieldData(controller: TextEditingController(), icon: Icons.height),
-    'city': FieldData(
-        controller: TextEditingController(), icon: Icons.location_city),
-    'email': FieldData(controller: TextEditingController(), icon: Icons.email),
-    'Medical History':
-        FieldData(controller: TextEditingController(), icon: Icons.history),
-    'Created': FieldData(
-        controller: TextEditingController(), icon: Icons.calendar_today),
-  };
+  List<String> updateFields = [];
 
   @override
   void initState() {
     super.initState();
+
+    // previous values of the fields
+    Map<String, String> previousValues = {
+      bname: widget.name,
+      bphone: widget.phone,
+      bage: widget.age,
+      bweight: widget.weight,
+      bheight: widget.height,
+      bmedicalHistory: widget.medicalHistory,
+      bcity: widget.city,
+      bgender: widget.isMale ? 'M' : 'F',
+      bemail: widget.email,
+      created: widget.timeStamp.substring(0, widget.timeStamp.indexOf('.')),
+    };
+
     _controllers.forEach((key, value) {
       if (key.toLowerCase().contains('created')) {
-        value.controller.text =
-            widget.timeStamp.substring(0, widget.timeStamp.indexOf('.'));
+        value.controller.text = previousValues[key]!;
       } else if (key.toLowerCase().contains('phone')) {
-        value.controller.text = widget.getValueByKey(key);
+        value.controller.text = previousValues[bphone]!;
         value.controller.text = value.controller.text.substring(3);
       } else if (!key.toLowerCase().contains('medical')) {
-        value.controller.text = widget.getValueByKey(key);
+        value.controller.text = previousValues[key]!;
       }
+      value.controller.addListener(() {
+        // check if any field is changed and if yes then add it to updateFields
+        if (value.controller.text != previousValues[key]) {
+          if (!updateFields.contains(key) &&
+              !key.toLowerCase().contains('created')) {
+            updateFields.add(key);
+          }
+        } else {
+          // if field is not changed then remove it from updateFields
+          if (updateFields.contains(key)) {
+            updateFields.remove(key);
+          }
+        }
+        // if updateFields isnot empty then enable the isEditing flag
+        setState(() {
+          isEditing = updateFields.isNotEmpty;
+        });
+      });
     });
   }
 
@@ -205,20 +235,52 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                   if (formKey.currentState!.validate()) {
                     try {
                       // update cust in firestore
+
+                      Map<String, dynamic> data = {
+                        'Name': _controllers[bname]!.controller.text.trim(),
+                        'Phone (+91)':
+                            int.parse(_controllers[bphone]!.controller.text),
+                        'Age': int.parse(_controllers[bage]!.controller.text),
+                        'Weight': double.parse(
+                            // fixed 2 decimal places
+                            _controllers[bweight]!.controller.text.substring(
+                                0,
+                                _controllers[bweight]!
+                                        .controller
+                                        .text
+                                        .indexOf('.') +
+                                    2)),
+                        'Height':
+                            int.parse(_controllers[bheight]!.controller.text),
+                        'City': _controllers[bcity]!.controller.text,
+                        'Gender': _controllers[bgender]!
+                                    .controller
+                                    .text
+                                    .toLowerCase() ==
+                                'm'
+                            ? "Male"
+                            : "Female",
+                        'Email': _controllers[bemail]!.controller.text,
+                      };
+                      // update only the fields that are changed
+                      List updateValues = [];
+                      for (var element in updateFields) {
+                        if (element.contains('Weight') ||
+                            element.contains('Height')) {
+                          element = element.substring(0, element.indexOf(' '));
+                        }
+                        updateValues.add(data[element]);
+                      }
+                      for (int i = 0; i < updateFields.length; i++) {
+                        debugPrint(
+                            '${updateFields[i]} ${updateValues[i]}'.toString());
+                      }
                       FirebaseFirestore.instance
                           .collection('body_form')
                           .doc(widget.id)
                           .update({
-                        'Name': _controllers['name']!.controller.text,
-                        'Phone (+91)': int.parse(
-                            _controllers['phone (+91)']!.controller.text),
-                        'Age': int.parse(_controllers['age']!.controller.text),
-                        'Weight': double.parse(
-                            _controllers['weight (kg)']!.controller.text),
-                        'Height': int.parse(
-                            _controllers['height (cm)']!.controller.text),
-                        'City': _controllers['city']!.controller.text,
-                        'Email': _controllers['email']!.controller.text,
+                        for (int i = 0; i < updateFields.length; i++)
+                          updateFields[i]: updateValues[i],
                         'Updated': FieldValue.serverTimestamp(),
                       }).then((value) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -269,7 +331,6 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
       {required String label,
       required IconData icon,
       required TextEditingController controller}) {
-    // width according to the value length
     final textPainter = TextPainter(
       text: TextSpan(
         text: controller.text.trim(),
@@ -294,24 +355,25 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                     children: [
                       Icon(icon),
                       const SizedBox(width: 10),
-                      // capitalize the first letter of the label
                       Text(
                         label[0].toUpperCase() + label.substring(1),
                       ),
                     ],
                   ),
-                  if (label != 'Created' && label != 'Medical History')
+                  if (!label.toLowerCase().contains('created') &&
+                      !label.toLowerCase().contains('medical'))
                     SizedBox(
-                      width: (label == 'email' && controller.text.isEmpty)
+                      width: label.toLowerCase().contains('email') &&
+                              controller.text.trim().length > 20
                           ? 200
                           : fieldWidth,
                       child: TextFormField(
                         // initialValue: value,
-                        keyboardType: label.contains('email')
+                        keyboardType: label.toLowerCase().contains('email')
                             ? TextInputType.emailAddress
-                            : label.contains('name') ||
-                                    label.contains('city') ||
-                                    label.contains('gender')
+                            : label.toLowerCase().contains('name') ||
+                                    label.toLowerCase().contains('city') ||
+                                    label.toLowerCase().contains('gender')
                                 ? TextInputType.text
                                 : TextInputType.number,
                         decoration: const InputDecoration(
@@ -324,11 +386,6 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                           focusedErrorBorder: InputBorder.none,
                           errorBorder: InputBorder.none,
                         ),
-                        onChanged: (newValue) {
-                          setState(() {
-                            isEditing = true;
-                          });
-                        },
                         validator: (value) => _validateField(value, label),
                         controller: controller,
                       ),
@@ -339,33 +396,25 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
               )
             ],
           ),
-          // error should be shown here
-          // Text()
         ],
       ),
     );
   }
 }
 
-//  Container(
-//                     margin: const EdgeInsets.symmetric(vertical: 5),
-//                     child: TextFormField(
-//                       controller: fields[i]['controller'],
-//                       decoration: InputDecoration(
-//                         labelText: fields[i]['label'],
-//                         prefixIcon: Icon(fields[i]['icon']),
-//                         border: OutlineInputBorder(
-//                           borderRadius: BorderRadius.circular(10),
-//                         ),
-//                         errorStyle: const TextStyle(
-//                           color: Colors.red,
-//                           fontSize: 15,
-//                         ),
-//                       ),
-//                       validator: (value) =>
-//                           _validateField(value, fields[i]['label']),
-//                       onSaved: (value) {
-//                         fields[i]['value'] = value;
-//                       },
-//                     ),
-//                   ),
+extension BodyFormCustomerExtension on BodyFormCustomer {
+  String getValueByKey(String key) {
+    return {
+          bname: name,
+          bphone: phone,
+          bage: age,
+          bweight: weight,
+          bheight: height,
+          bmedicalHistory: medicalHistory,
+          bcity: city,
+          bemail: email,
+          created: created,
+        }[key] ??
+        '';
+  }
+}

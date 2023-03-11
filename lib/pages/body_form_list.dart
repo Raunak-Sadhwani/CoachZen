@@ -8,59 +8,125 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../components/ui/appbar.dart';
 
-class BodyFormList extends StatelessWidget {
+class BodyFormList extends StatefulWidget {
   const BodyFormList({super.key});
+
+  @override
+  State<BodyFormList> createState() => _BodyFormListState();
+}
+
+class _BodyFormListState extends State<BodyFormList> {
+  bool isSearching = false;
+  String searchQuery = '';
+  FocusNode searchFocusNode = FocusNode();
+  double opacity = 0.0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: MyAppBar(
           leftIcon: IconButton(
-            icon: const Icon(Icons.menu_rounded),
+            icon: const Icon(Icons.arrow_back_rounded),
             color: Colors.black26,
             onPressed: () {
-              Navigator.pop(context);
+              if (!isSearching) {
+                Navigator.pop(context);
+              } else {
+                setState(() {
+                  isSearching = false;
+                  searchQuery = '';
+                });
+              }
             },
           ),
-          title: 'Body Form Customers',
+          ftitle: isSearching
+              ? AnimatedOpacity(
+                  opacity: opacity,
+                  duration: const Duration(milliseconds: 1000),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Name, City, Phone, Email',
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        searchQuery = value.toLowerCase();
+                      });
+                    },
+                    focusNode: searchFocusNode,
+                  ),
+                )
+              : const Text(
+                  'Body Form Customers',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
           rightIcons: [
             IconButton(
-              icon: const Icon(Icons.search_rounded),
+              icon: !isSearching
+                  ? const Icon(Icons.search_rounded)
+                  : const Icon(Icons.close_rounded),
               color: Colors.black26,
-              onPressed: () {},
+              onPressed: () {
+                setState(() {
+                  isSearching = !isSearching;
+                  opacity = 1.0;
+
+                  if (isSearching) {
+                    // set interval to wait for animation to complete
+
+                    return searchFocusNode.requestFocus();
+                  }
+                  searchQuery = '';
+                  opacity = 0.0;
+                });
+              },
             ),
           ],
         ),
+        // appBar: buildAppBar(),
         // listview from firestore collection
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream:
               FirebaseFirestore.instance.collection("body_form").snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+              final filteredData = snapshot.data!.docs.where((doc) {
+                final name = doc.data()['Name'].toString().toLowerCase();
+                final city = doc.data()['City'].toString().toLowerCase();
+                final phone =
+                    doc.data()['Phone (+91)'].toString().toLowerCase();
+                final email = doc.data()['Email'].toString().toLowerCase();
+                final searchLower = searchQuery.toLowerCase();
+                return name.contains(searchLower) ||
+                    city.contains(searchLower) ||
+                    phone.contains(searchLower) ||
+                    email.contains(searchLower);
+              }).toList();
+
               return ListView.builder(
                 physics: const BouncingScrollPhysics(),
-                itemCount: snapshot.data!.docs.length,
+                itemCount: filteredData.length,
                 itemBuilder: (context, index) {
-                  String phone =
-                      "+91${snapshot.data!.docs[index].data()['Phone (+91)']}";
-                  bool isMale =
-                      snapshot.data!.docs[index].data()['Gender'] == 'Male';
-                  String timeStamp = snapshot.data!.docs[index]
+                  final phone =
+                      "+91${filteredData[index].data()['Phone (+91)']}";
+                  final isMale = filteredData[index].data()['Gender'] == 'Male';
+                  final timeStamp = filteredData[index]
                       .data()['timestamp']
                       .toDate()
                       .toString();
-                  String name = snapshot.data!.docs[index].data()['Name'];
-                  String city = snapshot.data!.docs[index].data()['City'];
+                  final name = filteredData[index].data()['Name'];
+                  final city = filteredData[index].data()['City'];
 
-                  int age = snapshot.data!.docs[index].data()['Age'];
-                  double weight = snapshot.data!.docs[index].data()['Weight'];
-                  int height = snapshot.data!.docs[index].data()['Height'];
-                  String medicalHistory =
-                      snapshot.data!.docs[index].data()['Medical History'] ??
-                          '';
-                  String email =
-                      snapshot.data!.docs[index].data()['Email'] ?? '';
-                  String id = snapshot.data!.docs[index].id;
+                  final age = filteredData[index].data()['Age'];
+                  final weight = filteredData[index].data()['Weight'];
+                  final height = filteredData[index].data()['Height'];
+                  final medicalHistory =
+                      filteredData[index].data()['Medical History'] ?? '';
+                  final email = filteredData[index].data()['Email'] ?? '';
+                  final id = filteredData[index].id;
 
                   return Slidable(
                     startActionPane: ActionPane(
@@ -117,6 +183,49 @@ class BodyFormList extends StatelessWidget {
 
                             // whatsapp
                             launchWhatsApp(phone: phone);
+                          },
+                        ),
+                      ],
+                    ),
+                    // remove
+                    endActionPane: ActionPane(
+                      motion: const BehindMotion(),
+                      // key: const ValueKey(1),
+                      children: [
+                        SlidableAction(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          icon: Icons.delete,
+                          label: 'Delete',
+                          onPressed: (context) {
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                return AlertDialog(
+                                  title: const Text('Delete'),
+                                  content: Text(
+                                      'Are you sure you want to remove $name?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        FirebaseFirestore.instance
+                                            .collection('body_form')
+                                            .doc(id)
+                                            .delete();
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
                           },
                         ),
                       ],

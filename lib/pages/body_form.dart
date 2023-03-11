@@ -162,8 +162,6 @@ class _FormPageState extends State<FormPage> {
           // add timestamp of firestore
           data['timestamp'] = FieldValue.serverTimestamp();
 
-          // add id of firestore
-          data['id'] = FirebaseFirestore.instance.collection('body_form').doc().id;
 
           // Create a Firestore document reference
           final docRef =
