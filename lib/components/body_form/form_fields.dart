@@ -31,24 +31,32 @@ class FormFields extends StatelessWidget {
                 UICard(
                   width: width,
                   children: [
-                    TextFormField(
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      controller: field['controller'],
-                      decoration: InputDecoration(
-                        labelText: field['label'],
-                        suffixText: field['unit'],
-                      ),
-                      keyboardType: field['label'].toString().contains('Email')
-                          ? TextInputType.emailAddress
-                          : field['label'] == 'Name' ||
-                                  field['label'] == 'City' ||
-                                  field['label'].toString().contains('Medical')
-                              ? TextInputType.text
-                              : TextInputType.number,
-                      validator: (value) {
-                        return validator(value, field['label']);
-                      },
-                    ),
+                    if (!field['label'].toString().contains('Medical'))
+                      TextFormField(
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        controller: field['controller'],
+                        decoration: InputDecoration(
+                          labelText: field['label'],
+                          suffixText: field['unit'],
+                        ),
+                        keyboardType:
+                            field['label'].toString().contains('Email')
+                                ? TextInputType.emailAddress
+                                : field['label'] == 'Name' ||
+                                        field['label'] == 'City' ||
+                                        field['label']
+                                            .toString()
+                                            .contains('Medical')
+                                    ? TextInputType.text
+                                    : TextInputType.number,
+                        validator: (value) {
+                          return validator(value, field['label']);
+                        },
+                      )
+                    else
+                      MedicalHistory(
+                        title: field['label'],
+                      )
                   ],
                 ),
               ],
@@ -56,6 +64,97 @@ class FormFields extends StatelessWidget {
           ),
         ),
         SizedBox(height: height * 0.03),
+      ],
+    );
+  }
+}
+
+class MedicalHistory extends StatefulWidget {
+  final String title;
+
+  const MedicalHistory({Key? key, required this.title}) : super(key: key);
+
+  @override
+  State<MedicalHistory> createState() => _MedicalHistoryState();
+}
+
+class _MedicalHistoryState extends State<MedicalHistory> {
+  bool show = false;
+  List<TextEditingController> controllers = [TextEditingController()];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(widget.title),
+            // checkbox
+            Checkbox(
+              value: show,
+              onChanged: (value) {
+                setState(() {
+                  show = value!;
+                });
+              },
+            ),
+          ],
+        ),
+        if (show)
+          ListView.builder(
+            shrinkWrap: true,
+            itemCount: controllers.length,
+            itemBuilder: (BuildContext context, int index) {
+              return Column(
+                children: [
+                  TextFormField(
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.only(left: 10),
+                    ),
+                    controller: controllers[index],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10, left: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              controllers.add(TextEditingController());
+                            });
+                          },
+                          child: Row(
+                            children: const [
+                              Icon(Icons.add),
+                              SizedBox(width: 10),
+                              Text('Add More'),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              controllers.removeAt(index);
+                            });
+                          },
+                          child: Row(
+                            children: const [
+                              Icon(Icons.remove),
+                              SizedBox(width: 10),
+                              Text('Remove'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
       ],
     );
   }

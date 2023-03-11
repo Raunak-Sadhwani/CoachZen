@@ -17,16 +17,16 @@ class BodyForm3 extends StatefulWidget {
       "controller": TextEditingController(),
     },
     {
-      "label": "Medical History (optional)",
-      "controller": TextEditingController(),
-    },
-    {
       "label": "Phone (+91)",
       "controller": TextEditingController(),
     },
     {
       "label": "City",
       "controller": TextEditingController(),
+    },
+    {
+      "label": "Medical History (optional)",
+      // "controller": TextEditingController(),
     },
     {
       "label": "Email (optional)",
