@@ -45,7 +45,7 @@ class BodyForm extends StatefulWidget {
         },
         {
           'label': 'Gender',
-          'controller': TextEditingController(text: isMale ? 'Male' : 'Female'),
+          'controller': TextEditingController(text: isMale ? 'male' : 'female'),
         },
       ];
 }

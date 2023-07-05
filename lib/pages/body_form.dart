@@ -1,4 +1,8 @@
+// ignore_for_file: use_build_context_synchronously
+
+import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../components/body_form/body_form_1.dart';
 import '../components/body_form/body_form_2.dart';
@@ -138,7 +142,8 @@ class _FormPageState extends State<FormPage> {
           ...BodyForm2.allFields,
           ...BodyForm3.allFields,
         ];
-        dynamic data = [];
+        Map<String, dynamic> data = {};
+        List<Map<String, dynamic>> measurements = [];
         for (var field in allFields) {
           dynamic value = field['controller'].text;
           if (int.tryParse(field['controller'].text) != null) {
@@ -149,41 +154,65 @@ class _FormPageState extends State<FormPage> {
             value = field['controller'].text;
           }
           String label = field['label'];
-          if (label.contains(' (optional)') && value.toString().isEmpty) {
-            // remove (optional) from label
-            label = label.substring(0, label.length - 11);
+          if (label.contains('(')) {
+            // split label by '('
+            label = label.split('(')[0].trim();
           }
-          data.add({
-            label: value,
-          });
+          label = label.toLowerCase();
+          //  BodyForm2.fields is datatype of List<Map<String, dynamic>>
+          // if label contains any of BodyForm2.fields label, add to measurements
+          if (BodyForm2.fields.any((element) => element['label'] == label)) {
+            // if measurements doesn't already contain label, add to measurements
+            if (!measurements.any((element) => element['label'] == label)) {
+              measurements.add({
+                label: value,
+              });
+            }
+            continue;
+          } else {
+            data[label] = value;
+          }
         }
 
         try {
-          //  convert data to Map<String, dynamic> type
-          data = data.reduce((value, element) => value..addAll(element));
-
+          FieldValue timestamp = FieldValue.serverTimestamp();
+          // convert FieldValue timestamp to datetime
+          User? coach = FirebaseAuth.instance.currentUser;
           // add timestamp of firestore
-          data['timestamp'] = FieldValue.serverTimestamp();
+          data['created'] = timestamp;
+          measurements.add({'date': DateTime.now()});
+          data['measurements'] = measurements;
+          data['reg'] = 'false';
+          data['cid'] = coach!.uid;
+          debugPrint(data.toString());
 
           // Create a Firestore document reference
-          final docRef =
-              FirebaseFirestore.instance.collection('body_form').doc();
+          final docRef = FirebaseFirestore.instance.collection('Users');
 
           // Set data to the document
-          await docRef.set(
+          await docRef.add(
             data,
           );
-          // ignore: use_build_context_synchronously
-          return ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Data stored successfully!'),
+          Flushbar(
+            margin: const EdgeInsets.all(7),
+            borderRadius: BorderRadius.circular(15),
+            flushbarStyle: FlushbarStyle.FLOATING,
+            flushbarPosition: FlushbarPosition.BOTTOM,
+            message: "User added successfully!",
+            icon: Icon(
+              Icons.check_circle_outline,
+              size: 28.0,
+              color: Colors.green[300],
             ),
-          );
+            duration: const Duration(milliseconds: 1500),
+            leftBarIndicatorColor: Colors.green[300],
+          ).show(context);
+          return Navigator.pop(context);
         } catch (e) {
           // SnackBar
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Something went wrong!'),
+              content: Text('Something went wrong4!'),
             ),
           );
           return debugPrint(e.toString());

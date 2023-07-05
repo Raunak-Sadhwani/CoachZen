@@ -116,7 +116,7 @@ class _BodyFormListState extends State<BodyFormList> {
                 itemCount: filteredData.length,
                 itemBuilder: (context, index) {
                   final phone = "+91${filteredData[index].data()['phone']}";
-                  final isMale = filteredData[index].data()['gender'] == 'm';
+                  final isMale = filteredData[index].data()['gender'] == 'male';
                   final timeStamp =
                       filteredData[index].data()['created'].toDate().toString();
                   final name = filteredData[index].data()['name'];
@@ -128,6 +128,7 @@ class _BodyFormListState extends State<BodyFormList> {
                     age = DateTime.now().year -
                         DateTime.parse(age.toDate().toString()).year;
                   }
+                  String? image = filteredData[index].data()['image'];
                   // final weight = filteredData[index].data()['Weight'] ?? '';
                   // final height = filteredData[index].data()['height'];
                   // final medicalHistory =
@@ -144,19 +145,22 @@ class _BodyFormListState extends State<BodyFormList> {
                       userData[key] = value;
                     }
                     // if its last key, add id
-                    // if (key == filteredData[index].data().keys.last &&
-                    //     !userData[key].toLowerCase().contains('created')) {
-                    //   Timestamp cr = userData['created'];
-                    //   userData.remove('created');
-                    //   userData['created'] = cr;
-                    // }
+                    if (key == filteredData[index].data().keys.last &&
+                        userData[key] != 'created') {
+                      Timestamp cr = userData['created'];
+                      userData.remove('created');
+                      userData['created'] = cr;
+                    }
                   });
-                  //  created key already exists in userData, make it last
+                  List toBeOnTop = ["name", "phone", "city", "dob"];
+                  userData = Map.fromEntries([
+                    ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
+                    ...userData.entries
+                        .where((entry) => !toBeOnTop.contains(entry.key))
+                  ]);
 
-                  // sort userData keys
-                  // userData = Map.fromEntries(userData.entries.toList()
-                  //   ..sort((a, b) => a.key.compareTo(b.key)));
-
+                  debugPrint(userData.toString());
+                  String uid = filteredData[index].id;
                   return Slidable(
                     startActionPane: ActionPane(
                       motion: const BehindMotion(),
@@ -280,33 +284,58 @@ class _BodyFormListState extends State<BodyFormList> {
                       ],
                     ),
                     child: openCont(
-                      page: BodyFormCustomer(userData: userData),
-                      child: ListTile(
-                        leading: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // male.png from assets
-                            isMale
-                                ? Image.asset('lib/assets/male.png',
-                                    width: 44, height: 44, fit: BoxFit.cover)
-                                : Image.asset('lib/assets/female.png',
-                                    width: 44, height: 44, fit: BoxFit.cover)
-                          ],
-                        ),
-                        title: Text(name),
-                        subtitle: Text(phone.substring(3)),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // date
-                            Text(timeStamp.substring(0, 10)),
-                            // time
-                            Text(
-                              timeStamp.substring(11, 16),
-                              style: const TextStyle(color: Colors.black26),
+                      page: BodyFormCustomer(
+                          userData: userData, uid: uid, image: image ?? ''),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey,
+                              width: .5,
                             ),
-                          ],
+                          ),
+                        ),
+                        child: ListTile(
+                          leading: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // male.png from assets
+                              SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: ClipOval(
+                                    child: image != null && image.isNotEmpty
+                                        ? FadeInImage.assetNetwork(
+                                            fit: BoxFit.cover,
+                                            placeholder:
+                                                'lib/assets/${filteredData[index].data()['gender']}.png',
+                                            image: image)
+                                        : Image.asset(
+                                            fit: BoxFit.cover,
+                                            'lib/assets/${filteredData[index].data()['gender']}.png')),
+                              ),
+                            ],
+                          ),
+                          title: Text(name),
+                          subtitle: Text("+91 ${phone.substring(3)}"),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              // date
+                              Text(
+                                formatter.format(filteredData[index]
+                                    .data()['created']
+                                    .toDate()),
+                                style: const TextStyle(color: Colors.black),
+                              ),
+                              // time
+                              Text(
+                                timeStamp.substring(11, 16),
+                                style: const TextStyle(color: Colors.black26),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

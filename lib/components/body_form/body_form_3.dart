@@ -24,10 +24,10 @@ class BodyForm3 extends StatefulWidget {
       "label": "City",
       "controller": TextEditingController(),
     },
-    {
-      "label": "Medical History (optional)",
-      // "controller": TextEditingController(),
-    },
+    // {
+    //   "label": "Medical History (optional)",
+    //   // "controller": TextEditingController(),
+    // },
     {
       "label": "Email (optional)",
       "controller": TextEditingController(),
@@ -61,9 +61,11 @@ class _BodyForm3State extends State<BodyForm3>
       if (!RegExp(r'^[6-9]\d{9}$').hasMatch(value!)) {
         return 'Please enter a valid Indian phone number';
       }
-    } else if (label == 'Medical History (optional)') {
-      // medical history field can be empty
-    } else {
+    }
+    // else if (label == 'Medical History (optional)') {
+    //   // medical history field can be empty
+    // }
+    else {
       // other fields should not be empty
       if (value == null || value.isEmpty) {
         return 'Please enter a value';
