@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -35,4 +36,36 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+
+// ignore: unused_element
+class OpenContainerWrapper extends StatelessWidget {
+  const OpenContainerWrapper({super.key, 
+    required this.page,
+    required this.content,
+    // required this.onClosed,
+  });
+
+  // final ClosedCallback<bool?> onClosed;
+  final Widget page;
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) {
+    return OpenContainer<bool>(
+      transitionType: ContainerTransitionType.fade,
+      openBuilder: (BuildContext context, VoidCallback _) {
+        return page;
+      },
+      onClosed: null,
+      tappable: false,
+      closedBuilder: (BuildContext context, VoidCallback openContainer) {
+        return GestureDetector(
+          onTap: openContainer,
+          child: content,
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 450),
+    );
+  }
 }

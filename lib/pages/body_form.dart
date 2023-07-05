@@ -54,12 +54,15 @@ class _FormPageState extends State<FormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: MyAppBar(
-        leftIcon: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          color: Colors.black26,
-          onPressed: () {
-            Navigator.pop(context);
-          },
+        leftIcon: Container(
+          margin: const EdgeInsets.only(left: 10),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back_ios),
+            color: Colors.black26,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
         ),
         title: 'Body Form',
       ),
@@ -161,7 +164,6 @@ class _FormPageState extends State<FormPage> {
 
           // add timestamp of firestore
           data['timestamp'] = FieldValue.serverTimestamp();
-
 
           // Create a Firestore document reference
           final docRef =

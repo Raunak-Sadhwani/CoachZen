@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /body_form/{document=**} {
+      allow create: if request.resource.data.keys().hasAll([ 'Name', 'Phone (+91)', 'Age', 'Weight', 'Height', 'City', 'Gender', 'Email', 'timestamp' ]) 
+      &&
+  isValidName(request.resource.data.Name)
+  &&
+  (request.resource.data.Email == '' || isValidEmail(request.resource.data.Email))
+  &&
+  isValidPhone(request.resource.data['Phone (+91)'])
+  &&
+  isValidGender(request.resource.data.Gender)
+  &&
+  isValidAge(request.resource.data.Age)
+  &&
+  isValidCity(request.resource.data.City)
+  &&
+  isValidWeight(request.resource.data.Weight)
+  &&
+  isValidHeight(request.resource.data.Height);
+  
+allow update: if 
+
+request.resource.data.keys().
+  hasOnly(['Name', 'Phone (+91)', 'Age', 'Weight', 'Height', 'City', 'Gender', 'Email', 'Updated']) 
+  &&  (!('Name' in request.resource.data) || isValidName(request.resource.data.Name))
+  &&  (!('Email' in request.resource.data) || isValidEmail(request.resource.data.Email))
+  &&  (!('Phone (+91)' in request.resource.data) || isValidPhone(request.resource.data['Phone (+91)']))
+  &&  (!('Age' in request.resource.data) || isValidAge(request.resource.data.Age))
+  &&  (!('Weight' in request.resource.data) || isValidWeight(request.resource.data.Weight))
+  &&  (!('Height' in request.resource.data) || isValidHeight(request.resource.data.Height))
+  &&  (!('Gender' in request.resource.data) || isValidGender(request.resource.data.Gender))
+  &&  (!('City' in request.resource.data) || isValidCity(request.resource.data.City));
+
+
+
+      allow read: if true;
+    }
+  }
+}
+
+
+function isValidName(name) {
+  return name is string &&
+         name.trim().size() >= 3 &&
+         name.trim().matches('^([A-Za-z]{2,40}\\s){1,2}[A-Za-z]{2,40}');
+}
+function capitalizeFirstLetter(str) {
+  // in firestore, the first letter of the string  capitalize
+  // .upper()
+  return str[0].upper() 
+
+}
+function isValidEmail(email) {
+  return email is string &&
+         email.matches('(?i)^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$');
+}
+
+function isValidPhone(phone) {
+  return phone is string &&
+         phone.matches('^[6-9]\\d{9}$');
+}
+
+
+function isValidGender(gender) {
+  return gender is string &&
+         (gender == 'm' || gender == 'f');
+}
+
+function isValidAge(age) {
+  return age is int &&
+         int(age) >= 15 &&
+         int(age) <= 100;
+}
+
+function isValidHeight(height) {
+  return height is int  &&
+         int(height) >= 50 &&
+         int(height) <= 250;
+}
+function isValidWeight(weight) {
+  return weight is float &&
+         float(weight) >= 30 &&
+         float(weight) <= 200;
+}
+function isValidCity(city) {
+  return city is string &&
+         city.trim().size() >= 3 &&
+         city.trim().matches('^[a-zA-Z\\s]+$');
+}
+
+

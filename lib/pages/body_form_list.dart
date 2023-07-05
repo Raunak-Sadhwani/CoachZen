@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -25,19 +26,22 @@ class _BodyFormListState extends State<BodyFormList> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: MyAppBar(
-          leftIcon: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            color: Colors.black26,
-            onPressed: () {
-              if (!isSearching) {
-                Navigator.pop(context);
-              } else {
-                setState(() {
-                  isSearching = false;
-                  searchQuery = '';
-                });
-              }
-            },
+          leftIcon: Container(
+            margin: const EdgeInsets.only(left: 10),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              color: Colors.black26,
+              onPressed: () {
+                if (!isSearching) {
+                  Navigator.pop(context);
+                } else {
+                  setState(() {
+                    isSearching = false;
+                    searchQuery = '';
+                  });
+                }
+              },
+            ),
           ),
           ftitle: isSearching
               ? AnimatedOpacity(
@@ -56,7 +60,7 @@ class _BodyFormListState extends State<BodyFormList> {
                   ),
                 )
               : const Text(
-                  'Body Form Customers',
+                  'My Customers',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -89,16 +93,17 @@ class _BodyFormListState extends State<BodyFormList> {
         // appBar: buildAppBar(),
         // listview from firestore collection
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream:
-              FirebaseFirestore.instance.collection("body_form").snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection("Users")
+              .where('cid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
+              .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
               final filteredData = snapshot.data!.docs.where((doc) {
-                final name = doc.data()['Name'].toString().toLowerCase();
-                final city = doc.data()['City'].toString().toLowerCase();
-                final phone =
-                    doc.data()['Phone (+91)'].toString().toLowerCase();
-                final email = doc.data()['Email'].toString().toLowerCase();
+                final name = doc.data()['name'].toString().toLowerCase();
+                final city = doc.data()['city'].toString().toLowerCase();
+                final phone = doc.data()['phone'].toString().toLowerCase();
+                final email = doc.data()['email'].toString().toLowerCase();
                 final searchLower = searchQuery.toLowerCase();
                 return name.contains(searchLower) ||
                     city.contains(searchLower) ||
@@ -110,22 +115,24 @@ class _BodyFormListState extends State<BodyFormList> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: filteredData.length,
                 itemBuilder: (context, index) {
-                  final phone =
-                      "+91${filteredData[index].data()['Phone (+91)']}";
-                  final isMale = filteredData[index].data()['Gender'] == 'Male';
-                  final timeStamp = filteredData[index]
-                      .data()['timestamp']
-                      .toDate()
-                      .toString();
-                  final name = filteredData[index].data()['Name'];
-                  final city = filteredData[index].data()['City'];
+                  final phone = "+91${filteredData[index].data()['phone']}";
+                  final isMale = filteredData[index].data()['gender'] == 'm';
+                  final timeStamp =
+                      filteredData[index].data()['created'].toDate().toString();
+                  final name = filteredData[index].data()['name'];
+                  final city = filteredData[index].data()['city'];
 
-                  final age = filteredData[index].data()['Age'];
-                  final weight = filteredData[index].data()['Weight'];
-                  final height = filteredData[index].data()['Height'];
+                  var age = filteredData[index].data()['dob'];
+                  // calculate age
+                  if (age != null) {
+                    age = DateTime.now().year -
+                        DateTime.parse(age.toDate().toString()).year;
+                  }
+                  final weight = filteredData[index].data()['Weight'] ?? '';
+                  final height = filteredData[index].data()['height'];
                   final medicalHistory =
                       filteredData[index].data()['Medical History'] ?? '';
-                  final email = filteredData[index].data()['Email'] ?? '';
+                  final email = filteredData[index].data()['email'] ?? '';
                   final id = filteredData[index].id;
 
                   return Slidable(
@@ -193,41 +200,61 @@ class _BodyFormListState extends State<BodyFormList> {
                       // key: const ValueKey(1),
                       children: [
                         SlidableAction(
-                          backgroundColor: Colors.red,
+                          backgroundColor:
+                              const Color.fromARGB(255, 125, 3, 207),
                           foregroundColor: Colors.white,
-                          icon: Icons.delete,
-                          label: 'Delete',
+                          icon: Icons.add,
+                          label: 'Check-up',
                           onPressed: (context) {
-                            showDialog(
-                              context: context,
-                              builder: (context) {
-                                return AlertDialog(
-                                  title: const Text('Delete'),
-                                  content: Text(
-                                      'Are you sure you want to remove $name?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                      },
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        FirebaseFirestore.instance
-                                            .collection('body_form')
-                                            .doc(id)
-                                            .delete();
-                                        Navigator.pop(context);
-                                      },
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
+                            // debugPrint('call');
                           },
                         ),
+                        SlidableAction(
+                          backgroundColor:
+                              const Color.fromARGB(255, 244, 155, 54),
+                          foregroundColor: Colors.black,
+                          icon: Icons.history,
+                          label: 'Products',
+                          onPressed: (context) {
+                            // debugPrint('call');
+                          },
+                        ),
+                        // SlidableAction(
+                        //   backgroundColor: Colors.red,
+                        //   foregroundColor: Colors.white,
+                        //   icon: Icons.delete,
+                        //   label: 'Delete',
+                        //   onPressed: (context) {
+                        //     showDialog(
+                        //       context: context,
+                        //       builder: (context) {
+                        //         return AlertDialog(
+                        //           title: const Text('Delete'),
+                        //           content: Text(
+                        //               'Are you sure you want to remove $name?'),
+                        //           actions: [
+                        //             TextButton(
+                        //               onPressed: () {
+                        //                 Navigator.pop(context);
+                        //               },
+                        //               child: const Text('Cancel'),
+                        //             ),
+                        //             TextButton(
+                        //               onPressed: () {
+                        //                 FirebaseFirestore.instance
+                        //                     .collection('body_form')
+                        //                     .doc(id)
+                        //                     .delete();
+                        //                 Navigator.pop(context);
+                        //               },
+                        //               child: const Text('Delete'),
+                        //             ),
+                        //           ],
+                        //         );
+                        //       },
+                        //     );
+                        //   },
+                        // ),
                       ],
                     ),
                     child: openCont(

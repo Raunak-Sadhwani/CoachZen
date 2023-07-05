@@ -126,8 +126,8 @@ class _MedicalHistoryState extends State<MedicalHistory> {
                               controllers.add(TextEditingController());
                             });
                           },
-                          child: Row(
-                            children: const [
+                          child: const Row(
+                            children: [
                               Icon(Icons.add),
                               SizedBox(width: 10),
                               Text('Add More'),
@@ -140,8 +140,8 @@ class _MedicalHistoryState extends State<MedicalHistory> {
                               controllers.removeAt(index);
                             });
                           },
-                          child: Row(
-                            children: const [
+                          child: const Row(
+                            children: [
                               Icon(Icons.remove),
                               SizedBox(width: 10),
                               Text('Remove'),
