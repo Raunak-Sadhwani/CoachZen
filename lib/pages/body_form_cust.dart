@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:slimtrap/components/ui/appbar.dart';
 
 class BodyFormCustomer extends StatefulWidget {
@@ -89,11 +91,22 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
   //   return null;
   // }
 
+  DateFormat formatter = DateFormat('dd MMM yyyy');
+
+  // capitalize first letter of each word
+  String capitalize(String value) {
+    return value
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
   List<Map<String, dynamic>> updateFields = [];
   late Map<String, dynamic> editedData = Map.from(widget.userData);
   late final Map<String, dynamic> originalData = Map.from(widget.userData);
-  late String tempValue;
-  void _editData(String key, String value) {
+  String tempValue = '';
+  String dialogTempValue = '';
+  void _editData(String key, dynamic value) {
     setState(() {
       editedData[key] = value;
     });
@@ -193,73 +206,154 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                 ),
               ),
               ...editedData.entries.map(
-                (entry) => Card(
-                  elevation: 10,
-                  key: ValueKey(entry.key),
-                  margin: const EdgeInsets.all(10),
-                  child: ListTile(
-                    minVerticalPadding: 15,
-                    leading: Icon(
-                      _getIcon(entry.key),
-                      color: Colors.black,
-                      size: 30,
+                (entry) {
+                  var key = entry.key;
+                  var value = entry.value;
+                  late dynamic age;
+                  if (key == 'dob') {
+                    age = value;
+                    // calculate age
+                    age = DateTime.now().year -
+                        DateTime.parse(age.toDate().toString()).year;
+                  }
+
+                  return Card(
+                    elevation: 10,
+                    key: ValueKey(entry.key),
+                    margin: const EdgeInsets.all(10),
+                    child: ListTile(
+                      minVerticalPadding: 15,
+                      leading: Icon(
+                        _getIcon(entry.key),
+                        color: Colors.black,
+                        size: 30,
+                      ),
+                      title: Text(
+                        entry.key == 'dob'
+                            ? capitalize('dob ($age years)')
+                            : capitalize(entry.key),
+                        style:
+                            const TextStyle(color: Colors.black, fontSize: 18),
+                      ),
+                      subtitle: Text(
+                        entry.value.runtimeType == Timestamp
+                            ? formatter.format(entry.value.toDate()).toString()
+                            : entry.value.toString(),
+                        style:
+                            const TextStyle(color: Colors.black, fontSize: 16),
+                      ),
+                      onTap: () {
+                        if (entry.key == 'created') {
+                          return;
+                        }
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            String dialogTempValue =
+                                entry.value.runtimeType == Timestamp
+                                    ? formatter
+                                        .format(entry.value.toDate())
+                                        .toString()
+                                    : entry.value.toString();
+                            return StatefulBuilder(
+                                builder: (context, StateSetter setState) {
+                              return AlertDialog(
+                                title: Text(entry.key),
+                                content: entry.key.toLowerCase().contains('dob')
+                                    ? InkWell(
+                                        onTap: () {
+                                          showDatePicker(
+                                            context: context,
+                                            initialDate: entry.value.toDate() ??
+                                                DateTime.now(),
+                                            firstDate: DateTime(1900),
+                                            lastDate: DateTime.now(),
+                                          ).then((selectedDate) {
+                                            if (selectedDate != null) {
+                                              String formattedDate =
+                                                  DateFormat('dd MMM yyyy')
+                                                      .format(selectedDate);
+                                              setState(() {
+                                                dialogTempValue = formattedDate;
+                                              });
+                                            }
+                                          });
+                                        },
+                                        child: InputDecorator(
+                                          decoration: const InputDecoration(
+                                            border: OutlineInputBorder(),
+                                            labelText: 'Select Date',
+                                          ),
+                                          child: Text(dialogTempValue),
+                                        ),
+                                      )
+                                    : TextFormField(
+                                        onChanged: (value) {
+                                          setState(() {
+                                            dialogTempValue = value;
+                                          });
+                                        },
+                                        initialValue: dialogTempValue,
+                                      ),
+                                actions: [
+                                  TextButton(
+                                    child: const Text('Save'),
+                                    onPressed: () {
+                                      if (entry.key == 'dob') {
+                                        // convert to Timestamp
+                                        DateTime selectedDateTime =
+                                            DateFormat('dd MMM yyyy')
+                                                .parse(dialogTempValue);
+                                        Timestamp selectedTimestamp =
+                                            Timestamp.fromDate(
+                                                selectedDateTime);
+                                        if (selectedTimestamp !=
+                                            originalData[entry.key]) {
+                                          _editData(
+                                              entry.key, selectedTimestamp);
+                                          // if not in updateFields then add
+                                          if (!updateFields.any((element) =>
+                                              element.containsKey(entry.key))) {
+                                            updateFields.add({
+                                              entry.key: editedData[entry.key],
+                                            });
+                                          } else {
+                                            updateFields.removeWhere(
+                                                (element) => element
+                                                    .containsKey(entry.key));
+                                          }
+                                        } else {
+                                          _editData(
+                                              entry.key, selectedTimestamp);
+                                          updateFields.removeWhere((element) =>
+                                              element.containsKey(entry.key));
+                                        }
+                                      } else {
+                                        _editData(entry.key, dialogTempValue);
+                                        // if not in updateFields then add
+                                        if (!updateFields.any((element) =>
+                                            element.containsKey(entry.key))) {
+                                          updateFields.add({
+                                            entry.key: editedData[entry.key],
+                                          });
+                                        } else {
+                                          updateFields.removeWhere((element) =>
+                                              element.containsKey(entry.key));
+                                        }
+                                      }
+                                      debugPrint(updateFields.toString());
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                ],
+                              );
+                            });
+                          },
+                        );
+                      },
                     ),
-                    title: Text(
-                      entry.key,
-                      style: const TextStyle(color: Colors.black, fontSize: 18),
-                    ),
-                    subtitle: Text(
-                      entry.value.toString(),
-                      style: const TextStyle(color: Colors.black, fontSize: 16),
-                    ),
-                    onTap: () {
-                      if (entry.key == 'created') {
-                        return;
-                      }
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return AlertDialog(
-                            title: Text(entry.key),
-                            content: TextFormField(
-                              onChanged: (value) {
-                                setState(() {
-                                  tempValue = value;
-                                });
-                              },
-                              initialValue: entry.value.toString(),
-                            ),
-                            actions: [
-                              TextButton(
-                                child: const Text('Save'),
-                                onPressed: () {
-                                  if (tempValue.isNotEmpty) {
-                                    if (tempValue != originalData[entry.key]) {
-                                      _editData(entry.key, tempValue);
-                                      updateFields.add({
-                                        entry.key: editedData[entry.key],
-                                      });
-                                    } else {
-                                      _editData(entry.key, tempValue);
-                                      updateFields.removeWhere((element) =>
-                                          element.containsKey(entry.key));
-                                    }
-                                  } else {
-                                    // Handle case when tempValue is empty
-                                    _editData(entry.key, tempValue);
-                                    updateFields.removeWhere((element) =>
-                                        element.containsKey(entry.key));
-                                  }
-                                  Navigator.of(context).pop();
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ),

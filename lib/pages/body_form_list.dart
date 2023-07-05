@@ -21,7 +21,7 @@ class _BodyFormListState extends State<BodyFormList> {
   String searchQuery = '';
   FocusNode searchFocusNode = FocusNode();
   double opacity = 0.0;
-
+  DateFormat formatter = DateFormat('dd MMM yyyy');
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,26 +139,17 @@ class _BodyFormListState extends State<BodyFormList> {
                   // remove any list dataytype from filteredData and any exceptionList keys, add to userData
                   List exceptionList = ["cid", "reg", "cname", "image"];
                   filteredData[index].data().forEach((key, value) {
-                    if (value.runtimeType == Timestamp) {
-                      // format date ('dd MMM yyyy')
-                      DateFormat formatter = DateFormat('dd MMM yyyy');
-                      value = formatter.format(value.toDate()).toString();
-                    }
-                    if (key == 'dob') {
-                      key = 'dob ($age yrs)';
-                    }
-
                     if (value.runtimeType != List &&
                         !exceptionList.contains(key)) {
                       userData[key] = value;
                     }
                     // if its last key, add id
-                    if (key == filteredData[index].data().keys.last &&
-                        !userData[key].contains('created'.toLowerCase())) {
-                      String cr = userData['created'].toString();
-                      userData.remove('created');
-                      userData['created'] = cr;
-                    }
+                    // if (key == filteredData[index].data().keys.last &&
+                    //     !userData[key].toLowerCase().contains('created')) {
+                    //   Timestamp cr = userData['created'];
+                    //   userData.remove('created');
+                    //   userData['created'] = cr;
+                    // }
                   });
                   //  created key already exists in userData, make it last
 
