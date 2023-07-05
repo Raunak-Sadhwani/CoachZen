@@ -6,7 +6,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:slimtrap/pages/body_form_cust.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
 
 class BodyFormList extends StatefulWidget {
@@ -120,7 +120,7 @@ class _BodyFormListState extends State<BodyFormList> {
                   final timeStamp =
                       filteredData[index].data()['created'].toDate().toString();
                   final name = filteredData[index].data()['name'];
-                  final city = filteredData[index].data()['city'];
+                  // final city = filteredData[index].data()['city'];
 
                   var age = filteredData[index].data()['dob'];
                   // calculate age
@@ -128,12 +128,43 @@ class _BodyFormListState extends State<BodyFormList> {
                     age = DateTime.now().year -
                         DateTime.parse(age.toDate().toString()).year;
                   }
-                  final weight = filteredData[index].data()['Weight'] ?? '';
-                  final height = filteredData[index].data()['height'];
-                  final medicalHistory =
-                      filteredData[index].data()['Medical History'] ?? '';
-                  final email = filteredData[index].data()['email'] ?? '';
-                  final id = filteredData[index].id;
+                  // final weight = filteredData[index].data()['Weight'] ?? '';
+                  // final height = filteredData[index].data()['height'];
+                  // final medicalHistory =
+                  //     filteredData[index].data()['Medical History'] ?? '';
+                  // final email = filteredData[index].data()['email'] ?? '';
+                  // final id = filteredData[index].id;
+
+                  Map<String, dynamic> userData = {};
+                  // remove any list dataytype from filteredData and any exceptionList keys, add to userData
+                  List exceptionList = ["cid", "reg", "cname", "image"];
+                  filteredData[index].data().forEach((key, value) {
+                    if (value.runtimeType == Timestamp) {
+                      // format date ('dd MMM yyyy')
+                      DateFormat formatter = DateFormat('dd MMM yyyy');
+                      value = formatter.format(value.toDate()).toString();
+                    }
+                    if (key == 'dob') {
+                      key = 'dob ($age yrs)';
+                    }
+
+                    if (value.runtimeType != List &&
+                        !exceptionList.contains(key)) {
+                      userData[key] = value;
+                    }
+                    // if its last key, add id
+                    if (key == filteredData[index].data().keys.last &&
+                        !userData[key].contains('created'.toLowerCase())) {
+                      String cr = userData['created'].toString();
+                      userData.remove('created');
+                      userData['created'] = cr;
+                    }
+                  });
+                  //  created key already exists in userData, make it last
+
+                  // sort userData keys
+                  // userData = Map.fromEntries(userData.entries.toList()
+                  //   ..sort((a, b) => a.key.compareTo(b.key)));
 
                   return Slidable(
                     startActionPane: ActionPane(
@@ -258,19 +289,7 @@ class _BodyFormListState extends State<BodyFormList> {
                       ],
                     ),
                     child: openCont(
-                      page: BodyFormCustomer(
-                        name: name,
-                        phone: phone.toString(),
-                        isMale: isMale,
-                        timeStamp: timeStamp,
-                        age: age.toString(),
-                        email: email,
-                        medicalHistory: medicalHistory,
-                        weight: weight.toString(),
-                        height: height.toString(),
-                        id: id,
-                        city: city,
-                      ),
+                      page: BodyFormCustomer(userData: userData),
                       child: ListTile(
                         leading: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
