@@ -26,10 +26,43 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+   void updateText() {
+    final now = DateTime.now();
+    final hour = now.hour;
+
+    if (hour >= 6 && hour < 12) {
+      setState(() {
+        day = 'Morning';
+      });
+    } else if (hour >= 12 && hour < 18) {
+      setState(() {
+        day = 'Afternoon';
+      });
+    } else if (hour >= 18 && hour < 24) {
+      setState(() {
+        day = 'Evening';
+      });
+    } else {
+      setState(() {
+        day = 'Night';
+      });
+    }
+  }
+  late String day;
+
+  User? user = FirebaseAuth.instance.currentUser;
+  String capitalize(String value) {
+    return value
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
   @override
   void initState() {
     super.initState();
     checkAuth();
+    updateText();
   }
 
   @override
@@ -83,7 +116,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                           TextSpan(
-                            text: 'Rohit!',
+                            text: capitalize('${user!.displayName}!'),
                             style: GoogleFonts.raleway(
                               color: Colors.black,
                               fontSize: 24,
@@ -95,7 +128,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     SizedBox(height: height * 0.01),
                     Text(
-                      'Good Morning, welcome back!',
+                      'Good ${day}, welcome back!',
                       style: GoogleFonts.montserrat(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -127,13 +160,6 @@ class _HomePageState extends State<HomePage> {
                       page: const FormPage(),
                       imgPath: 'lib/assets/meas.jpg',
                       label1: 'New',
-                      label2: 'Customers'),
-                  HomeButton(
-                      height: height,
-                      width: width,
-                      page: const BodyFormList(),
-                      imgPath: 'lib/assets/focus.png',
-                      label1: 'My',
                       label2: 'Customers'),
                 ],
               )

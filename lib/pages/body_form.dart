@@ -4,6 +4,7 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:slimtrap/pages/home.dart';
 import '../components/body_form/body_form_1.dart';
 import '../components/body_form/body_form_2.dart';
 import '../components/body_form/body_form_3.dart';
@@ -137,6 +138,7 @@ class _FormPageState extends State<FormPage> {
           // );
           return debugPrint('BodyForm2 validation failed');
         }
+
         List<Map<String, dynamic>> allFields = [
           ...BodyForm.allFields,
           ...BodyForm2.allFields,
@@ -154,22 +156,28 @@ class _FormPageState extends State<FormPage> {
             value = field['controller'].text;
           }
           String label = field['label'];
-          if (label.contains('(')) {
+          if (!BodyForm2.fields.any((element) => element['label'] == label) &&
+              label.contains('(')) {
             // split label by '('
             label = label.split('(')[0].trim();
           }
-          label = label.toLowerCase();
           //  BodyForm2.fields is datatype of List<Map<String, dynamic>>
           // if label contains any of BodyForm2.fields label, add to measurements
-          if (BodyForm2.fields.any((element) => element['label'] == label)) {
+          if (value.runtimeType == String) {
+            value = value.trim();
+          }
+          if (BodyForm2.fields.any((element) => element['label'] == label) ||
+              label.toLowerCase().contains('weight')) {
             // if measurements doesn't already contain label, add to measurements
-            if (!measurements.any((element) => element['label'] == label)) {
-              measurements.add({
-                label: value,
-              });
+            label = label.toLowerCase();
+            if (measurements.isNotEmpty) {
+              measurements.last[label] = value;
+            } else {
+              measurements.add({label: value});
             }
             continue;
           } else {
+            label = label.toLowerCase();
             data[label] = value;
           }
         }
@@ -180,10 +188,18 @@ class _FormPageState extends State<FormPage> {
           User? coach = FirebaseAuth.instance.currentUser;
           // add timestamp of firestore
           data['created'] = timestamp;
-          measurements.add({'date': DateTime.now()});
+          measurements.last['date'] = DateTime.now();
           data['measurements'] = measurements;
           data['reg'] = 'false';
           data['cid'] = coach!.uid;
+          // convert age to date of birth
+          int age = data['age'];
+          DateTime currentDate = DateTime.now();
+          DateTime dob = DateTime(
+              currentDate.year - age, currentDate.month, currentDate.day);
+          data['dob'] = dob;
+          // remove age from data
+          data.remove('age');
           debugPrint(data.toString());
 
           // Create a Firestore document reference
@@ -193,7 +209,26 @@ class _FormPageState extends State<FormPage> {
           await docRef.add(
             data,
           );
-          Flushbar(
+          // clear all fields
+          for (var field in allFields) {
+            String label = field['label'];
+            if (!label.toLowerCase().contains('age') &&
+                !label.toLowerCase().contains('weight')) {
+              field['controller'].clear();
+            }
+          }
+          controller.animateToPage(
+            1,
+            duration: const Duration(milliseconds: 410),
+            curve: Curves.easeIn,
+          );
+          // if keybord is open, close it
+          FocusScope.of(context).unfocus();
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+          return Flushbar(
             margin: const EdgeInsets.all(7),
             borderRadius: BorderRadius.circular(15),
             flushbarStyle: FlushbarStyle.FLOATING,
@@ -204,10 +239,9 @@ class _FormPageState extends State<FormPage> {
               size: 28.0,
               color: Colors.green[300],
             ),
-            duration: const Duration(milliseconds: 1500),
+            duration: const Duration(milliseconds: 2000),
             leftBarIndicatorColor: Colors.green[300],
           ).show(context);
-          return Navigator.pop(context);
         } catch (e) {
           // SnackBar
           ScaffoldMessenger.of(context).showSnackBar(

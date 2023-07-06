@@ -110,6 +110,13 @@ class _BodyFormListState extends State<BodyFormList> {
                     phone.contains(searchLower) ||
                     email.contains(searchLower);
               }).toList();
+              filteredData.sort((a, b) {
+                final dateA = a.data()['created'];
+                final dateB = b.data()['created'];
+                return dateB
+                    .toDate()
+                    .compareTo(dateA.toDate()); // Compare in reverse order
+              });
 
               return ListView.builder(
                 physics: const BouncingScrollPhysics(),
@@ -122,12 +129,8 @@ class _BodyFormListState extends State<BodyFormList> {
                   final name = filteredData[index].data()['name'];
                   // final city = filteredData[index].data()['city'];
 
-                  var age = filteredData[index].data()['dob'];
-                  // calculate age
-                  if (age != null) {
-                    age = DateTime.now().year -
-                        DateTime.parse(age.toDate().toString()).year;
-                  }
+                  var age = filteredData[index].data()['age'];
+
                   String? image = filteredData[index].data()['image'];
                   // final weight = filteredData[index].data()['Weight'] ?? '';
                   // final height = filteredData[index].data()['height'];
@@ -152,7 +155,12 @@ class _BodyFormListState extends State<BodyFormList> {
                       userData['created'] = cr;
                     }
                   });
-                  List toBeOnTop = ["name", "phone", "city", "dob"];
+                  List toBeOnTop = ["name", "phone", "city"];
+                  if (age != null) {
+                    toBeOnTop.add("age");
+                  } else {
+                    toBeOnTop.add("dob");
+                  }
                   userData = Map.fromEntries([
                     ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
                     ...userData.entries
