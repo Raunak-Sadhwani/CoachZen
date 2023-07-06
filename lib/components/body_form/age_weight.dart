@@ -8,9 +8,11 @@ class VCard extends StatefulWidget {
   final String title;
   final Function(String) fn;
   final TextEditingController controller;
+  final bool? readonly;
 
   const VCard({
     Key? key,
+    this.readonly,
     required this.title,
     required this.fn,
     required this.value,
@@ -36,6 +38,7 @@ class _VCardState extends State<VCard> {
             )),
         const SizedBox(height: 10),
         TextField(
+          readOnly: widget.readonly ?? false,
           keyboardType: TextInputType.number,
           maxLength: 5,
           controller: widget.controller,

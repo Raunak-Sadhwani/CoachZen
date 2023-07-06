@@ -1,3 +1,4 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import '../ui/app_colors.dart';
 import 'age_weight.dart';
@@ -9,11 +10,17 @@ class BodyForm extends StatefulWidget {
   // final VoidCallback detailsSubmitted;
   final ValueChanged<bool> pageChange;
   final PageController? controller;
+  final String? age;
+  final double? heightParam;
+  final bool? gender;
   // final Function(List<Map<String, dynamic>>) onSubmit;
   const BodyForm({
     Key? key,
     this.controller,
     required this.pageChange,
+    this.age,
+    this.heightParam,
+    this.gender,
     // required this.onSubmit,
     // required this.detailsSubmitted,
   }) : super(key: key);
@@ -26,6 +33,8 @@ class BodyForm extends StatefulWidget {
       TextEditingController(text: '25');
   static TextEditingController weightController =
       TextEditingController(text: '60.0');
+  // void init
+
   static double height = 170;
   static bool isMale = true;
 
@@ -51,6 +60,28 @@ class BodyForm extends StatefulWidget {
 }
 
 class _BodyFormState extends State<BodyForm> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.heightParam != null) {
+      BodyForm.height = widget.heightParam!;
+    }
+    if (widget.age != null) {
+      BodyForm.ageController.text = widget.age!;
+    }
+    if (widget.gender != null) {
+      BodyForm.isMale = widget.gender!;
+    }
+  }
+
+  @override
+  void dispose() {
+    BodyForm.ageController.text = '25';
+    BodyForm.height = 170;
+    BodyForm.isMale = true;
+    super.dispose();
+  }
+
   final double minValue = 100; // minimum height value in cms
   final double maxValue = 220; // maximum height value in cms
   final double step = 1; // step value for the height picker
@@ -67,10 +98,30 @@ class _BodyFormState extends State<BodyForm> {
     void calc(calc, title) {
       setState(() {
         if (title == 'age') {
-          if (calc == 'add') {
-            ageController.text = (int.parse(ageController.text) + 1).toString();
+          if (widget.age == null) {
+            if (calc == 'add') {
+              ageController.text =
+                  (int.parse(ageController.text) + 1).toString();
+            } else {
+              ageController.text =
+                  (int.parse(ageController.text) - 1).toString();
+            }
           } else {
-            ageController.text = (int.parse(ageController.text) - 1).toString();
+            Flushbar(
+              margin: const EdgeInsets.all(7),
+              borderRadius: BorderRadius.circular(15),
+              flushbarStyle: FlushbarStyle.FLOATING,
+              flushbarPosition: FlushbarPosition.BOTTOM,
+              message:
+                  "Age is already set, change it from the user's profile page",
+              icon: Icon(
+                Icons.error_outline_rounded,
+                size: 28.0,
+                color: Colors.red[300],
+              ),
+              duration: const Duration(milliseconds: 3000),
+              leftBarIndicatorColor: Colors.red[300],
+            ).show(context);
           }
         } else {
           if (calc == 'add') {
@@ -87,15 +138,33 @@ class _BodyFormState extends State<BodyForm> {
     }
 
     void setHeight(DragUpdateDetails details) {
-      final double delta = -details.delta.dx;
-      setState(() {
-        BodyForm.height = math.max(
-            minValue,
-            math.min(
-                maxValue,
-                BodyForm.height +
-                    delta / (width / ((maxValue - minValue) / step))));
-      });
+      if (widget.heightParam == null) {
+        final double delta = -details.delta.dx;
+        setState(() {
+          BodyForm.height = math.max(
+              minValue,
+              math.min(
+                  maxValue,
+                  BodyForm.height +
+                      delta / (width / ((maxValue - minValue) / step))));
+        });
+      } else {
+        Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.BOTTOM,
+          message:
+              "Height is already set, change it from the user's profile page",
+          icon: Icon(
+            Icons.error_outline_rounded,
+            size: 28.0,
+            color: Colors.red[300],
+          ),
+          duration: const Duration(milliseconds: 3000),
+          leftBarIndicatorColor: Colors.red[300],
+        ).show(context);
+      }
       // BodyForm.height = height;
     }
 
@@ -144,26 +213,46 @@ class _BodyFormState extends State<BodyForm> {
                     Expanded(
                       child: VCard(
                         value: ageController.text,
+                        readonly: widget.age != null,
                         title: 'Age',
                         fn: (oper) {
-                          if ((oper == 'add' || oper == 'sub') &&
-                              !(int.parse(ageController.text) > 100 ||
-                                  int.parse(ageController.text) < 1)) {
-                            calc(oper, 'age');
+                          if (widget.age == null &&
+                              widget.heightParam == null) {
+                            if ((oper == 'add' || oper == 'sub') &&
+                                !(int.parse(ageController.text) > 100 ||
+                                    int.parse(ageController.text) < 1)) {
+                              calc(oper, 'age');
+                            } else {
+                              setState(() {
+                                if (int.parse(ageController.text) > 100 ||
+                                    int.parse(ageController.text) < 1) {
+                                  ageController.text = ageController.text
+                                      .substring(
+                                          0, ageController.text.length - 1);
+                                } else {
+                                  ageController.text = oper;
+                                }
+                                ageController.selection =
+                                    TextSelection.fromPosition(TextPosition(
+                                        offset: ageController.text.length));
+                              });
+                            }
                           } else {
-                            setState(() {
-                              if (int.parse(ageController.text) > 100 ||
-                                  int.parse(ageController.text) < 1) {
-                                ageController.text = ageController.text
-                                    .substring(
-                                        0, ageController.text.length - 1);
-                              } else {
-                                ageController.text = oper;
-                              }
-                              ageController.selection =
-                                  TextSelection.fromPosition(TextPosition(
-                                      offset: ageController.text.length));
-                            });
+                            Flushbar(
+                              margin: const EdgeInsets.all(7),
+                              borderRadius: BorderRadius.circular(15),
+                              flushbarStyle: FlushbarStyle.FLOATING,
+                              flushbarPosition: FlushbarPosition.BOTTOM,
+                              message:
+                                  "Age is already set, change it from the user's profile page",
+                              icon: Icon(
+                                Icons.error_outline_rounded,
+                                size: 28.0,
+                                color: Colors.red[300],
+                              ),
+                              duration: const Duration(milliseconds: 3000),
+                              leftBarIndicatorColor: Colors.red[300],
+                            ).show(context);
                           }
                         },
                         controller: ageController,
@@ -176,35 +265,38 @@ class _BodyFormState extends State<BodyForm> {
                         title: 'Weight',
                         fn: (oper) {
                           String weightText = weightController.text.trim();
-                          if ((oper == 'add' || oper == 'sub') &&
-                              !(double.parse(weightText) < 31 ||
-                                  double.parse(weightText) > 300)) {
-                            calc(oper, 'weight');
-                          } else {
-                            setState(() {
-                              // proper regex for weight
-                              try {
-                                if (!RegExp(r'^\d{0,3}(\.\d{0,1})?$')
-                                        .hasMatch(weightText) ||
-                                    weightText.contains(' ')) {
-                                  weightController.text = weightController.text
-                                      .substring(
-                                          0, weightController.text.length - 1);
-                                } else {
-                                  if ((weightText.isEmpty ||
-                                          double.tryParse(weightText) !=
-                                              null) &&
-                                      (oper != 'add' && oper != 'sub')) {
-                                    weightController.text = oper;
+                          {
+                            if ((oper == 'add' || oper == 'sub') &&
+                                !(double.parse(weightText) < 31 ||
+                                    double.parse(weightText) > 300)) {
+                              calc(oper, 'weight');
+                            } else {
+                              setState(() {
+                                // proper regex for weight
+                                try {
+                                  if (!RegExp(r'^\d{0,3}(\.\d{0,1})?$')
+                                          .hasMatch(weightText) ||
+                                      weightText.contains(' ')) {
+                                    weightController.text =
+                                        weightController.text.substring(0,
+                                            weightController.text.length - 1);
+                                  } else {
+                                    if ((weightText.isEmpty ||
+                                            double.tryParse(weightText) !=
+                                                null) &&
+                                        (oper != 'add' && oper != 'sub')) {
+                                      weightController.text = oper;
+                                    }
                                   }
+                                  weightController.selection =
+                                      TextSelection.fromPosition(TextPosition(
+                                          offset:
+                                              weightController.text.length));
+                                } catch (e) {
+                                  weightController.text = '31';
                                 }
-                                weightController.selection =
-                                    TextSelection.fromPosition(TextPosition(
-                                        offset: weightController.text.length));
-                              } catch (e) {
-                                weightController.text = '31';
-                              }
-                            });
+                              });
+                            }
                           }
                         },
                         controller: weightController,
@@ -247,9 +339,27 @@ class _BodyFormState extends State<BodyForm> {
                 SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                 GenderSwitch(
                   onGenderChanged: (bool value) {
-                    setState(() {
-                      BodyForm.isMale = value;
-                    });
+                    if (widget.gender == null) {
+                      setState(() {
+                        BodyForm.isMale = value;
+                      });
+                    } else {
+                      Flushbar(
+                        margin: const EdgeInsets.all(7),
+                        borderRadius: BorderRadius.circular(15),
+                        flushbarStyle: FlushbarStyle.FLOATING,
+                        flushbarPosition: FlushbarPosition.BOTTOM,
+                        message:
+                            "Gender is already set, change it from the user's profile page",
+                        icon: Icon(
+                          Icons.error_outline_rounded,
+                          size: 28.0,
+                          color: Colors.red[300],
+                        ),
+                        duration: const Duration(milliseconds: 3000),
+                        leftBarIndicatorColor: Colors.red[300],
+                      ).show(context);
+                    }
                   },
                   isMale: BodyForm.isMale,
                 ),

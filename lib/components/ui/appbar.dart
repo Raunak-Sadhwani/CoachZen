@@ -8,9 +8,11 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? rightIcons;
   final String? title;
   final Widget? ftitle;
+  final int? elevation;
   const MyAppBar({
     super.key,
     this.leftIcon,
+    this.elevation,
     this.rightIcons,
     this.ftitle,
     this.title,
@@ -20,7 +22,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       centerTitle: true,
-      elevation: 0,
+      elevation: elevation?.toDouble() ?? 0,
       leading: leftIcon,
       title: ftitle ??
           Text(

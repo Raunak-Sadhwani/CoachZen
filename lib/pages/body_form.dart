@@ -12,7 +12,22 @@ import '../components/body_form/form_fields.dart';
 import '../components/ui/appbar.dart';
 
 class FormPage extends StatefulWidget {
-  const FormPage({Key? key}) : super(key: key);
+  final double? height;
+  final String? age;
+  final bool? gender;
+  final List<Map<String, dynamic>>? measurements;
+  final String? name;
+  final String? uid;
+
+  const FormPage(
+      {Key? key,
+      this.height,
+      this.age,
+      this.gender,
+      this.measurements,
+      this.uid,
+      this.name})
+      : super(key: key);
 
   @override
   State<FormPage> createState() => _FormPageState();
@@ -26,6 +41,10 @@ class _FormPageState extends State<FormPage> {
   int currentPage = 0;
   int totalPages = 3;
   bool notChangePage = false;
+
+  bool isUser() {
+    return widget.uid != null && widget.uid!.isNotEmpty;
+  }
 
   void handleChangePage(bool newValue) {
     setState(() {
@@ -47,6 +66,11 @@ class _FormPageState extends State<FormPage> {
         currentPage = controller.page?.round() ?? 0;
       });
     });
+    if (isUser()) {
+      setState(() {
+        totalPages = 2;
+      });
+    }
   }
 
   @override
@@ -70,7 +94,7 @@ class _FormPageState extends State<FormPage> {
             },
           ),
         ),
-        title: 'Body Form',
+        title: 'Body Form ${isUser() ? 'of ${widget.name}' : ''}',
       ),
       body: Stack(
         children: [
@@ -89,14 +113,19 @@ class _FormPageState extends State<FormPage> {
                   pageChange: (bool value) {
                     handleChangePage(value);
                   },
+                  age: widget.age,
+                  heightParam: widget.height,
+                  gender: widget.gender,
                 ),
                 BodyForm2(
                   formKey: formKey,
+                  onSubmit: isUser() ? onSubmitUser : null,
                 ),
-                BodyForm3(
-                  onSubmit: onSubmit,
-                  formKey: formKey2,
-                )
+                if (!isUser())
+                  BodyForm3(
+                    onSubmit: onSubmit,
+                    formKey: formKey2,
+                  )
               ],
             ),
           ),
@@ -215,7 +244,6 @@ class _FormPageState extends State<FormPage> {
           data['dob'] = dob;
           // remove age from data
           data.remove('age');
-          debugPrint(data.toString());
 
           // Create a Firestore document reference
           final docRef = FirebaseFirestore.instance.collection('Users');
@@ -289,5 +317,231 @@ class _FormPageState extends State<FormPage> {
       );
       return debugPrint('Form1 validation failed');
     }
+  }
+
+  onSubmitUser() async {
+    bool formOneIsValid = formKey.currentState?.validate() ?? false;
+    if (formOneIsValid) {
+      List<Map<String, dynamic>> allFields = [
+        // BodyForm.weightController add to allFields
+        BodyForm.allFields[1],
+        ...BodyForm2.allFields,
+      ];
+      Map<String, dynamic> data = {};
+      for (var field in allFields) {
+        dynamic value = field['controller'].text;
+        if (int.tryParse(field['controller'].text) != null) {
+          value = int.parse(field['controller'].text);
+        } else if (double.tryParse(field['controller'].text) != null) {
+          value = double.parse(field['controller'].text);
+        } else {
+          value = field['controller'].text;
+        }
+        if (field['label'].toLowerCase().contains('weight')) {
+          data[field['label'].toLowerCase()] = value;
+        } else {
+          data[field['label']] = value;
+        }
+      }
+      data['date'] = DateTime.now();
+
+      widget.measurements!.add(data);
+
+      final docRef = FirebaseFirestore.instance.collection('Users');
+      try {
+        await docRef.doc(widget.uid).update({
+          'measurements': widget.measurements,
+        });
+        for (var field in allFields) {
+          String label = field['label'];
+          if (!label.toLowerCase().contains('age') &&
+              !label.toLowerCase().contains('weight')) {
+            field['controller'].clear();
+          }
+        }
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (Route<dynamic> route) => false,
+        );
+        return Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.BOTTOM,
+          message: "User added successfully!",
+          icon: Icon(
+            Icons.check_circle_outline,
+            size: 28.0,
+            color: Colors.green[300],
+          ),
+          duration: const Duration(milliseconds: 2000),
+          leftBarIndicatorColor: Colors.green[300],
+        ).show(context);
+      } catch (e) {
+        // SnackBar
+        Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.BOTTOM,
+          message: "Something went wrong!",
+          icon: Icon(
+            Icons.error_outline,
+            size: 28.0,
+            color: Colors.red[300],
+          ),
+          duration: const Duration(milliseconds: 2000),
+          leftBarIndicatorColor: Colors.red[300],
+        ).show(context);
+        return debugPrint(e.toString());
+      }
+    }
+  }
+}
+
+class FormPageWrapper extends StatelessWidget {
+  final double? heightx;
+  final String? age;
+  final bool? gender;
+  final List<Map<String, dynamic>>? measurements;
+  final String? name;
+  final String? uid;
+  const FormPageWrapper(
+      {Key? key,
+      this.heightx,
+      this.age,
+      this.gender,
+      this.measurements,
+      this.uid,
+      this.name})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    double height = MediaQuery.of(context).size.height;
+    double width = MediaQuery.of(context).size.width;
+    return Scaffold(
+      appBar: MyAppBar(
+        // avatar
+        leftIcon: Container(
+          margin: const EdgeInsets.only(left: 10),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back_ios),
+            color: Colors.black26,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ),
+        title: 'Select An Option',
+      ),
+      body: Center(
+        child: Padding(
+          padding: EdgeInsets.all(width * 0.1),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              HomeButton(
+                  height: height,
+                  width: width,
+                  page: FormPage(
+                    age: age,
+                    height: heightx,
+                    measurements: measurements,
+                    uid: uid,
+                    name: name,
+                    gender: gender,
+                  ),
+                  colors: const [
+                    // pink
+                    Color(0xffFF6E6E),
+                    Color(0xffFFA6A6),
+                  ],
+                  label1: 'Full Body',
+                  label2: 'Check-up'),
+              HomeButton(
+                  height: height,
+                  width: width,
+                  colors: [
+                    Colors.blueAccent.shade700,
+                    Colors.blue.shade300,
+                  ],
+                  page: Container(),
+                  label1: 'Add ',
+                  label2: 'Weight'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeButton extends StatelessWidget {
+  final double height;
+  final double width;
+  final String label1;
+  final String label2;
+  final Widget page;
+  final List<Color> colors;
+
+  const HomeButton(
+      {Key? key,
+      required this.height,
+      required this.width,
+      required this.label1,
+      required this.label2,
+      required this.page,
+      required this.colors})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: height * 0.1),
+      height: height * 0.2,
+      child: Card(
+        elevation: 10,
+        child: OpenContainerWrapper(
+          page: page,
+          content: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label1,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  label2,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

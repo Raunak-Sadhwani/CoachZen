@@ -26,7 +26,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-   void updateText() {
+  void updateText() {
     final now = DateTime.now();
     final hour = now.hour;
 
@@ -48,6 +48,7 @@ class _HomePageState extends State<HomePage> {
       });
     }
   }
+
   late String day;
 
   User? user = FirebaseAuth.instance.currentUser;
@@ -128,7 +129,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     SizedBox(height: height * 0.01),
                     Text(
-                      'Good ${day}, welcome back!',
+                      'Good $day, welcome back!',
                       style: GoogleFonts.montserrat(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -144,7 +145,7 @@ class _HomePageState extends State<HomePage> {
                       height: height,
                       width: width,
                       imgPath: 'lib/assets/meas.jpg',
-                      page: const FormPage(),
+                      page: const FormPageWrapper(),
                       label1: 'Customer',
                       label2: 'Check-up'),
                   HomeButton(

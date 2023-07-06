@@ -5,9 +5,11 @@ import '../ui/app_colors.dart';
 // ignore: must_be_immutable
 class BodyForm2 extends StatefulWidget {
   final GlobalKey<FormState> formKey;
+  final VoidCallback? onSubmit;
   const BodyForm2({
     Key? key,
     required this.formKey,
+    this.onSubmit,
   }) : super(key: key);
 
   @override
@@ -61,16 +63,21 @@ class _BodyForm2State extends State<BodyForm2>
     super.build(context);
     return Scaffold(
         backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Form(
-            key: widget.formKey,
-            child: FormFields(
-              fields: BodyForm2.fields,
-              validator: _validateField,
-            ),
-          )),
-    );
+        body: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Form(
+              key: widget.formKey,
+              child: FormFields(
+                fields: BodyForm2.fields,
+                validator: _validateField,
+              ),
+            )),
+        floatingActionButton: widget.onSubmit != null
+            ? FloatingActionButton(
+                onPressed: widget.onSubmit,
+                child: const Icon(Icons.check),
+              )
+            : null);
   }
 
   String? _validateField(String? value, String label) {

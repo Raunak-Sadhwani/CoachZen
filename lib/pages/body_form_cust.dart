@@ -33,10 +33,10 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data!.exists) {
+            final user = snapshot.data!.data();
             // Map<String, dynamic> updateFields = {};
             // Map<String, dynamic> editedData = {};
             // Map<String, dynamic> originalData = {};
-            final user = snapshot.data!.data();
             Map<String, dynamic> userData = {};
             // remove any list dataytype from filteredData and any exceptionList keys, add to userData
             List exceptionList = ["cid", "reg", "cname", "image"];
@@ -60,13 +60,11 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             List<Map<String, dynamic>> measurements = [];
             List<Map<String, dynamic>> products = [];
             List medicalHistory = user['medicalHistory'] ?? [];
-            String name = user['name'];
             String? image = user['image'];
 
             if (user['measurements'] != null) {
               measurements = (user['measurements'] as List)
                   .cast<Map<String, dynamic>>()
-                  .map((e) => {...e, 'date': formatDate(e['date'])})
                   .toList()
                 ..forEach((e) {
                   final weight = {'weight': e['weight']};
@@ -152,6 +150,14 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
           ? (originalData['height'] - 104)
           : (originalData['height'] - 106);
     }
+    DateTime selectedDate = DateTime.parse(widget.userData['dob'].toDate().toString());
+    DateTime currentDate = DateTime.now();
+    int age = currentDate.year - selectedDate.year;
+    if (currentDate.month < selectedDate.month ||
+        (currentDate.month == selectedDate.month &&
+            currentDate.day < selectedDate.day)) {
+      age--;
+    }
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     return GestureDetector(
@@ -210,6 +216,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                               imgPath: 'lib/assets/weights.png',
                               label: 'Weight',
                               page: WHistory(
+                                age: age.toString(),
+                                gender:widget.userData['gender'],
+                                height: double.parse(widget.userData['height'].toString()),
                                 name: widget.userData['name'].split(' ')[0],
                                 colors: [
                                   const Color(0xff5fbffa),
@@ -219,6 +228,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                 ],
                                 measurements: widget.measurements,
                                 idealweight: idealweight,
+                                uid: widget.uid,
                               ),
                             ),
                             CustButton(
@@ -247,7 +257,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             width: width,
                             onPressed: () {},
                             imgPath: 'lib/assets/focus.png',
-                            label: 'Plan',
+                            label: 'Meds',
                             page: CustMedHist(
                               name: widget.userData['name'].split(' ')[0],
                               uid: widget.uid,
@@ -270,20 +280,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
               ),
               ...editedData.entries.map(
                 (entry) {
-                  var key = entry.key;
-                  var value = entry.value;
-                  late dynamic age;
-                  if (key == 'dob') {
-                    DateTime selectedDate =
-                        DateTime.parse(value.toDate().toString());
-                    DateTime currentDate = DateTime.now();
-                    age = currentDate.year - selectedDate.year;
-                    if (currentDate.month < selectedDate.month ||
-                        (currentDate.month == selectedDate.month &&
-                            currentDate.day < selectedDate.day)) {
-                      age--;
-                    }
-                  }
+                  // var key = entry.key;
+                  // var value = entry.value;
+                  // if (key == 'dob') {}
 
                   return GestureDetector(
                     child: Card(
@@ -551,6 +550,20 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                     ).show(scaffoldKey.currentContext!);
                   } catch (error) {
                     debugPrint('Error updating user properties: $error');
+                    return Flushbar(
+                      margin: const EdgeInsets.all(7),
+                      borderRadius: BorderRadius.circular(15),
+                      flushbarStyle: FlushbarStyle.FLOATING,
+                      flushbarPosition: FlushbarPosition.BOTTOM,
+                      message: "Something went wrong",
+                      icon: Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 28.0,
+                        color: Colors.red[300],
+                      ),
+                      duration: const Duration(milliseconds: 1500),
+                      leftBarIndicatorColor: Colors.red[300],
+                    ).show(scaffoldKey.currentContext!);
                   }
                   // updateUserProperties(userId, updatedData);
                   // updateUser();
