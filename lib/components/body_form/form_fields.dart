@@ -31,7 +31,10 @@ class FormFields extends StatelessWidget {
                 UICard(
                   width: width,
                   children: [
-                    if (!field['label'].toString().contains('Medical'))
+                    if (!field['label']
+                        .toString()
+                        .toLowerCase()
+                        .contains('medical'))
                       TextFormField(
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         controller: field['controller'],
@@ -71,6 +74,8 @@ class FormFields extends StatelessWidget {
 
 class MedicalHistory extends StatefulWidget {
   final String title;
+  static List<TextEditingController> controllers = [TextEditingController()];
+  static bool show = false;
 
   const MedicalHistory({Key? key, required this.title}) : super(key: key);
 
@@ -79,8 +84,6 @@ class MedicalHistory extends StatefulWidget {
 }
 
 class _MedicalHistoryState extends State<MedicalHistory> {
-  bool show = false;
-  List<TextEditingController> controllers = [TextEditingController()];
 
   @override
   Widget build(BuildContext context) {
@@ -93,19 +96,19 @@ class _MedicalHistoryState extends State<MedicalHistory> {
             Text(widget.title),
             // checkbox
             Checkbox(
-              value: show,
+              value: MedicalHistory.show,
               onChanged: (value) {
                 setState(() {
-                  show = value!;
+                  MedicalHistory.show = value!;
                 });
               },
             ),
           ],
         ),
-        if (show)
+        if (MedicalHistory.show)
           ListView.builder(
             shrinkWrap: true,
-            itemCount: controllers.length,
+            itemCount: MedicalHistory.controllers.length,
             itemBuilder: (BuildContext context, int index) {
               return Column(
                 children: [
@@ -113,7 +116,7 @@ class _MedicalHistoryState extends State<MedicalHistory> {
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.only(left: 10),
                     ),
-                    controller: controllers[index],
+                    controller: MedicalHistory.controllers[index],
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 10, left: 10),
@@ -123,7 +126,8 @@ class _MedicalHistoryState extends State<MedicalHistory> {
                         GestureDetector(
                           onTap: () {
                             setState(() {
-                              controllers.add(TextEditingController());
+                              MedicalHistory.controllers
+                                  .add(TextEditingController());
                             });
                           },
                           child: const Row(
@@ -137,7 +141,7 @@ class _MedicalHistoryState extends State<MedicalHistory> {
                         GestureDetector(
                           onTap: () {
                             setState(() {
-                              controllers.removeAt(index);
+                              MedicalHistory.controllers.removeAt(index);
                             });
                           },
                           child: const Row(

@@ -8,6 +8,7 @@ import 'package:slimtrap/pages/home.dart';
 import '../components/body_form/body_form_1.dart';
 import '../components/body_form/body_form_2.dart';
 import '../components/body_form/body_form_3.dart';
+import '../components/body_form/form_fields.dart';
 import '../components/ui/appbar.dart';
 
 class FormPage extends StatefulWidget {
@@ -146,7 +147,20 @@ class _FormPageState extends State<FormPage> {
         ];
         Map<String, dynamic> data = {};
         List<Map<String, dynamic>> measurements = [];
+        List medicalHistory = [];
         for (var field in allFields) {
+          if (field['label'] == 'Medical History (optional)') {
+            if (MedicalHistory.show) {
+              medicalHistory = MedicalHistory.controllers
+                  .map((e) => e.text)
+                  .toList()
+                  .where((element) => element.isNotEmpty)
+                  .toList();
+              data['medicalHistory'] = medicalHistory;
+            }
+            continue;
+          }
+          // I want to make loop go forward if label is 'Medical History (optional)'
           dynamic value = field['controller'].text;
           if (int.tryParse(field['controller'].text) != null) {
             value = int.parse(field['controller'].text);
@@ -190,6 +204,7 @@ class _FormPageState extends State<FormPage> {
           data['created'] = timestamp;
           measurements.last['date'] = DateTime.now();
           data['measurements'] = measurements;
+          data['medicalHistory'] = medicalHistory;
           data['reg'] = 'false';
           data['cid'] = coach!.uid;
           // convert age to date of birth
@@ -211,6 +226,12 @@ class _FormPageState extends State<FormPage> {
           );
           // clear all fields
           for (var field in allFields) {
+            if (field['label'] == 'Medical History (optional)') {
+              for (var element in MedicalHistory.controllers) {
+                element.clear();
+              }
+              continue;
+            }
             String label = field['label'];
             if (!label.toLowerCase().contains('age') &&
                 !label.toLowerCase().contains('weight')) {

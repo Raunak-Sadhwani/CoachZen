@@ -5,16 +5,111 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:slimtrap/components/ui/appbar.dart';
 import 'package:another_flushbar/flushbar.dart';
+import 'package:slimtrap/pages/cust_med_hist.dart';
+import 'package:slimtrap/pages/cust_product_hist.dart';
+import 'package:slimtrap/pages/cust_weight.dart';
+
+class BodyFormCustomerWrap extends StatefulWidget {
+  final String uid;
+  const BodyFormCustomerWrap({Key? key, required this.uid}) : super(key: key);
+
+  @override
+  State<BodyFormCustomerWrap> createState() => _BodyFormCustomerWrapState();
+}
+
+String formatDate(Timestamp timestamp) {
+  DateTime dateTime = timestamp.toDate();
+  String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
+  return formattedDate;
+}
+
+class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection("Users")
+            .doc(widget.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data!.exists) {
+            // Map<String, dynamic> updateFields = {};
+            // Map<String, dynamic> editedData = {};
+            // Map<String, dynamic> originalData = {};
+            final user = snapshot.data!.data();
+            Map<String, dynamic> userData = {};
+            // remove any list dataytype from filteredData and any exceptionList keys, add to userData
+            List exceptionList = ["cid", "reg", "cname", "image"];
+            user!.forEach((key, value) {
+              if (value.runtimeType != List && !exceptionList.contains(key)) {
+                userData[key] = value;
+              }
+              // if its last key, add id
+              if (key == user.keys.last && userData[key] != 'created') {
+                Timestamp cr = userData['created'];
+                userData.remove('created');
+                userData['created'] = cr;
+              }
+            });
+            List toBeOnTop = ["name", "phone", "city", "dob"];
+            userData = Map.fromEntries([
+              ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
+              ...userData.entries
+                  .where((entry) => !toBeOnTop.contains(entry.key))
+            ]);
+            List<Map<String, dynamic>> measurements = [];
+            List<Map<String, dynamic>> products = [];
+            List medicalHistory = user['medicalHistory'] ?? [];
+            String name = user['name'];
+            String? image = user['image'];
+
+            if (user['measurements'] != null) {
+              measurements = (user['measurements'] as List)
+                  .cast<Map<String, dynamic>>()
+                  .map((e) => {...e, 'date': formatDate(e['date'])})
+                  .toList()
+                ..forEach((e) {
+                  final weight = {'weight': e['weight']};
+                  e.remove('weight');
+                  e.addAll(weight);
+                });
+            }
+            if (user['productsHistory'] != null) {
+              products = (user['productsHistory'] as List)
+                  .cast<Map<String, dynamic>>()
+                  .map((e) => {...e, 'date': formatDate(e['date'])})
+                  .toList();
+            }
+            return BodyFormCustomer(
+                userData: userData,
+                measurements: measurements,
+                products: products,
+                medicalHistory: medicalHistory,
+                uid: widget.uid,
+                image: image);
+          } else {
+            // Handle loading or empty state...
+            return const CircularProgressIndicator();
+          }
+        });
+  }
+}
 
 class BodyFormCustomer extends StatefulWidget {
   final Map<String, dynamic> userData;
+  final List<Map<String, dynamic>> measurements;
+  final List<Map<String, dynamic>> products;
+  final List medicalHistory;
   final String? image;
   final String uid;
   const BodyFormCustomer({
     Key? key,
     required this.userData,
+    required this.measurements,
+    required this.products,
     required this.uid,
     required this.image,
+    required this.medicalHistory,
   }) : super(key: key);
 
   @override
@@ -45,8 +140,18 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
     });
   }
 
+  int idealweight = 0;
   @override
   Widget build(BuildContext context) {
+    if (originalData['height'].runtimeType != int) {
+      idealweight = originalData['gender'] == 'm'
+          ? (int.tryParse(originalData['height'])! - 104)
+          : (int.tryParse(originalData['height'])! - 106);
+    } else {
+      idealweight = originalData['gender'] == 'm'
+          ? (originalData['height'] - 104)
+          : (originalData['height'] - 106);
+    }
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     return GestureDetector(
@@ -100,18 +205,33 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             CustButton(
                               height: height,
                               width: width,
+                              openColor: Colors.orange[800],
                               onPressed: () {},
                               imgPath: 'lib/assets/weights.png',
                               label: 'Weight',
-                              page: Container(),
+                              page: WHistory(
+                                name: widget.userData['name'].split(' ')[0],
+                                colors: [
+                                  const Color(0xff5fbffa),
+                                  Colors.cyanAccent.shade700,
+                                  const Color(0xffe9c333),
+                                  const Color(0xffff4d62),
+                                ],
+                                measurements: widget.measurements,
+                                idealweight: idealweight,
+                              ),
                             ),
                             CustButton(
+                              openColor: Colors.green[800],
                               height: height,
                               width: width,
                               onPressed: () {},
-                              imgPath: 'lib/assets/focus.png',
+                              imgPath: 'lib/assets/orders.png',
                               label: 'Orders',
-                              page: Container(),
+                              page: ProductsHistory(
+                                products: widget.products,
+                                name: widget.userData['name'].split(' ')[0],
+                              ),
                             ),
                           ],
                         )
@@ -123,21 +243,26 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       children: [
                         // 2 gradient buttons
                         CustButton(
-                          height: height,
-                          width: width,
-                          onPressed: () {},
-                          imgPath: 'lib/assets/focus.png',
-                          label: 'Plan',
-                          page: Container(),
-                        ),
-                        CustButton(
-                          height: height,
-                          width: width,
-                          onPressed: () {},
-                          imgPath: 'lib/assets/focus.png',
-                          label: 'Meds',
-                          page: Container(),
-                        ),
+                            height: height,
+                            width: width,
+                            onPressed: () {},
+                            imgPath: 'lib/assets/focus.png',
+                            label: 'Plan',
+                            page: CustMedHist(
+                              name: widget.userData['name'].split(' ')[0],
+                              uid: widget.uid,
+                              medicalhistory: widget.medicalHistory,
+                            )),
+                        // CustButton(
+                        //     height: height,
+                        //     width: width,
+                        //     onPressed: () {},
+                        //     imgPath: 'lib/assets/focus.png',
+                        //     label: 'Meds',
+                        //     page: CustMedHist(
+                        //       name: widget.userData['name'].split(' ')[0],
+                        //       medicalhistory: widget.medicalHistory,
+                        //     )),
                       ],
                     )
                   ],
@@ -381,7 +506,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                       }
                                       Navigator.of(context).pop();
                                     }
-                                    debugPrint(updateFields.toString());
+                                    // debugPrint(updateFields.toString());
                                   },
                                 ),
                               ],
@@ -439,8 +564,14 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
 
   IconData _getIcon(String key) {
     switch (key) {
+      case 'city':
+        return Icons.location_city;
       case 'created':
         return Icons.calendar_today;
+      case 'dob':
+        return Icons.cake;
+      case 'email':
+        return Icons.email;
       case 'gender':
         return Icons.male;
       case 'height':
@@ -453,13 +584,8 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
         return Icons.phone;
       case 'plan':
         return Icons.map;
-      case 'city':
-        return Icons.location_city;
       default:
-        if (key.contains('dob')) {
-          return Icons.cake;
-        }
-        return Icons.error;
+        return Icons.new_releases;
     }
   }
 }
@@ -471,6 +597,7 @@ class CustButton extends StatelessWidget {
   final String imgPath;
   final String label;
   final Widget page;
+  final Color? openColor;
 
   const CustButton({
     Key? key,
@@ -480,11 +607,13 @@ class CustButton extends StatelessWidget {
     required this.imgPath,
     required this.label,
     required this.page,
+    this.openColor,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: width * 0.4,
       margin: EdgeInsets.only(
         bottom: height * 0.01,
       ),
@@ -494,8 +623,10 @@ class CustButton extends StatelessWidget {
       child: Card(
         elevation: 8.5,
         child: OpenContainerWrapper(
+            openColor: openColor ?? Colors.white,
             page: page,
             content: Container(
+              padding: EdgeInsets.symmetric(horizontal: width * 0.02),
               decoration: BoxDecoration(
                 image: DecorationImage(
                   image: AssetImage(imgPath),
@@ -507,23 +638,17 @@ class CustButton extends StatelessWidget {
                   alignment: Alignment.centerRight,
                 ),
               ),
-              child: ElevatedButton(
-                onPressed: onPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(0, 255, 139, 139),
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: SizedBox(
-                  height: height * 0.1,
-                  width: width * 0.3,
-                  child: Row(
-                    children: [
-                      Text(label),
-                    ],
-                  ),
+              child: SizedBox(
+                height: height * 0.1,
+                width: width * 0.3,
+                child: Row(
+                  children: [
+                    Text(label,
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500)),
+                  ],
                 ),
               ),
             )),

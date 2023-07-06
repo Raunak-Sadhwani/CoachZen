@@ -1,0 +1,681 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:slimtrap/components/ui/appbar.dart';
+import 'package:another_flushbar/flushbar.dart';
+import 'package:slimtrap/pages/cust_med_hist.dart';
+import 'package:slimtrap/pages/cust_product_hist.dart';
+import 'package:slimtrap/pages/cust_weight.dart';
+
+class BodyFormCustomer extends StatefulWidget {
+  // final Map<String, dynamic> userData;
+  // final List<Map<String, dynamic>> measurements;
+  // final List<Map<String, dynamic>> products;
+  // final List medicalHistory;
+  // final String? image;
+  final String uid;
+  const BodyFormCustomer({
+    Key? key,
+    // required this.userData,
+    // required this.measurements,
+    // required this.products,
+    // required this.image,
+    // required this.medicalHistory,
+    required this.uid,
+  }) : super(key: key);
+
+  @override
+  State<BodyFormCustomer> createState() => _BodyFormCustomerState();
+}
+
+class _BodyFormCustomerState extends State<BodyFormCustomer> {
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+  final _formKey = GlobalKey<FormState>();
+  DateFormat formatter = DateFormat('dd MMM yyyy');
+  String formatDate(Timestamp timestamp) {
+    DateTime dateTime = timestamp.toDate();
+    String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
+    return formattedDate;
+  }
+
+  // capitalize first letter of each word
+  String capitalize(String value) {
+    return value
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
+  String dialogTempValue = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.of(context).size.height;
+    final width = MediaQuery.of(context).size.width;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection("Users")
+            .doc(widget.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data!.exists) {
+            Map<String, dynamic> updateFields = {};
+            Map<String, dynamic> editedData = {};
+            Map<String, dynamic> originalData = {};
+            final user = snapshot.data!.data();
+            Map<String, dynamic> userData = {};
+            // remove any list dataytype from filteredData and any exceptionList keys, add to userData
+            List exceptionList = ["cid", "reg", "cname", "image"];
+            user!.forEach((key, value) {
+              if (value.runtimeType != List && !exceptionList.contains(key)) {
+                userData[key] = value;
+              }
+              // if its last key, add id
+              if (key == user.keys.last && userData[key] != 'created') {
+                Timestamp cr = userData['created'];
+                userData.remove('created');
+                userData['created'] = cr;
+              }
+            });
+            List toBeOnTop = ["name", "phone", "city", "dob"];
+            userData = Map.fromEntries([
+              ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
+              ...userData.entries
+                  .where((entry) => !toBeOnTop.contains(entry.key))
+            ]);
+            editedData = userData;
+            originalData = Map.from(userData);
+            List<Map<String, dynamic>> measurements = [];
+            List<Map<String, dynamic>> products = [];
+            List medicalHistory = user['medicalHistory'] ?? [];
+            String name = user['name'];
+            String? image = user['image'];
+
+            if (user['measurements'] != null) {
+              measurements = (user['measurements'] as List)
+                  .cast<Map<String, dynamic>>()
+                  .map((e) => {...e, 'date': formatDate(e['date'])})
+                  .toList()
+                ..forEach((e) {
+                  final weight = {'weight': e['weight']};
+                  e.remove('weight');
+                  e.addAll(weight);
+                });
+            }
+            if (user['productsHistory'] != null) {
+              products = (user['productsHistory'] as List)
+                  .cast<Map<String, dynamic>>()
+                  .map((e) => {...e, 'date': formatDate(e['date'])})
+                  .toList();
+            }
+            int idealweight = 0;
+            if (originalData['height'].runtimeType != int) {
+              idealweight = originalData['gender'] == 'm'
+                  ? (int.tryParse(originalData['height'])! - 104)
+                  : (int.tryParse(originalData['height'])! - 106);
+            } else {
+              idealweight = originalData['gender'] == 'm'
+                  ? (originalData['height'] - 104)
+                  : (originalData['height'] - 106);
+            }
+
+            // void editData(String key, dynamic value) {
+            //   setState(() {
+            //     editedData[key] = value;
+            //     userData[key] = value;
+            //     debugPrint(editedData.toString());
+            //   });
+            // }
+
+            return GestureDetector(
+              onTap: () {
+                FocusScope.of(context).unfocus();
+              },
+              child: Scaffold(
+                key: scaffoldKey,
+                appBar: MyAppBar(
+                  title: name,
+                  leftIcon: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: Colors.black26,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                body: Container(
+                  padding: EdgeInsets.symmetric(
+                      vertical: height * 0.01, horizontal: width * 0.035),
+                  child: ListView(
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      Container(
+                        margin: EdgeInsets.symmetric(
+                            vertical: height * 0.025, horizontal: width * 0.05),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                SizedBox(
+                                    width: width * 0.3,
+                                    height: width * 0.3,
+                                    child: ClipOval(
+                                        child: image != null && image.isNotEmpty
+                                            ? FadeInImage(
+                                                placeholder: AssetImage(
+                                                    'lib/assets/${user["gender"]}.png'),
+                                                image:
+                                                    NetworkImage(image ?? ''),
+                                                fit: BoxFit
+                                                    .cover, // Adjust the fit as per your requirement
+                                              )
+                                            : Image.asset(
+                                                fit: BoxFit.cover,
+                                                'lib/assets/${user["gender"]}.png'))),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // 2 gradient buttons
+                                    CustButton(
+                                      height: height,
+                                      width: width,
+                                      openColor: Colors.orange[800],
+                                      onPressed: () {},
+                                      imgPath: 'lib/assets/weights.png',
+                                      label: 'Weight',
+                                      page: WHistory(
+                                        name: user['name'].split(' ')[0],
+                                        colors: [
+                                          const Color(0xff5fbffa),
+                                          Colors.cyanAccent.shade700,
+                                          const Color(0xffe9c333),
+                                          const Color(0xffff4d62),
+                                        ],
+                                        measurements: measurements,
+                                        idealweight: idealweight,
+                                      ),
+                                    ),
+                                    CustButton(
+                                      openColor: Colors.green[800],
+                                      height: height,
+                                      width: width,
+                                      onPressed: () {},
+                                      imgPath: 'lib/assets/orders.png',
+                                      label: 'Orders',
+                                      page: ProductsHistory(
+                                        products: products,
+                                        name: user['name'].split(' ')[0],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              ],
+                            ),
+                            Row(
+                              // crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // 2 gradient buttons
+                                CustButton(
+                                    height: height,
+                                    width: width,
+                                    onPressed: () {},
+                                    imgPath: 'lib/assets/focus.png',
+                                    label: 'Plan',
+                                    page: CustMedHist(
+                                      name: user['name'].split(' ')[0],
+                                      uid: widget.uid,
+                                      medicalhistory: medicalHistory,
+                                    )),
+                                // CustButton(
+                                //     height: height,
+                                //     width: width,
+                                //     onPressed: () {},
+                                //     imgPath: 'lib/assets/focus.png',
+                                //     label: 'Meds',
+                                //     page: CustMedHist(
+                                //       name: widget.userData['name'].split(' ')[0],
+                                //       medicalhistory: widget.medicalHistory,
+                                //     )),
+                              ],
+                            )
+                          ],
+                        ),
+                      ),
+                      ...editedData.entries.map(
+                        (entry) {
+                          var key = entry.key;
+                          var value = entry.value;
+                          late dynamic age;
+                          if (key == 'dob') {
+                            DateTime selectedDate =
+                                DateTime.parse(value.toDate().toString());
+                            DateTime currentDate = DateTime.now();
+                            age = currentDate.year - selectedDate.year;
+                            if (currentDate.month < selectedDate.month ||
+                                (currentDate.month == selectedDate.month &&
+                                    currentDate.day < selectedDate.day)) {
+                              age--;
+                            }
+                          }
+
+                          return GestureDetector(
+                            child: Card(
+                              elevation: 10,
+                              key: ValueKey(entry.key),
+                              margin: const EdgeInsets.all(10),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    vertical: height * 0.02,
+                                    horizontal: width * 0.05),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      _getIcon(entry.key),
+                                      color: Colors.black,
+                                      size: height * 0.03,
+                                    ),
+                                    SizedBox(
+                                      width: width * 0.07,
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          entry.key == 'dob'
+                                              ? capitalize('dob ($age years)')
+                                              : capitalize(entry.key),
+                                          style: GoogleFonts.poppins(
+                                              color: Colors.grey, fontSize: 14),
+                                        ),
+                                        SizedBox(
+                                          height: height * 0.01,
+                                        ),
+                                        Text(
+                                          entry.value.runtimeType == Timestamp
+                                              ? formatter
+                                                  .format(entry.value.toDate())
+                                                  .toString()
+                                              : entry.value.toString(),
+                                          style: GoogleFonts.dmSans(
+                                              color: Colors.black,
+                                              fontSize: 16),
+                                        ),
+                                      ],
+                                    )
+                                  ],
+                                ),
+                              ),
+                            ),
+                            onLongPress: () {
+                              if (entry.key == 'phone') {
+                                // copy phone number to clipboard
+                                Clipboard.setData(ClipboardData(
+                                    text: entry.value.toString()));
+                                Flushbar(
+                                  margin: const EdgeInsets.all(7),
+                                  borderRadius: BorderRadius.circular(15),
+                                  flushbarStyle: FlushbarStyle.FLOATING,
+                                  flushbarPosition: FlushbarPosition.BOTTOM,
+                                  message: "Phone number copied to clipboard",
+                                  icon: Icon(
+                                    Icons.phone_android_rounded,
+                                    size: 28.0,
+                                    color: Colors.green[300],
+                                  ),
+                                  duration: const Duration(milliseconds: 1500),
+                                  leftBarIndicatorColor: Colors.green[300],
+                                ).show(scaffoldKey.currentContext!);
+                                return;
+                              }
+                            },
+                            onTap: () {
+                              if (entry.key == 'created' ||
+                                  entry.key == 'plan') {
+                                return;
+                              }
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  String dialogTempValue =
+                                      entry.value.runtimeType == Timestamp
+                                          ? formatter
+                                              .format(entry.value.toDate())
+                                              .toString()
+                                          : entry.value.toString();
+                                  return StatefulBuilder(
+                                      builder: (context, StateSetter setState) {
+                                    return AlertDialog(
+                                      title: Text(capitalize(entry.key)),
+                                      content: Form(
+                                        key: _formKey,
+                                        autovalidateMode:
+                                            AutovalidateMode.onUserInteraction,
+                                        child: entry.key
+                                                .toLowerCase()
+                                                .contains('dob')
+                                            ? InkWell(
+                                                onTap: () {
+                                                  showDatePicker(
+                                                          context: context,
+                                                          initialDate: entry
+                                                                  .value
+                                                                  .toDate() ??
+                                                              DateTime.now(),
+                                                          firstDate:
+                                                              DateTime(1930),
+                                                          lastDate:
+                                                              DateTime(2011))
+                                                      .then((selectedDate) {
+                                                    if (selectedDate != null) {
+                                                      String formattedDate =
+                                                          DateFormat(
+                                                                  'dd MMM yyyy')
+                                                              .format(
+                                                                  selectedDate);
+                                                      setState(() {
+                                                        dialogTempValue =
+                                                            formattedDate;
+                                                      });
+                                                    }
+                                                  });
+                                                },
+                                                child: InputDecorator(
+                                                  decoration:
+                                                      const InputDecoration(
+                                                    border:
+                                                        OutlineInputBorder(),
+                                                    labelText: 'Select Date',
+                                                  ),
+                                                  child: Text(dialogTempValue),
+                                                ),
+                                              )
+                                            : entry.key.toLowerCase() ==
+                                                    'gender'
+                                                ? DropdownButton<String>(
+                                                    value: dialogTempValue,
+                                                    items: <String>[
+                                                      'male',
+                                                      'female'
+                                                    ].map<
+                                                            DropdownMenuItem<
+                                                                String>>(
+                                                        (String value) {
+                                                      return DropdownMenuItem<
+                                                          String>(
+                                                        value: value,
+                                                        child: Text(value),
+                                                      );
+                                                    }).toList(),
+                                                    onChanged:
+                                                        (String? newValue) {
+                                                      setState(() {
+                                                        dialogTempValue =
+                                                            newValue!;
+                                                      });
+                                                    },
+                                                  )
+                                                : TextFormField(
+                                                    onChanged: (value) {
+                                                      setState(() {
+                                                        dialogTempValue = value;
+                                                      });
+                                                    },
+                                                    initialValue:
+                                                        dialogTempValue,
+                                                    validator: (value) {
+                                                      if (entry.key == 'name') {
+                                                        if (value!.length < 3 ||
+                                                            !value
+                                                                .trim()
+                                                                .contains(RegExp(
+                                                                    r'^((\b[a-zA-Z]{2,40}\b)\s*){2,3}$'))) {
+                                                          return 'Please enter a valid name';
+                                                        }
+                                                      } else if (entry.key ==
+                                                          'phone') {
+                                                        if (!RegExp(
+                                                                r'^[6-9]\d{9}$')
+                                                            .hasMatch(value!)) {
+                                                          return 'Please enter a valid Indian phone number';
+                                                        }
+                                                        // You can add additional phone number validation logic here
+                                                      } else if (entry.key ==
+                                                          'city') {
+                                                        if (value!
+                                                                    .trim()
+                                                                    .length <
+                                                                3 ||
+                                                            !RegExp(r'^[a-zA-Z\s]+$')
+                                                                .hasMatch(
+                                                                    value)) {
+                                                          return 'Please enter a city';
+                                                        }
+                                                      } else if (entry.key ==
+                                                          'email') {
+                                                        if (value!.isNotEmpty &&
+                                                            (!RegExp(
+                                                                    r'^.+@[a-zA-Z]+\.{1}[a-zA-Z]+(\.{0,1}[a-zA-Z]+)$')
+                                                                .hasMatch(
+                                                                    value))) {
+                                                          return 'Please enter a valid email address';
+                                                        }
+                                                      } else if (entry.key ==
+                                                          'height') {
+                                                        if (int.tryParse(
+                                                                value!) ==
+                                                            null) {
+                                                          return 'Please enter a valid height';
+                                                        } else if (int.parse(
+                                                                    value) <
+                                                                50 ||
+                                                            int.parse(value) >
+                                                                250) {
+                                                          return 'Please enter a valid height';
+                                                        }
+                                                      }
+                                                      // Return null if there are no validation errors
+                                                      return null;
+                                                    },
+                                                  ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          child: const Text('Save'),
+                                          onPressed: () {
+                                            if (_formKey.currentState!
+                                                .validate()) {
+                                              if (entry.key == 'dob') {
+                                                // convert to Timestamp
+                                                DateTime selectedDateTime =
+                                                    DateFormat('dd MMM yyyy')
+                                                        .parse(dialogTempValue);
+                                                Timestamp selectedTimestamp =
+                                                    Timestamp.fromDate(
+                                                        selectedDateTime);
+                                                if (selectedTimestamp !=
+                                                    originalData[entry.key]) {
+                                                  editedData[entry.key] =
+                                                      dialogTempValue;
+                                                  updateFields[entry.key] =
+                                                      selectedTimestamp;
+                                                } else {
+                                                  editedData[entry.key] =
+                                                      dialogTempValue;
+                                                  updateFields
+                                                      .remove(entry.key);
+                                                }
+                                              } else {
+                                                editedData[entry.key] =
+                                                    dialogTempValue;
+                                                if (dialogTempValue !=
+                                                    originalData[entry.key]) {
+                                                  updateFields[entry.key] =
+                                                      dialogTempValue;
+                                                } else {
+                                                  updateFields
+                                                      .remove(entry.key);
+                                                }
+                                              }
+                                              debugPrint(editedData.toString());
+                                              Navigator.of(context).pop();
+                                            }
+                                            // debugPrint(updateFields.toString());
+                                          },
+                                        ),
+                                      ],
+                                    );
+                                  });
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                floatingActionButton: updateFields.isNotEmpty
+                    ? FloatingActionButton(
+                        onPressed: () async {
+                          try {
+                            final userRef = FirebaseFirestore.instance
+                                .collection('Users')
+                                .doc(widget.uid);
+
+                            await userRef.update(updateFields);
+                            setState(() {
+                              originalData = Map.from(editedData);
+                              updateFields.clear();
+                            });
+
+                            return Flushbar(
+                              margin: const EdgeInsets.all(7),
+                              borderRadius: BorderRadius.circular(15),
+                              flushbarStyle: FlushbarStyle.FLOATING,
+                              flushbarPosition: FlushbarPosition.BOTTOM,
+                              message: "User data updated successfully",
+                              icon: Icon(
+                                Icons.check_circle_outline_rounded,
+                                size: 28.0,
+                                color: Colors.green[300],
+                              ),
+                              duration: const Duration(milliseconds: 1500),
+                              leftBarIndicatorColor: Colors.green[300],
+                            ).show(scaffoldKey.currentContext!);
+                          } catch (error) {
+                            debugPrint(
+                                'Error updating user properties: $error');
+                          }
+                          // updateUserProperties(userId, updatedData);
+                          // updateUser();
+                        },
+                        child: const Icon(Icons.save),
+                      )
+                    : null,
+              ),
+            );
+          } else {
+            // Handle loading or empty state...
+            return const CircularProgressIndicator();
+          }
+        });
+  }
+
+  IconData _getIcon(String key) {
+    switch (key) {
+      case 'city':
+        return Icons.location_city;
+      case 'created':
+        return Icons.calendar_today;
+      case 'dob':
+        return Icons.cake;
+      case 'email':
+        return Icons.email;
+      case 'gender':
+        return Icons.male;
+      case 'height':
+        return Icons.height;
+      case 'image':
+        return Icons.photo;
+      case 'name':
+        return Icons.person;
+      case 'phone':
+        return Icons.phone;
+      case 'plan':
+        return Icons.map;
+      default:
+        return Icons.new_releases;
+    }
+  }
+}
+
+class CustButton extends StatelessWidget {
+  final double height;
+  final double width;
+  final VoidCallback? onPressed;
+  final String imgPath;
+  final String label;
+  final Widget page;
+  final Color? openColor;
+
+  const CustButton({
+    Key? key,
+    required this.height,
+    required this.width,
+    this.onPressed,
+    required this.imgPath,
+    required this.label,
+    required this.page,
+    this.openColor,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width * 0.4,
+      margin: EdgeInsets.only(
+        bottom: height * 0.01,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Card(
+        elevation: 8.5,
+        child: OpenContainerWrapper(
+            openColor: openColor ?? Colors.white,
+            page: page,
+            content: Container(
+              padding: EdgeInsets.symmetric(horizontal: width * 0.02),
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(imgPath),
+                  fit: BoxFit.cover,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.black38,
+                    BlendMode.darken,
+                  ),
+                  alignment: Alignment.centerRight,
+                ),
+              ),
+              child: SizedBox(
+                height: height * 0.1,
+                width: width * 0.3,
+                child: Row(
+                  children: [
+                    Text(label,
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+            )),
+      ),
+    );
+  }
+}

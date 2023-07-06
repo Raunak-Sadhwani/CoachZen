@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:animations/animations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +10,7 @@ import 'package:slimtrap/pages/body_form_cust.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
+import '../components/ui/data_manager.dart';
 
 class BodyFormList extends StatefulWidget {
   const BodyFormList({super.key});
@@ -17,11 +20,62 @@ class BodyFormList extends StatefulWidget {
 }
 
 class _BodyFormListState extends State<BodyFormList> {
+
   bool isSearching = false;
   String searchQuery = '';
   FocusNode searchFocusNode = FocusNode();
   double opacity = 0.0;
   DateFormat formatter = DateFormat('dd MMM yyyy');
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _dataSubscription;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredData = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dataSubscription =
+        DataManager.getLatestUserDataStream().listen((snapshot) {
+      _filterAndSortData(snapshot);
+    });
+  }
+
+  @override
+  void dispose() {
+    _dataSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _filterAndSortData(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    if (snapshot.docs.isNotEmpty) {
+      final filteredData = snapshot.docs.where((doc) {
+        final name = doc.data()['name'].toString().toLowerCase();
+        final city = doc.data()['city'].toString().toLowerCase();
+        final phone = doc.data()['phone'].toString().toLowerCase();
+        final email = doc.data()['email'].toString().toLowerCase();
+        final searchLower = searchQuery.toLowerCase();
+        return name.contains(searchLower) ||
+            city.contains(searchLower) ||
+            phone.contains(searchLower) ||
+            email.contains(searchLower);
+      }).toList();
+
+      filteredData.sort((a, b) {
+        final dateA = a.data()['created'];
+        final dateB = b.data()['created'];
+        return dateB
+            .toDate()
+            .compareTo(dateA.toDate()); // Compare in reverse order
+      });
+
+      setState(() {
+        _filteredData = filteredData;
+      });
+    } else {
+      setState(() {
+        _filteredData = [];
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,82 +147,28 @@ class _BodyFormListState extends State<BodyFormList> {
         // appBar: buildAppBar(),
         // listview from firestore collection
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection("Users")
-              .where('cid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
-              .snapshots(),
+          stream: DataManager.getLatestUserDataStream(),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-              final filteredData = snapshot.data!.docs.where((doc) {
-                final name = doc.data()['name'].toString().toLowerCase();
-                final city = doc.data()['city'].toString().toLowerCase();
-                final phone = doc.data()['phone'].toString().toLowerCase();
-                final email = doc.data()['email'].toString().toLowerCase();
-                final searchLower = searchQuery.toLowerCase();
-                return name.contains(searchLower) ||
-                    city.contains(searchLower) ||
-                    phone.contains(searchLower) ||
-                    email.contains(searchLower);
-              }).toList();
-              filteredData.sort((a, b) {
-                final dateA = a.data()['created'];
-                final dateB = b.data()['created'];
-                return dateB
-                    .toDate()
-                    .compareTo(dateA.toDate()); // Compare in reverse order
-              });
-
               return ListView.builder(
                 physics: const BouncingScrollPhysics(),
-                itemCount: filteredData.length,
+                itemCount: _filteredData.length,
                 itemBuilder: (context, index) {
-                  final phone = "+91${filteredData[index].data()['phone']}";
-                  final isMale = filteredData[index].data()['gender'] == 'male';
+                  final phone = "+91${_filteredData[index].data()['phone']}";
+                  // // final isMale = filteredData[index].data()['gender'] == 'male';
                   final timeStamp =
-                      filteredData[index].data()['created'].toDate().toString();
-                  final name = filteredData[index].data()['name'];
-                  // final city = filteredData[index].data()['city'];
+                      _filteredData[index].data()['created'].toDate().toString();
+                  final name = _filteredData[index].data()['name'];
+                  // // final city = filteredData[index].data()['city'];
 
-                  var age = filteredData[index].data()['age'];
+                  // var age = filteredData[index].data()['age'];
 
-                  String? image = filteredData[index].data()['image'];
-                  // final weight = filteredData[index].data()['Weight'] ?? '';
-                  // final height = filteredData[index].data()['height'];
-                  // final medicalHistory =
-                  //     filteredData[index].data()['Medical History'] ?? '';
-                  // final email = filteredData[index].data()['email'] ?? '';
-                  // final id = filteredData[index].id;
+                  String? image = _filteredData[index].data()['image'];
+                  final uid = _filteredData[index].id;
 
-                  Map<String, dynamic> userData = {};
-                  // remove any list dataytype from filteredData and any exceptionList keys, add to userData
-                  List exceptionList = ["cid", "reg", "cname", "image"];
-                  filteredData[index].data().forEach((key, value) {
-                    if (value.runtimeType != List &&
-                        !exceptionList.contains(key)) {
-                      userData[key] = value;
-                    }
-                    // if its last key, add id
-                    if (key == filteredData[index].data().keys.last &&
-                        userData[key] != 'created') {
-                      Timestamp cr = userData['created'];
-                      userData.remove('created');
-                      userData['created'] = cr;
-                    }
-                  });
-                  List toBeOnTop = ["name", "phone", "city"];
-                  if (age != null) {
-                    toBeOnTop.add("age");
-                  } else {
-                    toBeOnTop.add("dob");
-                  }
-                  userData = Map.fromEntries([
-                    ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
-                    ...userData.entries
-                        .where((entry) => !toBeOnTop.contains(entry.key))
-                  ]);
-
-                  debugPrint(userData.toString());
-                  String uid = filteredData[index].id;
+                 
+                  // String uid = _filteredData[index].id;
+                  String gender = _filteredData[index].data()['gender'];
                   return Slidable(
                     startActionPane: ActionPane(
                       motion: const BehindMotion(),
@@ -292,8 +292,7 @@ class _BodyFormListState extends State<BodyFormList> {
                       ],
                     ),
                     child: openCont(
-                      page: BodyFormCustomer(
-                          userData: userData, uid: uid, image: image ?? ''),
+                      page: BodyFormCustomerWrap(uid: uid),
                       child: Container(
                         decoration: const BoxDecoration(
                           border: Border(
@@ -316,11 +315,11 @@ class _BodyFormListState extends State<BodyFormList> {
                                         ? FadeInImage.assetNetwork(
                                             fit: BoxFit.cover,
                                             placeholder:
-                                                'lib/assets/${filteredData[index].data()['gender']}.png',
+                                                'lib/assets/$gender.png',
                                             image: image)
                                         : Image.asset(
                                             fit: BoxFit.cover,
-                                            'lib/assets/${filteredData[index].data()['gender']}.png')),
+                                            'lib/assets/$gender.png')),
                               ),
                             ],
                           ),
@@ -332,7 +331,7 @@ class _BodyFormListState extends State<BodyFormList> {
                             children: [
                               // date
                               Text(
-                                formatter.format(filteredData[index]
+                                formatter.format(_filteredData[index]
                                     .data()['created']
                                     .toDate()),
                                 style: const TextStyle(color: Colors.black),
