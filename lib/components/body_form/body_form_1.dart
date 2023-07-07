@@ -172,7 +172,9 @@ class _BodyFormState extends State<BodyForm> {
       FocusScope.of(context).unfocus();
 
       setState(() {
-        isInteractingWithPicker = true;
+        if (widget.heightParam == null) {
+          isInteractingWithPicker = true;
+        }
         if (weightController.text.endsWith(".") ||
             weightController.text.startsWith(".")) {
           weightController.text = weightController.text
@@ -188,7 +190,9 @@ class _BodyFormState extends State<BodyForm> {
             int.tryParse(ageController.text)! < 15) {
           ageController.text = '25';
         }
-        widget.pageChange(isInteractingWithPicker);
+        if (widget.heightParam == null) {
+          widget.pageChange(isInteractingWithPicker);
+        }
       });
     }
 
@@ -306,25 +310,50 @@ class _BodyFormState extends State<BodyForm> {
                 ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                 GestureDetector(
+                  onTap: () {
+                    if (widget.heightParam != null) {
+                      Flushbar(
+                        margin: const EdgeInsets.all(7),
+                        borderRadius: BorderRadius.circular(15),
+                        flushbarStyle: FlushbarStyle.FLOATING,
+                        flushbarPosition: FlushbarPosition.BOTTOM,
+                        message:
+                            "Height is already set, change it from the user's profile page",
+                        icon: Icon(
+                          Icons.error_outline_rounded,
+                          size: 28.0,
+                          color: Colors.red[300],
+                        ),
+                        duration: const Duration(milliseconds: 3000),
+                        leftBarIndicatorColor: Colors.red[300],
+                      ).show(context);
+                    }
+                  },
                   // when the user starts touching the height picker or drags it
                   // we set the isInteractingWithPicker to true
                   onTapDown: (TapDownDetails details) {
                     tappedOutside();
                   },
                   onPanDown: (DragDownDetails details) {
-                    setState(() {
-                      isInteractingWithPicker = true;
-                      widget.pageChange(isInteractingWithPicker);
-                    });
+                    if (widget.heightParam == null) {
+                      setState(() {
+                        isInteractingWithPicker = true;
+                        widget.pageChange(isInteractingWithPicker);
+                      });
+                    }
                   },
                   onPanUpdate: (details) {
-                    isInteractingWithPicker = true;
-                    widget.pageChange(isInteractingWithPicker);
-                    setHeight(details);
+                    if (widget.heightParam == null) {
+                      isInteractingWithPicker = true;
+                      widget.pageChange(isInteractingWithPicker);
+                      setHeight(details);
+                    }
                   },
                   onPanEnd: (details) {
-                    isInteractingWithPicker = false;
-                    widget.pageChange(isInteractingWithPicker);
+                    if (widget.heightParam == null) {
+                      isInteractingWithPicker = false;
+                      widget.pageChange(isInteractingWithPicker);
+                    }
                   },
                   child: HeightPicker(
                     // setHeight: (DragUpdateDetails details) => setHeight(details),

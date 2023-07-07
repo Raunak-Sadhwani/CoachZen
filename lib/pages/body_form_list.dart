@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:animations/animations.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -11,6 +10,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
 import '../components/ui/data_manager.dart';
+import 'body_form.dart';
+import 'cust_order_form.dart';
 
 class BodyFormList extends StatefulWidget {
   const BodyFormList({super.key});
@@ -20,7 +21,6 @@ class BodyFormList extends StatefulWidget {
 }
 
 class _BodyFormListState extends State<BodyFormList> {
-
   bool isSearching = false;
   String searchQuery = '';
   FocusNode searchFocusNode = FocusNode();
@@ -154,21 +154,41 @@ class _BodyFormListState extends State<BodyFormList> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: _filteredData.length,
                 itemBuilder: (context, index) {
-                  final phone = "+91${_filteredData[index].data()['phone']}";
+                  final userInfo = _filteredData[index].data();
+                  final phone = "+91${userInfo['phone']}";
                   // // final isMale = filteredData[index].data()['gender'] == 'male';
-                  final timeStamp =
-                      _filteredData[index].data()['created'].toDate().toString();
-                  final name = _filteredData[index].data()['name'];
+                  final timeStamp = userInfo['created'].toDate().toString();
+                  final name = userInfo['name'];
                   // // final city = filteredData[index].data()['city'];
+                  DateTime selectedDate =
+                      DateTime.parse(userInfo['dob'].toDate().toString());
+                  DateTime currentDate = DateTime.now();
+                  int age = currentDate.year - selectedDate.year;
+                  if (currentDate.month < selectedDate.month ||
+                      (currentDate.month == selectedDate.month &&
+                          currentDate.day < selectedDate.day)) {
+                    age--;
+                  }
+                  if (userInfo['measurements'] != null) {
+                    userInfo['measurements'] =
+                        (userInfo['measurements'] as List)
+                            .cast<Map<String, dynamic>>()
+                            .toList();
+                  }
+                  if (userInfo['productsHistory'] != null) {
+                    userInfo['productsHistory'] =
+                        (userInfo['productsHistory'] as List)
+                            .cast<Map<String, dynamic>>()
+                            .toList();
+                  }
 
                   // var age = filteredData[index].data()['age'];
 
-                  String? image = _filteredData[index].data()['image'];
+                  String? image = userInfo['image'];
                   final uid = _filteredData[index].id;
 
-                 
                   // String uid = _filteredData[index].id;
-                  String gender = _filteredData[index].data()['gender'];
+                  String gender = userInfo['gender'];
                   return Slidable(
                     startActionPane: ActionPane(
                       motion: const BehindMotion(),
@@ -241,16 +261,41 @@ class _BodyFormListState extends State<BodyFormList> {
                           label: 'Check-up',
                           onPressed: (context) {
                             // debugPrint('call');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FormPageWrapper(
+                                  uid: uid,
+                                  age: age.toString(),
+                                  measurements: userInfo['measurements'],
+                                  heightx: double.parse(
+                                      userInfo['height'].toString()),
+                                  popIndex: 2,
+                                  gender: gender == 'male',
+                                  name: name,
+                                ),
+                              ),
+                            );
                           },
                         ),
                         SlidableAction(
                           backgroundColor:
                               const Color.fromARGB(255, 244, 155, 54),
                           foregroundColor: Colors.black,
-                          icon: Icons.history,
-                          label: 'Products',
+                          icon: Icons.add,
+                          label: 'Order',
                           onPressed: (context) {
-                            // debugPrint('call');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CustOrderForm(
+                                  uid: uid,
+                                  productsHistory: userInfo['productsHistory'],
+                                  name: name,
+                                  popIndex: 1,
+                                ),
+                              ),
+                            );
                           },
                         ),
                         // SlidableAction(

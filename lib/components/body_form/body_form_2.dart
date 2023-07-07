@@ -23,12 +23,12 @@ class BodyForm2 extends StatefulWidget {
     },
     {
       "label": "Visceral Fat",
-      "unit": "",
+      "unit": "g",
       "controller": TextEditingController(),
     },
     {
-      "label": "TSF (Trunk Subcutaneous Fat)",
-      "unit": "mm",
+      "label": "BMI (Body Mass Index)",
+      "unit": "",
       "controller": TextEditingController(),
     },
     {
@@ -37,8 +37,13 @@ class BodyForm2 extends StatefulWidget {
       "controller": TextEditingController(),
     },
     {
-      "label": "BMI (Body Mass Index)",
-      "unit": "",
+      "label": "Body Age",
+      "unit": "yrs",
+      "controller": TextEditingController(),
+    },
+    {
+      "label": "TSF (Trunk Subcutaneous Fat)",
+      "unit": "mm",
       "controller": TextEditingController(),
     },
     {

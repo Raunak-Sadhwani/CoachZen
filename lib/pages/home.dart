@@ -145,7 +145,7 @@ class _HomePageState extends State<HomePage> {
                       height: height,
                       width: width,
                       imgPath: 'lib/assets/meas.jpg',
-                      page: const FormPageWrapper(),
+                      page: const FormPage(),
                       label1: 'Customer',
                       label2: 'Check-up'),
                   HomeButton(

@@ -7,7 +7,7 @@ import 'package:slimtrap/components/ui/appbar.dart';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:slimtrap/pages/cust_med_hist.dart';
 import 'package:slimtrap/pages/cust_product_hist.dart';
-import 'package:slimtrap/pages/cust_weight.dart';
+import 'package:slimtrap/pages/cust_weight_hist.dart';
 
 class BodyFormCustomerWrap extends StatefulWidget {
   final String uid;
@@ -75,8 +75,10 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             if (user['productsHistory'] != null) {
               products = (user['productsHistory'] as List)
                   .cast<Map<String, dynamic>>()
-                  .map((e) => {...e, 'date': formatDate(e['date'])})
+                  // .map((e) => {...e, 'date': formatDate(e['date'])})
                   .toList();
+
+              products.sort((a, b) => b['date'].compareTo(a['date']));
             }
             return BodyFormCustomer(
                 userData: userData,
@@ -150,7 +152,8 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
           ? (originalData['height'] - 104)
           : (originalData['height'] - 106);
     }
-    DateTime selectedDate = DateTime.parse(widget.userData['dob'].toDate().toString());
+    DateTime selectedDate =
+        DateTime.parse(widget.userData['dob'].toDate().toString());
     DateTime currentDate = DateTime.now();
     int age = currentDate.year - selectedDate.year;
     if (currentDate.month < selectedDate.month ||
@@ -176,7 +179,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
         ),
         body: Container(
           padding: EdgeInsets.symmetric(
-              vertical: height * 0.01, horizontal: width * 0.035),
+              vertical: height * 0.0, horizontal: width * 0.035),
           child: ListView(
             physics: const BouncingScrollPhysics(),
             children: [
@@ -217,8 +220,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                               label: 'Weight',
                               page: WHistory(
                                 age: age.toString(),
-                                gender:widget.userData['gender'],
-                                height: double.parse(widget.userData['height'].toString()),
+                                gender: widget.userData['gender'],
+                                height: double.parse(
+                                    widget.userData['height'].toString()),
                                 name: widget.userData['name'].split(' ')[0],
                                 colors: [
                                   const Color(0xff5fbffa),
@@ -239,6 +243,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                               imgPath: 'lib/assets/orders.png',
                               label: 'Orders',
                               page: ProductsHistory(
+                                uid: widget.uid,
                                 products: widget.products,
                                 name: widget.userData['name'].split(' ')[0],
                               ),
@@ -256,7 +261,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             height: height,
                             width: width,
                             onPressed: () {},
-                            imgPath: 'lib/assets/focus.png',
+                            imgPath: 'lib/assets/meds.png',
                             label: 'Meds',
                             page: CustMedHist(
                               name: widget.userData['name'].split(' ')[0],

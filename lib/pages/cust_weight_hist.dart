@@ -169,6 +169,7 @@ class _WHistoryState extends State<WHistory> {
                   measurements: updatedMeasurements,
                   heightx: widget.height,
                   gender: widget.gender == 'male',
+                  popIndex: 3,
                   name: widget.name,
                 ),
               ),
@@ -196,8 +197,10 @@ class _WHistoryState extends State<WHistory> {
               }
               double weightLoss = 0;
               if (index > 0) {
-                weightLoss = measurement['weight'] -
-                    widget.measurements[index - 1]['weight'];
+                // tryparse to double
+                weightLoss = double.parse((measurement['weight'] -
+                        updatedMeasurements[index - 1]['weight'])
+                    .toString());
               }
               dynamic arrowIcon = false;
               Color arrowColor = widget.colors[0];
@@ -222,16 +225,19 @@ class _WHistoryState extends State<WHistory> {
                 margin: EdgeInsets.only(bottom: height * 0.015),
                 color: bg,
                 child: measurement.length > 2
-                    ? OpenContainerWrapper(
-                        page: Meas(
-                          measurements: updatedMeasurements[index],
-                          index: index,
-                          allmeasurements: updatedMeasurements,
-                          card: card,
-                          uid: widget.uid,
-                        ),
-                        content: widMeas(measurement, height, width, arrowIcon,
-                            arrowColor, weightLoss, index))
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: OpenContainerWrapper(
+                            page: Meas(
+                              measurements: updatedMeasurements[index],
+                              index: index,
+                              allmeasurements: updatedMeasurements,
+                              card: card,
+                              uid: widget.uid,
+                            ),
+                            content: widMeas(measurement, height, width,
+                                arrowIcon, arrowColor, weightLoss, index)),
+                      )
                     : widMeas(measurement, height, width, arrowIcon, arrowColor,
                         weightLoss, index),
               );

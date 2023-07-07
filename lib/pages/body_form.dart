@@ -4,6 +4,7 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:slimtrap/pages/cust_add_weight.dart';
 import 'package:slimtrap/pages/home.dart';
 import '../components/body_form/body_form_1.dart';
 import '../components/body_form/body_form_2.dart';
@@ -94,7 +95,7 @@ class _FormPageState extends State<FormPage> {
             },
           ),
         ),
-        title: 'Body Form ${isUser() ? 'of ${widget.name}' : ''}',
+        title: 'Check-up ${isUser() ? 'of ${widget.name}' : '(New User)'}',
       ),
       body: Stack(
         children: [
@@ -369,7 +370,7 @@ class _FormPageState extends State<FormPage> {
           borderRadius: BorderRadius.circular(15),
           flushbarStyle: FlushbarStyle.FLOATING,
           flushbarPosition: FlushbarPosition.BOTTOM,
-          message: "User added successfully!",
+          message: "${widget.name} check-up added successfully!",
           icon: Icon(
             Icons.check_circle_outline,
             size: 28.0,
@@ -407,12 +408,14 @@ class FormPageWrapper extends StatelessWidget {
   final List<Map<String, dynamic>>? measurements;
   final String? name;
   final String? uid;
+  final int? popIndex;
   const FormPageWrapper(
       {Key? key,
       this.heightx,
       this.age,
       this.gender,
       this.measurements,
+      this.popIndex,
       this.uid,
       this.name})
       : super(key: key);
@@ -468,7 +471,12 @@ class FormPageWrapper extends StatelessWidget {
                     Colors.blueAccent.shade700,
                     Colors.blue.shade300,
                   ],
-                  page: Container(),
+                  page: AddWeight(
+                    measurements: measurements!,
+                    name: name!,
+                    popIndex: popIndex!,
+                    uid: uid!,
+                  ),
                   label1: 'Add ',
                   label2: 'Weight'),
             ],
