@@ -316,6 +316,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                     labelText: 'Quantity',
                                     hintText: 'qty',
                                   ),
+                                  keyboardType: TextInputType.number,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'Please enter a quantity';
