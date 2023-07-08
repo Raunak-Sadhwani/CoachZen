@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:animations/animations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -9,7 +11,6 @@ import 'package:slimtrap/pages/body_form_cust.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
-import '../components/ui/data_manager.dart';
 import 'body_form.dart';
 import 'cust_order_form.dart';
 
@@ -21,63 +22,79 @@ class BodyFormList extends StatefulWidget {
 }
 
 class _BodyFormListState extends State<BodyFormList> {
+  bool _hasInternet = true;
+  Future<void> checkInternetConnection() async {
+    if (!await Method.checkInternetConnection(context)) {
+      setState(() {
+        _hasInternet = false;
+      });
+      return;
+    } else {
+      setState(() {
+        _hasInternet = true;
+      });
+    }
+    try {
+      final result =
+          await InternetAddress.lookup('firebasestorage.googleapis.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        setState(() {
+          _hasInternet = true;
+        });
+      }
+    } on SocketException catch (_) {
+      setState(() {
+        _hasInternet = false;
+      });
+    }
+  }
+
   bool isSearching = false;
   String searchQuery = '';
   FocusNode searchFocusNode = FocusNode();
   double opacity = 0.0;
   DateFormat formatter = DateFormat('dd MMM yyyy');
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _dataSubscription;
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredData = [];
 
   @override
   void initState() {
     super.initState();
-    _dataSubscription =
-        DataManager.getLatestUserDataStream().listen((snapshot) {
-      _filterAndSortData(snapshot);
-    });
+    checkInternetConnection();
   }
 
   @override
   void dispose() {
-    _dataSubscription?.cancel();
     super.dispose();
-  }
-
-  void _filterAndSortData(QuerySnapshot<Map<String, dynamic>> snapshot) {
-    if (snapshot.docs.isNotEmpty) {
-      final filteredData = snapshot.docs.where((doc) {
-        final name = doc.data()['name'].toString().toLowerCase();
-        final city = doc.data()['city'].toString().toLowerCase();
-        final phone = doc.data()['phone'].toString().toLowerCase();
-        final email = doc.data()['email'].toString().toLowerCase();
-        final searchLower = searchQuery.toLowerCase();
-        return name.contains(searchLower) ||
-            city.contains(searchLower) ||
-            phone.contains(searchLower) ||
-            email.contains(searchLower);
-      }).toList();
-
-      filteredData.sort((a, b) {
-        final dateA = a.data()['created'];
-        final dateB = b.data()['created'];
-        return dateB
-            .toDate()
-            .compareTo(dateA.toDate()); // Compare in reverse order
-      });
-
-      setState(() {
-        _filteredData = filteredData;
-      });
-    } else {
-      setState(() {
-        _filteredData = [];
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasInternet) {
+      // Show appropriate UI or display an error message
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'No Internet Connection',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () {
+                  checkInternetConnection();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
         appBar: MyAppBar(
           leftIcon: Container(
@@ -147,9 +164,37 @@ class _BodyFormListState extends State<BodyFormList> {
         // appBar: buildAppBar(),
         // listview from firestore collection
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: DataManager.getLatestUserDataStream(),
+          stream: FirebaseFirestore.instance
+              .collection("Users")
+              .where('cid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
+              .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+              final filteredData = snapshot.data!.docs.where((doc) {
+                final name = doc.data()['name'].toString().toLowerCase();
+                final city = doc.data()['city'].toString().toLowerCase();
+                final phone = doc.data()['phone'].toString().toLowerCase();
+                final email = doc.data()['email'].toString().toLowerCase();
+                final searchLower = searchQuery.toLowerCase();
+                return name.contains(searchLower) ||
+                    city.contains(searchLower) ||
+                    phone.contains(searchLower) ||
+                    email.contains(searchLower);
+              }).toList();
+
+              filteredData.sort((a, b) {
+                final dateA = a.data()['created'];
+                final dateB = b.data()['created'];
+                return dateB
+                    .toDate()
+                    .compareTo(dateA.toDate()); // Compare in reverse order
+              });
+
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                setState(() {
+                  _filteredData = filteredData;
+                });
+              });
               return ListView.builder(
                 physics: const BouncingScrollPhysics(),
                 itemCount: _filteredData.length,
@@ -298,42 +343,6 @@ class _BodyFormListState extends State<BodyFormList> {
                             );
                           },
                         ),
-                        // SlidableAction(
-                        //   backgroundColor: Colors.red,
-                        //   foregroundColor: Colors.white,
-                        //   icon: Icons.delete,
-                        //   label: 'Delete',
-                        //   onPressed: (context) {
-                        //     showDialog(
-                        //       context: context,
-                        //       builder: (context) {
-                        //         return AlertDialog(
-                        //           title: const Text('Delete'),
-                        //           content: Text(
-                        //               'Are you sure you want to remove $name?'),
-                        //           actions: [
-                        //             TextButton(
-                        //               onPressed: () {
-                        //                 Navigator.pop(context);
-                        //               },
-                        //               child: const Text('Cancel'),
-                        //             ),
-                        //             TextButton(
-                        //               onPressed: () {
-                        //                 FirebaseFirestore.instance
-                        //                     .collection('body_form')
-                        //                     .doc(id)
-                        //                     .delete();
-                        //                 Navigator.pop(context);
-                        //               },
-                        //               child: const Text('Delete'),
-                        //             ),
-                        //           ],
-                        //         );
-                        //       },
-                        //     );
-                        //   },
-                        // ),
                       ],
                     ),
                     child: openCont(
@@ -342,7 +351,7 @@ class _BodyFormListState extends State<BodyFormList> {
                         decoration: const BoxDecoration(
                           border: Border(
                             bottom: BorderSide(
-                              color: Colors.grey,
+                              color: Color.fromARGB(52, 158, 158, 158),
                               width: .5,
                             ),
                           ),

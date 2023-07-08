@@ -93,6 +93,9 @@ class _WHistoryState extends State<WHistory> {
               TextButton(
                 onPressed: () async {
                   try {
+                    if (!await Method.checkInternetConnection(context)) {
+                      return;
+                    }
                     if (_formKey.currentState!.validate()) {
                       setState(() {
                         updatedMeasurements[index]['weight'] = weight;
@@ -335,6 +338,9 @@ class _WHistoryState extends State<WHistory> {
                       ),
                       TextButton(
                         onPressed: () async {
+                          if (!await Method.checkInternetConnection(context)) {
+                            return;
+                          }
                           try {
                             setState(() {
                               updatedMeasurements.removeAt(index);

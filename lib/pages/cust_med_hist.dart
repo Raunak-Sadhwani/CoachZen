@@ -118,6 +118,9 @@ class _CustMedHistState extends State<CustMedHist> {
                   onPressed: () async {
                     // save to firestore
                     try {
+                      if (!await Method.checkInternetConnection(context)) {
+                        return;
+                      }
                       final userRef = FirebaseFirestore.instance
                           .collection('Users')
                           .doc(widget.uid);

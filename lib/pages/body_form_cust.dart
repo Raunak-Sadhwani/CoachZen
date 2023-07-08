@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:slimtrap/components/ui/appbar.dart';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:slimtrap/pages/cust_med_hist.dart';
+import 'package:slimtrap/pages/cust_plan_hist.dart';
 import 'package:slimtrap/pages/cust_product_hist.dart';
 import 'package:slimtrap/pages/cust_weight_hist.dart';
 
@@ -24,8 +27,69 @@ String formatDate(Timestamp timestamp) {
 }
 
 class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
+  bool _hasInternet = true;
+
+  @override
+  void initState() {
+    super.initState();
+    checkInternetConnection();
+  }
+
+  Future<void> checkInternetConnection() async {
+    if (!await Method.checkInternetConnection(context)) {
+      setState(() {
+        _hasInternet = false;
+      });
+      return;
+    } else {
+      setState(() {
+        _hasInternet = true;
+      });
+    }
+    try {
+      final result =
+          await InternetAddress.lookup('firebasestorage.googleapis.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        setState(() {
+          _hasInternet = true;
+        });
+      }
+    } on SocketException catch (_) {
+      setState(() {
+        _hasInternet = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_hasInternet) {
+      // Show appropriate UI or display an error message
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'No Internet Connection',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () {
+                  checkInternetConnection();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection("Users")
@@ -59,6 +123,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             ]);
             List<Map<String, dynamic>> measurements = [];
             List<Map<String, dynamic>> products = [];
+            List<Map<String, dynamic>> plans = [];
             List medicalHistory = user['medicalHistory'] ?? [];
             String? image = user['image'];
 
@@ -75,15 +140,19 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             if (user['productsHistory'] != null) {
               products = (user['productsHistory'] as List)
                   .cast<Map<String, dynamic>>()
-                  // .map((e) => {...e, 'date': formatDate(e['date'])})
                   .toList();
-
               products.sort((a, b) => b['date'].compareTo(a['date']));
+            }
+            if (user['plans'] != null) {
+              plans =
+                  (user['plans'] as List).cast<Map<String, dynamic>>().toList();
+              plans.sort((a, b) => b['started'].compareTo(a['started']));
             }
             return BodyFormCustomer(
                 userData: userData,
                 measurements: measurements,
                 products: products,
+                plans: plans,
                 medicalHistory: medicalHistory,
                 uid: widget.uid,
                 image: image);
@@ -99,6 +168,7 @@ class BodyFormCustomer extends StatefulWidget {
   final Map<String, dynamic> userData;
   final List<Map<String, dynamic>> measurements;
   final List<Map<String, dynamic>> products;
+  final List<Map<String, dynamic>> plans;
   final List medicalHistory;
   final String? image;
   final String uid;
@@ -106,6 +176,7 @@ class BodyFormCustomer extends StatefulWidget {
     Key? key,
     required this.userData,
     required this.measurements,
+    required this.plans,
     required this.products,
     required this.uid,
     required this.image,
@@ -268,16 +339,17 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                               uid: widget.uid,
                               medicalhistory: widget.medicalHistory,
                             )),
-                        // CustButton(
-                        //     height: height,
-                        //     width: width,
-                        //     onPressed: () {},
-                        //     imgPath: 'lib/assets/focus.png',
-                        //     label: 'Meds',
-                        //     page: CustMedHist(
-                        //       name: widget.userData['name'].split(' ')[0],
-                        //       medicalhistory: widget.medicalHistory,
-                        //     )),
+                        CustButton(
+                            height: height,
+                            width: width,
+                            onPressed: () {},
+                            imgPath: 'lib/assets/plans.png',
+                            label: 'Plans',
+                            page: CustPlanHist(
+                              name: widget.userData['name'],
+                              uid: widget.uid,
+                              plans: widget.plans,
+                            )),
                       ],
                     )
                   ],
@@ -529,6 +601,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
             ? FloatingActionButton(
                 onPressed: () async {
                   try {
+                    if (!await Method.checkInternetConnection(context)) {
+                      return;
+                    }
                     final userRef = FirebaseFirestore.instance
                         .collection('Users')
                         .doc(widget.uid);

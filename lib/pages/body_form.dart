@@ -158,6 +158,9 @@ class _FormPageState extends State<FormPage> {
   }
 
   onSubmit() async {
+    if (!await Method.checkInternetConnection(context)) {
+      return;
+    }
     bool formOneIsValid = formKey.currentState?.validate() ?? false;
     bool formTwoIsValid = formKey2.currentState?.validate() ?? false;
 
@@ -321,6 +324,9 @@ class _FormPageState extends State<FormPage> {
   }
 
   onSubmitUser() async {
+    if (!await Method.checkInternetConnection(context)) {
+      return;
+    }
     bool formOneIsValid = formKey.currentState?.validate() ?? false;
     if (formOneIsValid) {
       List<Map<String, dynamic>> allFields = [

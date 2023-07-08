@@ -68,7 +68,6 @@ class ProductsHistory extends StatelessWidget {
                   products: product['products'],
                   gradientColors: gradientColors,
                   onLongPress: (index) {
-                    print('long pressed');
                     Navigator.push(
                       context,
                       MaterialPageRoute(

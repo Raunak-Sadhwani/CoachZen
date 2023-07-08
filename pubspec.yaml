@@ -58,6 +58,8 @@ dependencies:
   google_sign_in: ^5.2.0
   another_flushbar: ^1.12.30
   cached_network_image: ^3.2.3
+  connectivity_plus: ^4.0.1
+  image_picker: ^1.0.0
 
 
 # For information on the generic Dart part of this file, see the

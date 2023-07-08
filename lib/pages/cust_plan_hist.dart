@@ -1,3 +1,4 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,25 +6,13 @@ import 'package:intl/intl.dart';
 
 import '../components/ui/appbar.dart';
 
-class PlanClass {
-  final String planName;
-  final int planDays;
-  final Timestamp planDate;
-
-  PlanClass({
-    required this.planName,
-    required this.planDays,
-    required this.planDate,
-  });
-  @override
-  String toString() {
-    return 'Plan Name: $planName, Plan Days: $planDays, Plan Date: $planDate';
-  }
-}
-
 class CustPlanHist extends StatefulWidget {
   final String name;
-  const CustPlanHist({Key? key, required this.name}) : super(key: key);
+  final String uid;
+  final List<Map<String, dynamic>> plans;
+  const CustPlanHist(
+      {Key? key, required this.name, required this.uid, required this.plans})
+      : super(key: key);
 
   @override
   State<CustPlanHist> createState() => _CustPlanHistState();
@@ -37,20 +26,66 @@ String formatDate(DateTime dateTime) {
 
 class _CustPlanHistState extends State<CustPlanHist> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  List<PlanClass> plans = [];
+  List<TextEditingController> planNameControllers = [];
+  List<TextEditingController> planDaysControllers = [];
+  List<Map<String, dynamic>> newPlans = [];
+  bool isPlanModified = false;
 
   @override
   void initState() {
     super.initState();
-    // Add some sample data to the plans list
-    plans = [];
-    debugPrint('Plans: ${plans.toString()}');
+    for (int i = 0; i < widget.plans.length; i++) {
+      newPlans.add(Map<String, dynamic>.from(widget.plans[i]));
+      var old = {'old': true};
+      newPlans[i].addAll(old);
+      planNameControllers.add(TextEditingController(text: newPlans[i]['name']));
+      planDaysControllers
+          .add(TextEditingController(text: newPlans[i]['days'].toString()));
+    }
+    debugPrint('newPlans: ${newPlans.toString()}');
+    debugPrint('plans: ${widget.plans.toString()}');
+  }
+
+  @override
+  void dispose() {
+    for (int i = 0; i < planNameControllers.length; i++) {
+      planNameControllers[i].dispose();
+      planDaysControllers[i].dispose();
+    }
+    newPlans.clear();
+    super.dispose();
+  }
+
+  void isPlanModifiedFunc() {
+    if (newPlans.length != widget.plans.length) {
+      setState(() {
+        isPlanModified = true;
+      });
+      return;
+    }
+
+    for (int i = 0; i < newPlans.length; i++) {
+      if (newPlans[i]['name'] != planNameControllers[i].text ||
+          newPlans[i]['days'].toString() != planDaysControllers[i].text ||
+          newPlans[i]['started'].toDate() !=
+              widget.plans[i]['started'].toDate()) {
+        setState(() {
+          isPlanModified = true;
+        });
+        return;
+      }
+    }
+
+    setState(() {
+      isPlanModified = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
+
     return Scaffold(
       appBar: MyAppBar(
         title: 'Plans of ${widget.name}',
@@ -65,200 +100,336 @@ class _CustPlanHistState extends State<CustPlanHist> {
             color: Colors.black26,
             onPressed: () {
               setState(() {
-                plans.add(PlanClass(
-                  planName: '',
-                  planDays: 0,
-                  planDate: Timestamp.now(),
-                ));
+                newPlans.add(
+                  {
+                    'name': '',
+                    'days': 0,
+                    'started': Timestamp.now(),
+                  },
+                );
+                planNameControllers.add(TextEditingController());
+                planDaysControllers.add(TextEditingController());
               });
+              isPlanModifiedFunc();
             },
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: plans.length,
-        itemBuilder: (context, index) {
-          return PlanCard(
-            onRemove: (plan) {
-              setState(() {
-                plans.remove(plan);
-              });
-            },
-          );
-        },
-      ),
-      // floatingActionButton: FloatingActionButton(
-      //   child: const Icon(Icons.add),
-      //   onPressed: () {
-      //     setState(() {
-      //       plans.add(PlanClass(
-      //         planName: '',
-      //         planDays: 0,
-      //         planDate: Timestamp.now(),
-      //       ));
-      //     });
-      //   },
-      // ),
-    );
-  }
-}
+      body: Form(
+        autovalidateMode: AutovalidateMode.onUserInteraction,
+        key: _formKey,
+        child: ListView.builder(
+          itemCount: newPlans.length,
+          itemBuilder: (context, index) {
+            final planNameController = planNameControllers[index];
+            final planDaysController = planDaysControllers[index];
+            final plan = newPlans[index];
+            return Container(
+              margin: EdgeInsets.only(
+                right: width * 0.01,
+                bottom: height * 0.02,
+                top: height * 0.02,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: width * 0.1,
+                    child: IconButton(
+                      icon:
+                          const Icon(Icons.close, color: Colors.red, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          // ask dialog
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: const Text('Delete Plan'),
+                                content: const Text(
+                                    'Are you sure you want to delete this plan?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text('No'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        newPlans.removeAt(index);
+                                        planNameControllers[index].dispose();
+                                        planDaysControllers[index].dispose();
+                                        planNameControllers.removeAt(index);
+                                        planDaysControllers.removeAt(index);
+                                      });
+                                      Navigator.pop(context);
 
-class PlanCard extends StatefulWidget {
-  final Function(PlanClass) onRemove;
-
-  const PlanCard({
-    Key? key,
-    required this.onRemove,
-  }) : super(key: key);
-
-  @override
-  State<PlanCard> createState() => _PlanCardState();
-}
-class _PlanCardState extends State<PlanCard> {
-  late String planName;
-  late int planDays;
-  late Timestamp planDate;
-
-  @override
-  void initState() {
-    super.initState();
-    planName = '';
-    planDays = 0;
-    planDate = Timestamp.now();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    double width = MediaQuery.of(context).size.width;
-    double height = MediaQuery.of(context).size.height;
-
-    return Container(
-      margin: EdgeInsets.only(
-        right: width * 0.01,
-        bottom: height * 0.02,
-        top: height * 0.02,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: width * 0.1,
-            child: IconButton(
-              icon: const Icon(Icons.close, color: Colors.red, size: 20),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text('Delete Plan?'),
-                      content: const Text(
-                          'Are you sure you want to delete this Plan?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              widget.onRemove(PlanClass(
-                                planName: planName,
-                                planDays: planDays,
-                                planDate: planDate,
-                              ));
-                            });
-                          },
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          Expanded(
-            child: Card(
-              elevation: 10,
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: width * 0.04, vertical: height * 0.02),
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        // Date and time picker code...
+                                      isPlanModifiedFunc();
+                                    },
+                                    child: const Text('Yes'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        });
                       },
+                    ),
+                  ),
+                  Expanded(
+                    child: Card(
+                      elevation: 10,
                       child: Container(
-                        margin: EdgeInsets.only(bottom: height * 0.02),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: width * 0.04,
+                          vertical: height * 0.02,
+                        ),
+                        child: Column(
                           children: [
-                            Text(
-                              'Plan Start:',
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
+                            if (plan['old'] != null && plan['old'] == true)
+                              Container(
+                                margin: EdgeInsets.only(bottom: height * 0.02),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Current Day:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    Text(
+                                      // today - started + 1
+                                      '${(DateTime.now().difference(plan['started'].toDate()).inDays + 1) > plan['days'] ? 'Expired' : (DateTime.now().difference(plan['started'].toDate()).inDays + 1)}',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color: (DateTime.now()
+                                                        .difference(
+                                                            plan['started']
+                                                                .toDate())
+                                                        .inDays +
+                                                    1) >
+                                                plan['days']
+                                            ? Colors.red
+                                            : Colors.black,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            GestureDetector(
+                              onTap: () async {
+                                final selected = await showDatePicker(
+                                  context: context,
+                                  initialDate: plan['started'].toDate(),
+                                  firstDate: DateTime.now()
+                                      .subtract(const Duration(days: 13 * 365)),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (selected != null) {
+                                  final selectedTime = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.now(),
+                                  );
+                                  if (selectedTime != null) {
+                                    setState(() {
+                                      DateTime selectedDateTime = DateTime(
+                                        selected.year,
+                                        selected.month,
+                                        selected.day,
+                                        selectedTime.hour,
+                                        selectedTime.minute,
+                                      );
+                                      plan['started'] =
+                                          Timestamp.fromDate(selectedDateTime);
+                                    });
+                                    isPlanModifiedFunc();
+                                  }
+                                }
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(bottom: height * 0.02),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Plan Start:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    Text(
+                                      formatDate(
+                                        plan['started'].toDate(),
+                                      ),
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            Text(
-                              formatDate(planDate.toDate()),
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600, fontSize: 14),
+                            if (plan['old'] != null && plan['old'] == true)
+                              Container(
+                                margin: EdgeInsets.only(bottom: height * 0.02),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Plan End:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    Text(
+                                      formatDate(
+                                        plan['started'].toDate().add(
+                                              Duration(
+                                                days: plan['days'],
+                                              ),
+                                            ),
+                                      ),
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: TextFormField(
+                                    controller: planNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Plan Name',
+                                      contentPadding: EdgeInsets.only(left: 10),
+                                    ),
+                                    onChanged: (value) {
+                                      isPlanModifiedFunc();
+                                    },
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter a plan name';
+                                      } else if (value.length < 3) {
+                                        return 'Plan name must be atleast 3 characters long';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: width * 0.1,
+                                ),
+                                Expanded(
+                                  flex: 1,
+                                  child: TextFormField(
+                                    controller: planDaysController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Days',
+                                      contentPadding: EdgeInsets.only(left: 10),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Empty';
+                                      } else if (int.parse(value) < 1) {
+                                        return '> 1';
+                                      } else {
+                                        return null;
+                                      }
+                                    },
+                                    onChanged: (value) {
+                                      isPlanModifiedFunc();
+                                      debugPrint(
+                                          'newPlans: ${newPlans.toString()}');
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextFormField(
-                            decoration: const InputDecoration(
-                                labelText: 'Plan Name',
-                                contentPadding: EdgeInsets.only(left: 10)),
-                            validator: (value) {
-                              // Validation code...
-                            },
-                            onChanged: (value) {
-                              setState(() {
-                                planName = value;
-                              });
-                            },
-                          ),
-                        ),
-                        SizedBox(
-                          width: width * 0.1,
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: TextFormField(
-                            decoration: const InputDecoration(
-                                labelText: 'Days',
-                                contentPadding: EdgeInsets.only(left: 10)),
-                            keyboardType: TextInputType.number,
-                            validator: (value) {
-                              // Validation code...
-                            },
-                            onChanged: (value) {
-                              setState(() {
-                                planDays = int.parse(value);
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
+      floatingActionButton: newPlans.isNotEmpty && isPlanModified
+          ? FloatingActionButton(
+              child: const Icon(Icons.save),
+              onPressed: () async {
+                if (_formKey.currentState!.validate()) {
+                  if (!await Method.checkInternetConnection(context)) {
+                    return;
+                  }
+                  try {
+                    // remove 'old' key if exists
+                    for (int i = 0; i < newPlans.length; i++) {
+                      if (newPlans[i]['old'] != null) {
+                        newPlans[i].remove('old');
+                      }
+                      newPlans[i]['name'] = planNameControllers[i].text;
+                      newPlans[i]['days'] =
+                          int.parse(planDaysControllers[i].text);
+                    }
+                    await FirebaseFirestore.instance
+                        .collection('Users')
+                        .doc(widget.uid)
+                        .update({
+                      'plans': newPlans,
+                    });
+                    Navigator.pop(context);
+                    Flushbar(
+                      margin: const EdgeInsets.all(7),
+                      borderRadius: BorderRadius.circular(15),
+                      flushbarStyle: FlushbarStyle.FLOATING,
+                      flushbarPosition: FlushbarPosition.BOTTOM,
+                      message: "Plan updated successfully",
+                      icon: Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 28.0,
+                        color: Colors.green[300],
+                      ),
+                      duration: const Duration(milliseconds: 1500),
+                      leftBarIndicatorColor: Colors.green[300],
+                    ).show(context);
+                  } catch (e) {
+                    debugPrint(e.toString());
+                    Flushbar(
+                      margin: const EdgeInsets.all(7),
+                      borderRadius: BorderRadius.circular(15),
+                      flushbarStyle: FlushbarStyle.FLOATING,
+                      flushbarPosition: FlushbarPosition.BOTTOM,
+                      message: "Error updating user data",
+                      icon: Icon(
+                        Icons.error_outline_rounded,
+                        size: 28.0,
+                        color: Colors.red[300],
+                      ),
+                      duration: const Duration(milliseconds: 1500),
+                      leftBarIndicatorColor: Colors.red[300],
+                    ).show(context);
+                  }
+                }
+              },
+            )
+          : null,
     );
   }
 }

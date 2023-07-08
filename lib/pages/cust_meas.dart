@@ -120,6 +120,9 @@ class _MeasState extends State<Meas> {
           ? FloatingActionButton.extended(
               onPressed: () async {
                 try {
+                  if (!await Method.checkInternetConnection(context)) {
+                    return;
+                  }
                   setState(() {
                     widget.allmeasurements[widget.index] = updatedMeasurements;
                     ogMeasurements = Map.from(updatedMeasurements);

@@ -65,11 +65,9 @@ class _CustOrderFormState extends State<CustOrderForm> {
   @override
   void dispose() {
     // Dispose the controllers
-    for (var controller in productNameControllers) {
-      controller.dispose();
-    }
-    for (var controller in productQuantityControllers) {
-      controller.dispose();
+    for (int i = 0; i < productNameControllers.length; i++) {
+      productNameControllers[i].dispose();
+      productQuantityControllers[i].dispose();
     }
     super.dispose();
   }
@@ -340,9 +338,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
       ),
       floatingActionButton: tempList.isNotEmpty
           ? FloatingActionButton(
-              onPressed: () {
+              onPressed: () async {
                 if (_formKey.currentState!.validate() &&
                     selectedDateTime != null) {
+                  if (!await Method.checkInternetConnection(context)) {
+                    return;
+                  }
                   try {
                     Map<String, dynamic> products = {};
                     for (var i = 0; i < tempList.length; i++) {
@@ -390,7 +391,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                     });
                     debugPrint(widget.productsHistory.toString());
                     try {
-                      FirebaseFirestore.instance
+                      await FirebaseFirestore.instance
                           .collection('Users')
                           .doc(widget.uid)
                           .update({
@@ -404,7 +405,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         borderRadius: BorderRadius.circular(15),
                         flushbarStyle: FlushbarStyle.FLOATING,
                         flushbarPosition: FlushbarPosition.BOTTOM,
-                        message: "User data updated successfully",
+                        message: "Order added successfully",
                         icon: Icon(
                           Icons.check_circle_outline_rounded,
                           size: 28.0,

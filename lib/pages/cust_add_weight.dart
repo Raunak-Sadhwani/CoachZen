@@ -40,6 +40,9 @@ class _AddWeightState extends State<AddWeight> {
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      if (!await Method.checkInternetConnection(context)) {
+        return;
+      }
       // parse date
       DateTime date = DateTime.now();
       try {

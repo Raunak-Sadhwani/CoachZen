@@ -1,7 +1,7 @@
 import 'package:animations/animations.dart';
+import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
-
-
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leftIcon;
@@ -44,7 +44,8 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 // ignore: unused_element
 class OpenContainerWrapper extends StatelessWidget {
-  const OpenContainerWrapper({super.key, 
+  const OpenContainerWrapper({
+    super.key,
     required this.page,
     required this.content,
     this.openColor,
@@ -76,4 +77,51 @@ class OpenContainerWrapper extends StatelessWidget {
       transitionDuration: const Duration(milliseconds: 450),
     );
   }
+}
+
+// static Future<bool> checkInternetConnection(BuildContext context) async {
+//   var connectivityResult = await (Connectivity().checkConnectivity());
+//   if (connectivityResult == ConnectivityResult.none) {
+//     Flushbar(
+//       margin: const EdgeInsets.all(7),
+//       borderRadius: BorderRadius.circular(15),
+//       flushbarStyle: FlushbarStyle.FLOATING,
+//       flushbarPosition: FlushbarPosition.TOP,
+//       message: "No internet connection",
+//       icon: Icon(
+//         Icons.wifi_off,
+//         size: 28.0,
+//         color: Colors.blue[300],
+//       ),
+//       duration: const Duration(milliseconds: 1500),
+//       leftBarIndicatorColor: Colors.blue[300],
+//     ).show(context);
+//     return false;
+//   }
+//   return true;
+// }
+
+class Method {
+  static Future<bool> checkInternetConnection(BuildContext context) async {
+  var connectivityResult = await (Connectivity().checkConnectivity());
+  if (connectivityResult == ConnectivityResult.none) {
+    Flushbar(
+      margin: const EdgeInsets.all(7),
+      borderRadius: BorderRadius.circular(15),
+      flushbarStyle: FlushbarStyle.FLOATING,
+      flushbarPosition: FlushbarPosition.TOP,
+      message: "No internet connection",
+      icon: Icon(
+        Icons.wifi_off,
+        size: 28.0,
+        color: Colors.blue[300],
+      ),
+      duration: const Duration(milliseconds: 3000),
+      leftBarIndicatorColor: Colors.blue[300],
+    ).show(context!);
+    return false;
+  }
+  return true;
+}
+
 }
