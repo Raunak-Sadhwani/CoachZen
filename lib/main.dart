@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:slimtrap/pages/get_start.dart';
 import 'package:slimtrap/pages/home.dart';
-import 'package:slimtrap/pages/login.dart';
 // import 'pages/home.dart';
 
 void main() async {
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
     User? user = FirebaseAuth.instance.currentUser;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: user == null ? const LoginPage() : const HomePage(),
+      home: user == null ? const GetStarted() : const HomePage(),
     );
   }
 }

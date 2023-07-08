@@ -1,227 +1,371 @@
-// ignore_for_file: use_build_context_synchronously
+import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'get_start.dart';
 import 'home.dart';
+import 'register.dart';
+import 'package:auto_size_text/auto_size_text.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({Key? key}) : super(key: key);
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final email = TextEditingController();
+  final password = TextEditingController();
+  final Color? _color = Colors.grey[100];
+  bool _obscureText = true;
+  bool pressed = false;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login Page'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _emailController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: 'Email'),
+        key: _scaffoldKey,
+        body: Align(
+            alignment: Alignment.topCenter,
+            child: Column(children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.05,
               ),
-              TextFormField(
-                controller: _passwordController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter your password';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20.0),
-              Row(
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        _signInWithEmailAndPassword();
-                      }
-                    },
-                    child: const Text('Login'),
+              SizedBox(
+                width: MediaQuery.of(context).size.width,
+                height: MediaQuery.of(context).size.height * 0.12,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const GetStarted())),
+                    child: AutoSizeText(
+                      "CoachUp",
+                      style: GoogleFonts.luckiestGuy(
+                        color: Colors.blue,
+                        fontSize: 45,
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 20.0),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(MaterialPageRoute(
-                        builder: (context) => const RegisterPage(),
-                      ));
-                    },
-                    child: const Text('Sign Up'),
-                  ),
-                ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(40),
+                          topRight: Radius.circular(40))),
+                  child: SingleChildScrollView(
+                    padding:
+                        const EdgeInsets.only(left: 20.0, right: 20.0, top: 15),
+                    child: Column(children: [
+                      Text(
+                        'Log In',
+                        style: GoogleFonts.notoSans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 32,
+                        ),
+                      ),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.01,
+                      ),
+                      Text('Please login to continue using our app',
+                          style: TextStyle(color: Colors.grey[100])),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.1,
+                      ),
+                      Form(
+                          autovalidateMode: pressed
+                              ? AutovalidateMode.onUserInteraction
+                              : AutovalidateMode.disabled,
+                          key: _formKey,
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextFormField(
+                                  controller: email,
+                                  validator: (email) => email!.isValidEmail()
+                                      ? null
+                                      : "Check your email",
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Padding(
+                                      padding: EdgeInsets.only(left: 10.0),
+                                      child: Icon(
+                                        Icons.email,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    hintText: "   Your Email",
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.blue,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    errorStyle:
+                                        const TextStyle(color: Colors.black),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 0, 0, 0),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.blue,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: _color,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: 20,
+                                ),
+                                TextFormField(
+                                  validator: (password) =>
+                                      password != null && password.length < 6
+                                          ? "Invalid Password"
+                                          : null,
+                                  controller: password,
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Padding(
+                                      padding: EdgeInsets.only(left: 10.0),
+                                      child: Icon(
+                                        Icons.vpn_key,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    suffixIcon: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _obscureText = !_obscureText;
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 10.0),
+                                        child: Icon(
+                                          _obscureText
+                                              ? Icons.visibility_off
+                                              : Icons.visibility,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
+                                    hintText: "   Enter Password",
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.blue,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    errorStyle:
+                                        const TextStyle(color: Colors.black),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.black,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.blue,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: _color,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25.0),
+                                      borderSide: const BorderSide(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                  obscureText: _obscureText,
+                                ),
+                                const SizedBox(
+                                  height: 60,
+                                ),
+                                Center(
+                                  child: Column(
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: signIn,
+                                        style: ElevatedButton.styleFrom(
+                                          minimumSize:
+                                              const Size.fromHeight(50),
+                                          backgroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: MediaQuery.of(context)
+                                                    .size
+                                                    .height *
+                                                0.02,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(40),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Log In',
+                                          style: GoogleFonts.montserrat(
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 20,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        height:
+                                            MediaQuery.of(context).size.height *
+                                                0.03,
+                                      ),
+                                      RichText(
+                                          text: TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: "Don't have an account? ",
+                                            style: GoogleFonts.notoSans(
+                                              color: Colors.grey[200],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () => Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          const Register())),
+                                            text: ' Sign Up',
+                                            style: GoogleFonts.notoSans(
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      )),
+                                    ],
+                                  ),
+                                ),
+                              ]))
+                    ]),
+                  ),
+                ),
+              ),
+            ])));
   }
 
-  void _signInWithEmailAndPassword() async {
-    try {
-      final UserCredential userCredential =
-          await _auth.signInWithEmailAndPassword(
-        email: _emailController.text,
-        password: _passwordController.text,
-      );
-      final User? user = userCredential.user;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user!.email} signed in'),
+  Future signIn() async {
+    final isValform = _formKey.currentState?.validate();
+    if (!isValform!) return;
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      return Flushbar(
+        message: 'No Internet Connection, Login Failed',
+        icon: Icon(
+          Icons.info_outline,
+          size: 28.0,
+          color: Colors.blue[300],
         ),
-      );
-      // navigate to home page (home.dart)
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (context) => const HomePage(),
-      ));
-    } on FirebaseAuthException {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to sign in with email and password'),
-        ),
-      );
+        duration: const Duration(milliseconds: 1500),
+        leftBarIndicatorColor: Colors.blue[300],
+      )..show(_scaffoldKey.currentContext!);
     }
-  }
-}
 
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
-  @override
-  State<RegisterPage> createState() => _RegisterPageState();
-}
+    var emailT = email.text.trim();
 
-class _RegisterPageState extends State<RegisterPage> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ));
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Register Page'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nameController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter your name';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              TextFormField(
-                controller: _emailController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: 'Email'),
-              ),
-              TextFormField(
-                controller: _passwordController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter your password';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20.0),
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    _registerWithEmailAndPassword();
-                  }
-                },
-                child: const Text('Register'),
-              ),
-            ],
-          ),
+    // Check if the email belongs to a coach
+    var coachSnapshot = await FirebaseFirestore.instance
+        .collection('Coaches')
+        .where('email', isEqualTo: emailT)
+        .limit(1)
+        .get();
+
+    if (coachSnapshot.docs.isEmpty) {
+      Navigator.of(context, rootNavigator: true).pop('dialog');
+      return Flushbar(
+        message:
+            'Unauthorized User or User not found. Please check your credentials',
+        icon: Icon(
+          Icons.info_outline,
+          size: 28.0,
+          color: Colors.blue[300],
         ),
-      ),
-    );
-  }
+        duration: const Duration(milliseconds: 3000),
+        leftBarIndicatorColor: Colors.blue[300],
+      )..show(_scaffoldKey.currentContext!);
+    }
 
-  void _registerWithEmailAndPassword() async {
     try {
-      final UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text,
-        password: _passwordController.text,
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: emailT, password: password.text.trim());
+      Navigator.of(context, rootNavigator: true).pop('dialog');
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
+        (Route<dynamic> route) => false,
       );
-      final User? user = userCredential.user;
-      await user!.updateDisplayName(_nameController.text);
-      // insert user data to firestore, 'coaches' collection
-      try {
-        // a unique id
-        await FirebaseFirestore.instance
-            .collection('Coaches')
-            .doc(_nameController.text)
-            .set({
-          'name': _nameController.text,
-          'email': _emailController.text,
-        });
-      } catch (e) {
-        // delete the user if firestore insertion failed
-        await user.delete();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to register with email and password: $e'),
-          ),
-        );
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.email} registered'),
-        ),
-      );
-      // navigate to home page (home.dart)
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (context) => const HomePage(),
-      ));
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to register with email and password: $e'),
-        ),
-      );
+      Navigator.of(context, rootNavigator: true).pop('dialog');
+      if (e.code == 'user-not-found') {
+        return Flushbar(
+          message: 'User not found. Please check your credentials',
+          icon: Icon(
+            Icons.info_outline,
+            size: 28.0,
+            color: Colors.blue[300],
+          ),
+          duration: const Duration(milliseconds: 3000),
+          leftBarIndicatorColor: Colors.blue[300],
+        )..show(_scaffoldKey.currentContext!);
+      } else if (e.code == 'wrong-password') {
+        return Flushbar(
+          message: 'Incorrect email or password. Please check your credentials',
+          icon: Icon(
+            Icons.info_outline,
+            size: 28.0,
+            color: Colors.blue[300],
+          ),
+          duration: const Duration(milliseconds: 3000),
+          leftBarIndicatorColor: Colors.blue[300],
+        )..show(_scaffoldKey.currentContext!);
+      }
     }
   }
 }

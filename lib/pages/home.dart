@@ -147,32 +147,56 @@ class _HomePageState extends State<HomePage> {
     }
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: MyAppBar(
-          // avatar
-          rightIcons: [
-            OpenContainerWrapper(
-              page: ProfilePg(
-                userData: coachData,
-              ),
-              content: Container(
-                margin: EdgeInsets.only(right: width * 0.06),
-                child: Image.asset('lib/assets/male.png',
-                    height: 40, fit: BoxFit.cover),
-              ),
-            ),
-          ]
 
-          // title: 'Home',
-          ),
       // backgroundColor: const Color.fromARGB(255, 83, 98, 210),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: width * 0.035,
-            vertical: height * 0.02,
+          padding: EdgeInsets.only(
+            left: width * 0.035,
+            right: width * 0.035,
+            bottom: height * 0.02,
+            top: height * 0.07,
           ),
           child: Column(
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProfilePg(userData: coachData),
+                        ),
+                      );
+                    },
+                    child: Container(
+                        width: width * 0.175,
+                        height: width * 0.175,
+                        margin: EdgeInsets.only(
+                            bottom: width * 0.06, right: width * 0.032),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(100),
+                          child: user!.photoURL != null &&
+                                  user!.photoURL!.isNotEmpty
+                              ? FadeInImage(
+                                  placeholder: const AssetImage(
+                                      // 'lib/assets/${coachData["gender"]}.png'),
+                                      'lib/assets/male.png'),
+                                  image: NetworkImage(user!.photoURL!),
+                                  fit: BoxFit
+                                      .cover, // Adjust the fit as per your requirement
+                                )
+                              : Image.asset(
+                                  fit: BoxFit.cover,
+                                  'lib/assets/female.png',
+                                ),
+                        )),
+                  )
+                ],
+              ),
               Container(
                 padding: EdgeInsets.only(left: width * 0.04),
                 margin: EdgeInsets.only(bottom: height * 0.03),

@@ -2,6 +2,7 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:slimtrap/components/body_form/gender_switch.dart';
 
@@ -358,12 +359,17 @@ class CustomTextFormField extends StatelessWidget {
         ),
         child: Container(
           padding: EdgeInsets.symmetric(
-              vertical: height * 0.02, horizontal: width * 0.07),
+              vertical: height * 0.04, horizontal: width * 0.07),
           child: TextFormField(
             readOnly: readOnly,
             controller: controller,
             keyboardType: keyboardType,
             onTap: onTap,
+            // change font family
+            style: GoogleFonts.raleway(
+              fontSize: height * 0.02,
+              fontWeight: FontWeight.w500,
+            ),
             decoration: InputDecoration(
               labelText: labelText,
               suffixText: suffixText,
