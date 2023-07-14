@@ -28,8 +28,7 @@ class _AddWeightState extends State<AddWeight> {
   double weight = 60.0;
 
 // todays date not time
-  final TextEditingController _dateController = TextEditingController(
-      text: DateFormat('dd-MM-yyyy').format(DateTime.now()));
+  final TextEditingController _dateController = TextEditingController();
 
   @override
   void dispose() {
@@ -48,8 +47,27 @@ class _AddWeightState extends State<AddWeight> {
       try {
         final DateFormat format = DateFormat('dd-MM-yyyy');
         date = format.parseStrict(_dateController.text);
+        // check in widget.measurements if duplicate date exists
+        for (int i = 0; i < widget.measurements.length; i++) {
+          if (widget.measurements[i]['date'].toDate() == date) {
+            return Flushbar(
+              margin: const EdgeInsets.all(7),
+              borderRadius: BorderRadius.circular(15),
+              flushbarStyle: FlushbarStyle.FLOATING,
+              flushbarPosition: FlushbarPosition.BOTTOM,
+              message: "Weight for this date already exists!",
+              icon: Icon(
+                Icons.error_outline,
+                size: 28.0,
+                color: Colors.red[300],
+              ),
+              duration: const Duration(milliseconds: 2000),
+              leftBarIndicatorColor: Colors.red[300],
+            ).show(scaffoldKey.currentContext!);
+          }
+        }
       } catch (e) {
-        Flushbar(
+        return Flushbar(
           margin: const EdgeInsets.all(7),
           borderRadius: BorderRadius.circular(15),
           flushbarStyle: FlushbarStyle.FLOATING,
@@ -63,9 +81,7 @@ class _AddWeightState extends State<AddWeight> {
           duration: const Duration(milliseconds: 2000),
           leftBarIndicatorColor: Colors.red[300],
         ).show(scaffoldKey.currentContext!);
-        return debugPrint(e.toString());
       }
-
       Map<String, dynamic> data = {
         'weight': weight,
         'date': date,
@@ -116,6 +132,29 @@ class _AddWeightState extends State<AddWeight> {
     }
   }
 
+  List<DateTime> disabledDates = [];
+  DateTime selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    // disable dates
+    for (int i = 0; i < widget.measurements.length; i++) {
+      DateTime date = widget.measurements[i]['date'].toDate();
+      // remove time if exists
+      date = DateTime(date.year, date.month, date.day);
+      disabledDates.add(date);
+    }
+    selectedDate =
+        DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    while (disabledDates.contains(selectedDate)) {
+      selectedDate =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      selectedDate = selectedDate.subtract(const Duration(days: 1));
+    }
+    _dateController.text = DateFormat('dd-MM-yyyy').format(selectedDate);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,9 +182,13 @@ class _AddWeightState extends State<AddWeight> {
                 onTap: () {
                   showDatePicker(
                     context: context,
-                    initialDate: DateTime.now(),
+                    // set initialDate which is not in disabledDates
+                    initialDate: selectedDate,
                     firstDate: DateTime(DateTime.now().year - 13),
                     lastDate: DateTime.now(),
+                    // selectableDayPredicate: (DateTime date) {
+                    //   return !disabledDates.contains(date);
+                    // },
                   ).then((date) {
                     if (date != null) {
                       setState(() {

@@ -143,10 +143,21 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                   .toList();
               products.sort((a, b) => b['date'].compareTo(a['date']));
             }
-            if (user['plans'] != null) {
+            if (user['plans'] != null && user['plans'].isNotEmpty) {
               plans =
                   (user['plans'] as List).cast<Map<String, dynamic>>().toList();
               plans.sort((a, b) => b['started'].compareTo(a['started']));
+              // if userdata does not have plan, add it
+              if (userData['plan'] == null) {
+                String plan = plans[0]['name'];
+                // make plan before 'created' key in userData
+                userData = Map.fromEntries([
+                  ...userData.entries
+                      .where((entry) => entry.key != 'created'),
+                  MapEntry('plan', plan),
+                  MapEntry('created', userData['created']),
+                ]);
+              }
             }
             return BodyFormCustomer(
                 userData: userData,
@@ -582,7 +593,6 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                       }
                                       Navigator.of(context).pop();
                                     }
-                                    // debugPrint(updateFields.toString());
                                   },
                                 ),
                               ],

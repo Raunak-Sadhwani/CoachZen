@@ -3,10 +3,9 @@ import 'form_fields.dart';
 import '../ui/app_colors.dart';
 
 class BodyForm3 extends StatefulWidget {
-  final VoidCallback onSubmit;
+  // final VoidCallback onSubmit;
   final GlobalKey<FormState> formKey;
-  const BodyForm3({Key? key, required this.onSubmit, required this.formKey})
-      : super(key: key);
+  const BodyForm3({Key? key, required this.formKey}) : super(key: key);
 
   @override
   State<BodyForm3> createState() => _BodyForm3State();
@@ -61,6 +60,12 @@ class _BodyForm3State extends State<BodyForm3>
       if (!RegExp(r'^[6-9]\d{9}$').hasMatch(value!)) {
         return 'Please enter a valid Indian phone number';
       }
+    } else if (label == 'City') {
+      // containy only alphabets and spaces
+      if (value!.length < 3 || !value.contains(RegExp(r'^[a-zA-Z\s]+$'))) {
+        return 'Invalid city name';
+      }
+      return null;
     }
     // else if (label == 'Medical History (optional)') {
     //   // medical history field can be empty
@@ -88,10 +93,10 @@ class _BodyForm3State extends State<BodyForm3>
               validator: _validateField,
             ),
           )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: widget.onSubmit,
-        child: const Icon(Icons.check),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: widget.onSubmit,
+      //   child: const Icon(Icons.check),
+      // ),
     );
   }
 }

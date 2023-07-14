@@ -32,7 +32,7 @@ class ProductsHistory extends StatelessWidget {
     return Scaffold(
       backgroundColor: bg,
       appBar: MyAppBar(
-        title: 'Product History of $name',
+        title: 'Order History of $name',
         leftIcon: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           color: Colors.black26,

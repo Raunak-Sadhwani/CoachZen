@@ -35,6 +35,7 @@ class _CustPlanHistState extends State<CustPlanHist> {
   void initState() {
     super.initState();
     for (int i = 0; i < widget.plans.length; i++) {
+      // add at first
       newPlans.add(Map<String, dynamic>.from(widget.plans[i]));
       var old = {'old': true};
       newPlans[i].addAll(old);
@@ -42,8 +43,6 @@ class _CustPlanHistState extends State<CustPlanHist> {
       planDaysControllers
           .add(TextEditingController(text: newPlans[i]['days'].toString()));
     }
-    debugPrint('newPlans: ${newPlans.toString()}');
-    debugPrint('plans: ${widget.plans.toString()}');
   }
 
   @override
@@ -81,12 +80,16 @@ class _CustPlanHistState extends State<CustPlanHist> {
     });
   }
 
+  // scaffold key
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
 
     return Scaffold(
+      key: _scaffoldKey,
       appBar: MyAppBar(
         title: 'Plans of ${widget.name}',
         leftIcon: IconButton(
@@ -124,6 +127,12 @@ class _CustPlanHistState extends State<CustPlanHist> {
             final planNameController = planNameControllers[index];
             final planDaysController = planDaysControllers[index];
             final plan = newPlans[index];
+            final daysSinceStarted =
+                DateTime.now().difference(plan['started'].toDate()).inDays + 1;
+            final planStatus = daysSinceStarted > plan['days']
+                ? 'Expired'
+                : '$daysSinceStarted / ${plan['days']} days';
+
             return Container(
               margin: EdgeInsets.only(
                 right: width * 0.01,
@@ -203,18 +212,11 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                       ),
                                     ),
                                     Text(
-                                      // today - started + 1
-                                      '${(DateTime.now().difference(plan['started'].toDate()).inDays + 1) > plan['days'] ? 'Expired' : (DateTime.now().difference(plan['started'].toDate()).inDays + 1)}',
+                                      planStatus,
                                       style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
-                                        color: (DateTime.now()
-                                                        .difference(
-                                                            plan['started']
-                                                                .toDate())
-                                                        .inDays +
-                                                    1) >
-                                                plan['days']
+                                        color: planStatus == 'Expired'
                                             ? Colors.red
                                             : Colors.black,
                                       ),
@@ -264,13 +266,19 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                         fontSize: 15,
                                       ),
                                     ),
-                                    Text(
-                                      formatDate(
-                                        plan['started'].toDate(),
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                                    Flexible(
+                                      child: Wrap(
+                                        children: [
+                                          Text(
+                                            formatDate(
+                                              plan['started'].toDate(),
+                                            ),
+                                            style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -290,17 +298,23 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                         fontSize: 15,
                                       ),
                                     ),
-                                    Text(
-                                      formatDate(
-                                        plan['started'].toDate().add(
-                                              Duration(
-                                                days: plan['days'],
-                                              ),
+                                    Flexible(
+                                      child: Wrap(
+                                        children: [
+                                          Text(
+                                            formatDate(
+                                              plan['started'].toDate().add(
+                                                    Duration(
+                                                      days: plan['days'],
+                                                    ),
+                                                  ),
                                             ),
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                                            style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     )
                                   ],
@@ -352,8 +366,6 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                     },
                                     onChanged: (value) {
                                       isPlanModifiedFunc();
-                                      debugPrint(
-                                          'newPlans: ${newPlans.toString()}');
                                     },
                                   ),
                                 ),
@@ -370,66 +382,95 @@ class _CustPlanHistState extends State<CustPlanHist> {
           },
         ),
       ),
-      floatingActionButton: newPlans.isNotEmpty && isPlanModified
-          ? FloatingActionButton(
-              child: const Icon(Icons.save),
-              onPressed: () async {
-                if (_formKey.currentState!.validate()) {
-                  if (!await Method.checkInternetConnection(context)) {
-                    return;
-                  }
-                  try {
-                    // remove 'old' key if exists
-                    for (int i = 0; i < newPlans.length; i++) {
-                      if (newPlans[i]['old'] != null) {
-                        newPlans[i].remove('old');
+      //  if newplans is empty and widget.plans is empty and !isPlanModified
+      floatingActionButton:
+          // (newPlans.isNotEmpty && widget.plans.isNotEmpty) && isPlanModified
+          (newPlans.isNotEmpty || widget.plans.isNotEmpty) && isPlanModified
+              ? FloatingActionButton(
+                  child: const Icon(Icons.save),
+                  onPressed: () async {
+                    if (_formKey.currentState!.validate()) {
+                      if (!await Method.checkInternetConnection(context)) {
+                        return;
                       }
-                      newPlans[i]['name'] = planNameControllers[i].text;
-                      newPlans[i]['days'] =
-                          int.parse(planDaysControllers[i].text);
+                      try {
+                        int activePlans = 0;
+                        // remove 'old' key if exists
+                        for (int i = 0; i < newPlans.length; i++) {
+                          if (newPlans[i]['old'] != null) {
+                            newPlans[i].remove('old');
+                          }
+                          newPlans[i]['name'] = planNameControllers[i].text;
+                          newPlans[i]['days'] =
+                              int.parse(planDaysControllers[i].text);
+                          if (DateTime.now()
+                                      .difference(
+                                          newPlans[i]['started'].toDate())
+                                      .inDays +
+                                  1 <=
+                              newPlans[i]['days']) {
+                            activePlans++;
+                          }
+                        }
+                        if (activePlans > 1) {
+                          Flushbar(
+                            margin: const EdgeInsets.all(7),
+                            borderRadius: BorderRadius.circular(15),
+                            flushbarStyle: FlushbarStyle.FLOATING,
+                            flushbarPosition: FlushbarPosition.BOTTOM,
+                            message: "Only one active plan is allowed",
+                            icon: Icon(
+                              Icons.error_outline_rounded,
+                              size: 28.0,
+                              color: Colors.red[300],
+                            ),
+                            duration: const Duration(milliseconds: 1500),
+                            leftBarIndicatorColor: Colors.red[300],
+                          ).show(_scaffoldKey.currentContext!);
+                          return;
+                        }
+                        await FirebaseFirestore.instance
+                            .collection('Users')
+                            .doc(widget.uid)
+                            .update({
+                          'plans': newPlans,
+                        });
+                        Navigator.pop(_scaffoldKey.currentContext!);
+                        Flushbar(
+                          margin: const EdgeInsets.all(7),
+                          borderRadius: BorderRadius.circular(15),
+                          flushbarStyle: FlushbarStyle.FLOATING,
+                          flushbarPosition: FlushbarPosition.BOTTOM,
+                          message: "Plan updated successfully",
+                          icon: Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 28.0,
+                            color: Colors.green[300],
+                          ),
+                          duration: const Duration(milliseconds: 1500),
+                          leftBarIndicatorColor: Colors.green[300],
+                        ).show(_scaffoldKey.currentContext!);
+                      } catch (e) {
+                        debugPrint(e.toString());
+                        Flushbar(
+                          margin: const EdgeInsets.all(7),
+                          borderRadius: BorderRadius.circular(15),
+                          flushbarStyle: FlushbarStyle.FLOATING,
+                          flushbarPosition: FlushbarPosition.BOTTOM,
+                          message: "Error updating user data",
+                          icon: Icon(
+                            Icons.error_outline_rounded,
+                            size: 28.0,
+                            color: Colors.red[300],
+                          ),
+                          duration: const Duration(milliseconds: 1500),
+                          leftBarIndicatorColor: Colors.red[300],
+                        ).show(_scaffoldKey.currentContext!);
+                      }
                     }
-                    await FirebaseFirestore.instance
-                        .collection('Users')
-                        .doc(widget.uid)
-                        .update({
-                      'plans': newPlans,
-                    });
-                    Navigator.pop(context);
-                    Flushbar(
-                      margin: const EdgeInsets.all(7),
-                      borderRadius: BorderRadius.circular(15),
-                      flushbarStyle: FlushbarStyle.FLOATING,
-                      flushbarPosition: FlushbarPosition.BOTTOM,
-                      message: "Plan updated successfully",
-                      icon: Icon(
-                        Icons.check_circle_outline_rounded,
-                        size: 28.0,
-                        color: Colors.green[300],
-                      ),
-                      duration: const Duration(milliseconds: 1500),
-                      leftBarIndicatorColor: Colors.green[300],
-                    ).show(context);
-                  } catch (e) {
-                    debugPrint(e.toString());
-                    Flushbar(
-                      margin: const EdgeInsets.all(7),
-                      borderRadius: BorderRadius.circular(15),
-                      flushbarStyle: FlushbarStyle.FLOATING,
-                      flushbarPosition: FlushbarPosition.BOTTOM,
-                      message: "Error updating user data",
-                      icon: Icon(
-                        Icons.error_outline_rounded,
-                        size: 28.0,
-                        color: Colors.red[300],
-                      ),
-                      duration: const Duration(milliseconds: 1500),
-                      leftBarIndicatorColor: Colors.red[300],
-                    ).show(context);
-                  }
-                }
-              },
-            )
-          : null,
+                  },
+                )
+              : null,
     );
   }
 }

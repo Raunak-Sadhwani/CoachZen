@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'form_fields.dart';
 import '../ui/app_colors.dart';
 
-// ignore: must_be_immutable
 class BodyForm2 extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final VoidCallback? onSubmit;
+  final List<DateTime>? disabledDates;
   const BodyForm2({
     Key? key,
     required this.formKey,
     this.onSubmit,
+    this.disabledDates,
   }) : super(key: key);
 
   @override
@@ -51,6 +53,11 @@ class BodyForm2 extends StatefulWidget {
       "unit": "",
       "controller": TextEditingController(),
     },
+    {
+      "label": "date",
+      "unit": "",
+      "controller": TextEditingController(),
+    }
   ];
   // create a bool wantKeepAlive with getter and setter
 
@@ -62,6 +69,23 @@ class _BodyForm2State extends State<BodyForm2>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => BodyForm2.wantKeepAlive;
+  DateTime selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.disabledDates != null && widget.disabledDates!.isNotEmpty) {
+      selectedDate =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      while (widget.disabledDates!.contains(selectedDate)) {
+        selectedDate =
+            DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+        selectedDate = selectedDate.subtract(const Duration(days: 1));
+      }
+    }
+       BodyForm2.fields.last['controller'].text =
+          DateFormat('dd-MM-yyyy').format(selectedDate);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +97,8 @@ class _BodyForm2State extends State<BodyForm2>
             child: Form(
               key: widget.formKey,
               child: FormFields(
+                selectedDate: selectedDate,
+                disabledDates: widget.disabledDates,
                 fields: BodyForm2.fields,
                 validator: _validateField,
               ),

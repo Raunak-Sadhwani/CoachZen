@@ -27,12 +27,12 @@ class Register extends StatefulWidget {
 }
 
 class _RegisterState extends State<Register> {
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   final name = TextEditingController();
   final phone = TextEditingController();
   var cphone = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
-  static final RegExp nameRegExp = RegExp(r"^([a-zA-Z]+\s)*[a-zA-Z]+$");
   final Color? _color = Colors.grey[100];
   bool _obscureText = true;
   final _formKey = GlobalKey<FormState>();
@@ -40,8 +40,9 @@ class _RegisterState extends State<Register> {
 
   @override
   Widget build(BuildContext context) {
-    var _height = MediaQuery.of(context).size.height * .04;
+    double height = MediaQuery.of(context).size.height * .04;
     return Scaffold(
+        key: scaffoldKey,
         backgroundColor: Colors.blue,
         body: Center(
             child: Column(children: [
@@ -163,7 +164,7 @@ class _RegisterState extends State<Register> {
                               ),
                             ),
                           ),
-                          SizedBox(height: _height),
+                          SizedBox(height: height),
                           IntlPhoneField(
                             autovalidateMode: _autoValidate
                                 ? AutovalidateMode.always
@@ -215,7 +216,7 @@ class _RegisterState extends State<Register> {
                             ),
                             initialCountryCode: 'IN',
                           ),
-                          SizedBox(height: _height - 5),
+                          SizedBox(height: height - 5),
                           TextFormField(
                             controller: email,
                             validator: (email) =>
@@ -264,7 +265,7 @@ class _RegisterState extends State<Register> {
                               ),
                             ),
                           ),
-                          SizedBox(height: _height),
+                          SizedBox(height: height),
                           TextFormField(
                             controller: password,
                             validator: (password) => password != null &&
@@ -426,7 +427,7 @@ class _RegisterState extends State<Register> {
         ),
         duration: const Duration(milliseconds: 1500),
         leftBarIndicatorColor: Colors.blue[300],
-      )..show(context);
+      )..show(scaffoldKey.currentContext!);
     }
     var emailT = email.text.trim();
     List lists = [];
@@ -451,25 +452,33 @@ class _RegisterState extends State<Register> {
         ),
         duration: const Duration(milliseconds: 1500),
         leftBarIndicatorColor: Colors.blue[300],
-      )..show(context);
+      )..show(scaffoldKey.currentContext!);
     }
     if (phone.text.isNotEmpty) {
-      final QuerySnapshot result = await FirebaseFirestore.instance
-          .collection('Coaches')
-          .where('phone', isEqualTo: phone.text)
+      QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+          .collection('Users')
+          .where('phone', isEqualTo: phone.text.trim())
           .get();
-      final List<DocumentSnapshot> documents = result.docs;
-      if (documents.isNotEmpty) {
+
+      QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
+          .collection('Coaches')
+          .where('phone', isEqualTo: phone.text.trim())
+          .get();
+      if (userSnapshot.docs.isNotEmpty || coachSnapshot.docs.isNotEmpty) {
         return Flushbar(
-          message: 'Phone Number Already In Use',
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.BOTTOM,
+          message: "User with this phone number already exists!",
           icon: Icon(
-            Icons.info_outline,
+            Icons.error_outline,
             size: 28.0,
-            color: Colors.blue[300],
+            color: Colors.red[300],
           ),
-          duration: const Duration(milliseconds: 1500),
-          leftBarIndicatorColor: Colors.blue[300],
-        )..show(context);
+          duration: const Duration(milliseconds: 4000),
+          leftBarIndicatorColor: Colors.red[300],
+        ).show(scaffoldKey.currentContext!);
       }
     }
     showDialog(
@@ -486,6 +495,7 @@ class _RegisterState extends State<Register> {
         User? user = FirebaseAuth.instance.currentUser;
         // updateDisplayName
         await user?.updateDisplayName(name.text.trim());
+        FieldValue serverTimestamp = FieldValue.serverTimestamp();
         // update phoneNumber
         await FirebaseFirestore.instance
             .collection('Coaches')
@@ -494,6 +504,7 @@ class _RegisterState extends State<Register> {
           'name': name.text.trim(),
           'phone': phone.text.trim(),
           'email': email.text.trim(),
+          'created': serverTimestamp,
         });
         Navigator.of(context, rootNavigator: true).pop('dialog');
         Navigator.pushAndRemoveUntil(
@@ -513,7 +524,7 @@ class _RegisterState extends State<Register> {
         ),
         duration: const Duration(milliseconds: 1500),
         leftBarIndicatorColor: Colors.blue[300],
-      )..show(context);
+      )..show(scaffoldKey.currentContext!);
     } catch (e) {
       debugPrint(e.toString());
     }

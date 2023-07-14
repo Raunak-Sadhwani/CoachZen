@@ -23,7 +23,6 @@ class _HomePageState extends State<HomePage> {
   bool internet = true;
   Future<void> checkInternetAndAuth() async {
     bool hasInternet = await Method.checkInternetConnection(context);
-
     if (!hasInternet) {
       setState(() {
         internet = false;
@@ -56,6 +55,7 @@ class _HomePageState extends State<HomePage> {
         }
         getUserData();
         updateText();
+        // fetchUserPlans();
       });
     }
   }
@@ -93,6 +93,37 @@ class _HomePageState extends State<HomePage> {
         .join(' ');
   }
 
+  List<Map<String, dynamic>> remindUsers = [];
+
+  void fetchUserPlans() async {
+    if (!await Method.checkInternetConnection(context)) {
+      return;
+    }
+    // FirebaseFirestore.instance
+    //     .collection('Users')
+    //     .where('cid', isEqualTo: user!.uid)
+    //     .get()
+    //     .then((value) => {
+    //           for (var i = 0; i < value.docs.length; i++)
+    //             {
+    //               // check if user has a plan and it is about to expire
+    //               if (value.docs[i]['plan'] != null &&
+    //                   value.docs[i]['plan']['expiry'] != null)
+    //                 {
+    //                   if (value.docs[i]['plan']['expiry'].toDate().isBefore(
+    //                       DateTime.now().add(const Duration(days: 7))))
+    //                     {
+    //                       remindUsers.add({
+    //                         'name': value.docs[i]['name'],
+    //                         'phone': value.docs[i]['phone'],
+    //                         'expiry': value.docs[i]['plan']['expiry'],
+    //                       })
+    //                     }
+    //                 }
+    //             }
+    //         });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -111,7 +142,6 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           coachData = documentSnapshot.data()!;
         });
-        debugPrint('Document data: ${documentSnapshot.data()}');
       }
     });
   }
@@ -147,7 +177,6 @@ class _HomePageState extends State<HomePage> {
     }
     return Scaffold(
       backgroundColor: Colors.white,
-
       // backgroundColor: const Color.fromARGB(255, 83, 98, 210),
       body: SingleChildScrollView(
         child: Padding(

@@ -261,17 +261,43 @@ class _CustNewFormState extends State<CustNewForm> {
                 }
               ];
               Map<String, dynamic> data = {
-                'name': _nameController.text,
+                'name': _nameController.text.trim(),
                 'dob': dob,
                 'gender': isMale ? 'male' : 'female',
                 'height': int.parse(_heightController.text),
                 'measurements': measurements,
-                'phone': _phoneController.text,
-                'city': _cityController.text,
-                'email': _emailController.text,
+                'phone': _phoneController.text.trim(),
+                'city': _cityController.text.trim(),
+                'email': _emailController.text.trim(),
                 'created': created,
                 'cid': cid,
               };
+              QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+                  .collection('Users')
+                  .where('phone', isEqualTo: data['phone'])
+                  .get();
+
+              QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
+                  .collection('Coaches')
+                  .where('phone', isEqualTo: data['phone'])
+                  .get();
+              if (userSnapshot.docs.isNotEmpty ||
+                  coachSnapshot.docs.isNotEmpty) {
+                return Flushbar(
+                  margin: const EdgeInsets.all(7),
+                  borderRadius: BorderRadius.circular(15),
+                  flushbarStyle: FlushbarStyle.FLOATING,
+                  flushbarPosition: FlushbarPosition.BOTTOM,
+                  message: "User with this phone number already exists!",
+                  icon: Icon(
+                    Icons.error_outline,
+                    size: 28.0,
+                    color: Colors.red[300],
+                  ),
+                  duration: const Duration(milliseconds: 4000),
+                  leftBarIndicatorColor: Colors.red[300],
+                ).show(scaffoldKey.currentContext!);
+              }
               await FirebaseFirestore.instance.collection('Users').add(data);
               //  dispose all the controllers
               _dateController.clear();
@@ -315,6 +341,7 @@ class _CustNewFormState extends State<CustNewForm> {
                 duration: const Duration(milliseconds: 1500),
                 leftBarIndicatorColor: Colors.red[300],
               ).show(context);
+              return;
             }
           }
         },

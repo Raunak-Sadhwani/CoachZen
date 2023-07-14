@@ -1,9 +1,11 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 import '../components/ui/appbar.dart';
 
 class CustOrderForm extends StatefulWidget {
@@ -27,15 +29,59 @@ class CustOrderForm extends StatefulWidget {
 
 class _CustOrderFormState extends State<CustOrderForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> tempList = [{}];
   List<TextEditingController> productNameControllers = [];
   List<TextEditingController> productQuantityControllers = [];
   DateTime? selectedDateTime;
+  static const List<String> allProducts = <String>[
+    "F1-Vanilla (₹2276)",
+    "F1-Chocolate (₹2276)",
+    "F1-Mango (₹2276)",
+    "F1-Orange (₹2276)",
+    "F1-Strawberry (₹2276)",
+    "F1-Kulfi (₹2276)",
+    "F1-Banana (₹2276)",
+    "F1-Rose (₹2276)",
+    "PPP-200 (₹1352)",
+    "PPP-400 (₹2594)",
+    "ShakeMate (₹681)",
+    "Male Factor (₹3559)",
+    "Woman's Choice (₹1298)",
+    "Brain Health (₹1529)",
+    "Immune Health (₹1596)",
+    "Afresh-Ginger (₹848)",
+    "Afresh-Elaich (₹848)",
+    "Afresh-Lemon (₹848)",
+    "Afresh-Peach (₹848)",
+    "Afresh-Cinnamon (₹848)",
+    "Afresh-Kashmiri (₹848)",
+    "Afresh-Tulsi (₹848)",
+    "H24-Hydrate (₹1709)",
+    "H24-Rebuild (₹2731)",
+    "Skin Booster (₹4082)",
+    "Dino-Choco (₹1164)",
+    "Dino-Strawberry (₹1164)",
+    "Active Fiber Tablets - (₹1709)",
+    "Active Fiber Complex (₹2672)",
+    "Aloe Plus (₹1106)",
+    "Aloe Concentrate (₹2815)",
+    "Probiotic (₹2306)",
+    "Triphala (₹1138)",
+    "Calcium (₹1256)",
+    "Joint Support (₹2563)",
+    "Niteworks (₹7442)",
+    "Herbalifeline (₹2785)",
+    "Beta Heart (₹2342)",
+    "Multivitamin (₹2091)",
+    "Cell Activator (₹2313)",
+    "Cell-U-Loss (₹1780)",
+    "Control (₹3584)"
+  ];
 
   @override
   void initState() {
     super.initState();
-    // Initialize the controllers
     if (widget.index == null) {
       for (var _ in tempList) {
         final productNameController = TextEditingController();
@@ -45,7 +91,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
       }
     } else {
       final products = widget.productsHistory[widget.index!]['products'];
-      // debugPrint(widget.productsHistory[widget.index!]['date'].toString());
       selectedDateTime = widget.productsHistory[widget.index!]['date'].toDate();
       tempList.clear();
       for (var i = 0; i < products.length; i++) {
@@ -84,6 +129,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
     return Scaffold(
+      key: _scaffoldKey,
       appBar: MyAppBar(
         title: 'Order of ${widget.name}',
         leftIcon: IconButton(
@@ -292,18 +338,59 @@ class _CustOrderFormState extends State<CustOrderForm> {
                               ),
                               Expanded(
                                 flex: 3,
-                                child: TextFormField(
-                                  controller: productNameController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Product Name',
-                                    hintText: 'Enter product name',
+                                child: TypeAheadFormField(
+                                  minCharsForSuggestions: 1,
+                                  hideOnEmpty: true,
+                                  animationStart: 0.5,
+                                  autoFlipMinHeight: 0,
+                                  textFieldConfiguration:
+                                      TextFieldConfiguration(
+                                          controller: productNameController,
+                                          decoration: const InputDecoration(
+                                              labelText: 'Product Name',
+                                              hintText: 'Enter product name')),
+                                  suggestionsCallback: (pattern) {
+                                    // if more than 3 suggestions, show only 3
+                                    if (pattern.length > 3) {
+                                      return allProducts
+                                          .where((element) => element
+                                              .toLowerCase()
+                                              .contains(pattern.toLowerCase()))
+                                          .toList()
+                                          .sublist(0, 3);
+                                    }
+                                    return allProducts
+                                        .where((element) => element
+                                            .toLowerCase()
+                                            .contains(pattern.toLowerCase()))
+                                        .toList();
+                                  },
+                                  // only max 5 suggestions
+                                  itemBuilder: (context, suggestion) {
+                                    return ListTile(
+                                      title: Text(suggestion),
+                                    );
+                                  },
+                                  suggestionsBoxDecoration:
+                                      SuggestionsBoxDecoration(
+                                    borderRadius: BorderRadius.circular(7.5),
                                   ),
+                                  direction: AxisDirection.up,
+                                  transitionBuilder:
+                                      (context, suggestionsBox, controller) {
+                                    return suggestionsBox;
+                                  },
+                                  onSuggestionSelected: (suggestion) {
+                                    productNameController.text = suggestion;
+                                  },
                                   validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter a product name';
+                                    if (value!.isEmpty) {
+                                      return 'Please select a city';
                                     }
                                     return null;
                                   },
+                                  onSaved: (value) =>
+                                      productNameController.text = value!,
                                 ),
                               ),
                               SizedBox(width: width * 0.1),
@@ -389,7 +476,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         };
                       }
                     });
-                    debugPrint(widget.productsHistory.toString());
                     try {
                       await FirebaseFirestore.instance
                           .collection('Users')
@@ -413,7 +499,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         ),
                         duration: const Duration(milliseconds: 1500),
                         leftBarIndicatorColor: Colors.green[300],
-                      ).show(context);
+                      ).show(_scaffoldKey.currentContext!);
                       return;
                     } catch (e) {
                       debugPrint(e.toString());
@@ -430,7 +516,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         ),
                         duration: const Duration(milliseconds: 1500),
                         leftBarIndicatorColor: Colors.red[300],
-                      ).show(context);
+                      ).show(_scaffoldKey.currentContext!);
                       return;
                     }
                   } catch (e) {
@@ -448,7 +534,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                       ),
                       duration: const Duration(milliseconds: 1500),
                       leftBarIndicatorColor: Colors.red[300],
-                    ).show(context);
+                    ).show(_scaffoldKey.currentContext!);
                     return;
                   }
                 }

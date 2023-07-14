@@ -58,7 +58,9 @@ class _ProfilePgState extends State<ProfilePg> {
   }
 
   String formatDate(DateTime dateTime) {
-    final DateFormat formatter = DateFormat('dd MMM yyyy - hh:mm a');
+    DateFormat formatter = DateFormat('dd MMM yyyy - hh:mm a');
+    // make date from london timezone to local timezone
+    dateTime = dateTime.add(const Duration(hours: 5, minutes: 30));
     final String formatted = formatter.format(dateTime);
     return formatted;
   }

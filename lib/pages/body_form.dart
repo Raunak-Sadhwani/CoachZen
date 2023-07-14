@@ -4,6 +4,7 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:slimtrap/pages/cust_add_weight.dart';
 import 'package:slimtrap/pages/home.dart';
 import '../components/body_form/body_form_1.dart';
@@ -58,6 +59,8 @@ class _FormPageState extends State<FormPage> {
     BodyForm3.wantKeepAlive = val;
   }
 
+  List<DateTime> disabledDates = [];
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +74,12 @@ class _FormPageState extends State<FormPage> {
       setState(() {
         totalPages = 2;
       });
+      for (int i = 0; i < widget.measurements!.length; i++) {
+        DateTime date = widget.measurements![i]['date'].toDate();
+        // remove time if exists
+        date = DateTime(date.year, date.month, date.day);
+        disabledDates.add(date);
+      }
     }
   }
 
@@ -110,6 +119,11 @@ class _FormPageState extends State<FormPage> {
                   ? const NeverScrollableScrollPhysics()
                   : const PageScrollPhysics(),
               children: [
+                if (!isUser())
+                  BodyForm3(
+                    // onSubmit: onSubmit,
+                    formKey: formKey,
+                  ),
                 BodyForm(
                   pageChange: (bool value) {
                     handleChangePage(value);
@@ -119,14 +133,10 @@ class _FormPageState extends State<FormPage> {
                   gender: widget.gender,
                 ),
                 BodyForm2(
-                  formKey: formKey,
-                  onSubmit: isUser() ? onSubmitUser : null,
+                  disabledDates: disabledDates,
+                  formKey: formKey2,
+                  onSubmit: isUser() ? onSubmitUser : onSubmit,
                 ),
-                if (!isUser())
-                  BodyForm3(
-                    onSubmit: onSubmit,
-                    formKey: formKey2,
-                  )
               ],
             ),
           ),
@@ -231,11 +241,67 @@ class _FormPageState extends State<FormPage> {
 
         try {
           FieldValue timestamp = FieldValue.serverTimestamp();
+          DateTime date = DateTime.now();
+          try {
+            final DateFormat format = DateFormat('dd-MM-yyyy');
+            date =
+                format.parseStrict(BodyForm2.allFields.last['controller'].text);
+            measurements.last['date'] = date;
+          } catch (e) {
+            Flushbar(
+              margin: const EdgeInsets.all(7),
+              borderRadius: BorderRadius.circular(15),
+              flushbarStyle: FlushbarStyle.FLOATING,
+              flushbarPosition: FlushbarPosition.BOTTOM,
+              message: "Something went wrong!",
+              icon: Icon(
+                Icons.error_outline,
+                size: 28.0,
+                color: Colors.red[300],
+              ),
+              duration: const Duration(milliseconds: 2000),
+              leftBarIndicatorColor: Colors.red[300],
+            ).show(context);
+            return debugPrint(e.toString());
+          }
+
+          // check if phone  exists in firestore
+          QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+              .collection('Users')
+              .where('phone', isEqualTo: data['phone'])
+              .get();
+
+          QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
+              .collection('Coaches')
+              .where('phone', isEqualTo: data['phone'])
+              .get();
+
+          if (userSnapshot.docs.isNotEmpty || coachSnapshot.docs.isNotEmpty) {
+            controller.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 410),
+              curve: Curves.easeIn,
+            );
+            return Flushbar(
+              margin: const EdgeInsets.all(7),
+              borderRadius: BorderRadius.circular(15),
+              flushbarStyle: FlushbarStyle.FLOATING,
+              flushbarPosition: FlushbarPosition.BOTTOM,
+              message: "User with this phone number already exists!",
+              icon: Icon(
+                Icons.error_outline,
+                size: 28.0,
+                color: Colors.red[300],
+              ),
+              duration: const Duration(milliseconds: 4500),
+              leftBarIndicatorColor: Colors.red[300],
+            ).show(context);
+          }
+
           // convert FieldValue timestamp to datetime
           User? coach = FirebaseAuth.instance.currentUser;
           // add timestamp of firestore
           data['created'] = timestamp;
-          measurements.last['date'] = DateTime.now();
           data['measurements'] = measurements;
           data['medicalHistory'] = medicalHistory;
           data['reg'] = 'false';
@@ -315,7 +381,7 @@ class _FormPageState extends State<FormPage> {
       }
     } else {
       controller.animateToPage(
-        1,
+        0,
         duration: const Duration(milliseconds: 410),
         curve: Curves.easeIn,
       );
@@ -327,7 +393,7 @@ class _FormPageState extends State<FormPage> {
     if (!await Method.checkInternetConnection(context)) {
       return;
     }
-    bool formOneIsValid = formKey.currentState?.validate() ?? false;
+    bool formOneIsValid = formKey2.currentState?.validate() ?? false;
     if (formOneIsValid) {
       List<Map<String, dynamic>> allFields = [
         // BodyForm.weightController add to allFields
@@ -350,8 +416,46 @@ class _FormPageState extends State<FormPage> {
           data[field['label']] = value;
         }
       }
-      data['date'] = DateTime.now();
-
+      DateTime date = DateTime.now();
+      try {
+        final DateFormat format = DateFormat('dd-MM-yyyy');
+        date = format.parseStrict(BodyForm2.allFields.last['controller'].text);
+        for (int i = 0; i < widget.measurements!.length; i++) {
+          if (widget.measurements![i]['date'].toDate() == date) {
+            return Flushbar(
+              margin: const EdgeInsets.all(7),
+              borderRadius: BorderRadius.circular(15),
+              flushbarStyle: FlushbarStyle.FLOATING,
+              flushbarPosition: FlushbarPosition.BOTTOM,
+              message: "Weight for this date already exists!",
+              icon: Icon(
+                Icons.error_outline,
+                size: 28.0,
+                color: Colors.red[300],
+              ),
+              duration: const Duration(milliseconds: 2000),
+              leftBarIndicatorColor: Colors.red[300],
+            ).show(context);
+          }
+        }
+        data['date'] = date;
+      } catch (e) {
+        Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.BOTTOM,
+          message: "Something went wrong!",
+          icon: Icon(
+            Icons.error_outline,
+            size: 28.0,
+            color: Colors.red[300],
+          ),
+          duration: const Duration(milliseconds: 2000),
+          leftBarIndicatorColor: Colors.red[300],
+        ).show(context);
+        return debugPrint(e.toString());
+      }
       widget.measurements!.add(data);
 
       final docRef = FirebaseFirestore.instance.collection('Users');
@@ -403,6 +507,8 @@ class _FormPageState extends State<FormPage> {
         ).show(context);
         return debugPrint(e.toString());
       }
+    } else {
+      debugPrint('Form1 validation failed');
     }
   }
 }

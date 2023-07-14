@@ -300,7 +300,7 @@ class _LoginPageState extends State<LoginPage> {
       )..show(_scaffoldKey.currentContext!);
     }
 
-    var emailT = email.text.trim();
+    var emailT = email.text.trim().toLowerCase();
 
     showDialog(
         context: context,

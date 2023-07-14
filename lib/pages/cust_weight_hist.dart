@@ -1,6 +1,8 @@
 import 'package:another_flushbar/flushbar.dart';
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:slimtrap/pages/body_form.dart';
 
@@ -152,7 +154,6 @@ class _WHistoryState extends State<WHistory> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('measurements: ${widget.measurements}');
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
     Color bg = Colors.white;
@@ -193,58 +194,71 @@ class _WHistoryState extends State<WHistory> {
         child: Padding(
           padding: EdgeInsets.all(width * 0.04),
           child: Column(
-            children: widget.measurements.reversed.toList().map((measurement) {
-              final int index = widget.measurements.indexOf(measurement);
-              if (measurement['weight'].runtimeType == String) {
-                measurement['weight'] = double.parse(measurement['weight']);
-              }
-              double weightLoss = 0;
-              if (index > 0) {
-                // tryparse to double
-                weightLoss = double.parse((measurement['weight'] -
-                        updatedMeasurements[index - 1]['weight'])
-                    .toString());
-              }
-              dynamic arrowIcon = false;
-              Color arrowColor = widget.colors[0];
+            children: [
+              AutoSizeText('Ideal Weight: ${widget.idealweight} kg',
+                  style: GoogleFonts.montserrat(
+                      color: Colors.grey[600],
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
+              SizedBox(
+                height: height * 0.025,
+              ),
+              Column(
+                children:
+                    widget.measurements.reversed.toList().map((measurement) {
+                  final int index = widget.measurements.indexOf(measurement);
+                  if (measurement['weight'].runtimeType == String) {
+                    measurement['weight'] = double.parse(measurement['weight']);
+                  }
+                  double weightLoss = 0;
+                  if (index > 0) {
+                    // tryparse to double
+                    weightLoss = double.parse((measurement['weight'] -
+                            updatedMeasurements[index - 1]['weight'])
+                        .toString());
+                  }
+                  dynamic arrowIcon = false;
+                  Color arrowColor = widget.colors[0];
 
-              if (weightLoss > 0) {
-                arrowIcon = Icons.arrow_upward_outlined;
-                arrowColor = Colors.green;
-              } else if (weightLoss < 0) {
-                arrowIcon = Icons.arrow_downward_outlined;
-                arrowColor = Colors.red;
-              }
+                  if (weightLoss > 0) {
+                    arrowIcon = Icons.arrow_upward_outlined;
+                    arrowColor = Colors.green;
+                  } else if (weightLoss < 0) {
+                    arrowIcon = Icons.arrow_downward_outlined;
+                    arrowColor = Colors.red;
+                  }
 
-              if (widget.idealweight < measurement['weight'] &&
-                  weightLoss < 0) {
-                arrowColor = Colors.green;
-              } else if (widget.idealweight < measurement['weight'] &&
-                  weightLoss > 0) {
-                arrowColor = Colors.red;
-              }
+                  if (widget.idealweight < measurement['weight'] &&
+                      weightLoss < 0) {
+                    arrowColor = Colors.green;
+                  } else if (widget.idealweight < measurement['weight'] &&
+                      weightLoss > 0) {
+                    arrowColor = Colors.red;
+                  }
 
-              return Container(
-                margin: EdgeInsets.only(bottom: height * 0.015),
-                color: bg,
-                child: measurement.length > 2
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: OpenContainerWrapper(
-                            page: Meas(
-                              measurements: updatedMeasurements[index],
-                              index: index,
-                              allmeasurements: updatedMeasurements,
-                              card: card,
-                              uid: widget.uid,
-                            ),
-                            content: widMeas(measurement, height, width,
-                                arrowIcon, arrowColor, weightLoss, index)),
-                      )
-                    : widMeas(measurement, height, width, arrowIcon, arrowColor,
-                        weightLoss, index),
-              );
-            }).toList(),
+                  return Container(
+                    margin: EdgeInsets.only(bottom: height * 0.015),
+                    color: bg,
+                    child: measurement.length > 2
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: OpenContainerWrapper(
+                                page: Meas(
+                                  measurements: updatedMeasurements[index],
+                                  index: index,
+                                  allmeasurements: updatedMeasurements,
+                                  card: card,
+                                  uid: widget.uid,
+                                ),
+                                content: widMeas(measurement, height, width,
+                                    arrowIcon, arrowColor, weightLoss, index)),
+                          )
+                        : widMeas(measurement, height, width, arrowIcon,
+                            arrowColor, weightLoss, index),
+                  );
+                }).toList(),
+              ),
+            ],
           ),
         ),
       ),
@@ -314,10 +328,15 @@ class _WHistoryState extends State<WHistory> {
           if (measurement.length > 2)
             Container(
               margin: const EdgeInsets.only(right: 10),
-              child: const Icon(
-                Icons.check_circle_outline_rounded,
-                color: Color.fromARGB(255, 98, 0, 255),
-                size: 20,
+              color: Colors.transparent,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: Image.asset(
+                  'lib/assets/scan.png',
+                  height: 45,
+                  width: 45,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           GestureDetector(
@@ -427,13 +446,13 @@ class _WHistoryState extends State<WHistory> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         gradient: const LinearGradient(
-          // dark grey gradient
           colors: [
-            Color.fromARGB(255, 226, 226, 226),
-            Color.fromARGB(255, 185, 185, 185),
+            Color.fromARGB(255, 255, 191, 0),
+            Color(0xFFFFF176),
           ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          stops: [0.2, 1.0],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
       child: child,

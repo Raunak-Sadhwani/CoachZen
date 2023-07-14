@@ -77,10 +77,11 @@ class GetStarted extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(25),
-                          ), backgroundColor: Colors.blue,
+                          ),
+                          backgroundColor: Colors.blue,
                           padding: EdgeInsets.symmetric(
                               horizontal:
-                                  MediaQuery.of(context).size.width * 0.27,
+                                  MediaQuery.of(context).size.width * 0.25,
                               vertical:
                                   MediaQuery.of(context).size.height * 0.015),
                           textStyle: GoogleFonts.montserrat(
@@ -88,7 +89,12 @@ class GetStarted extends StatelessWidget {
                             fontSize: 20,
                           ),
                         ),
-                        child: const Text('Get Started'),
+                        child: const AutoSizeText(
+                          'Get Started',
+                          minFontSize: 14,
+                          softWrap: false,
+                          maxLines: 1,
+                        ),
                       ),
                       Container(
                         height: MediaQuery.of(context).size.height * 0.03,

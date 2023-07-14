@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../ui/card.dart';
 
 class FormFields extends StatelessWidget {
   final List<Map<String, dynamic>> fields;
+  final List<DateTime>? disabledDates;
   // validator
   final Function validator;
 
-  const FormFields({Key? key, required this.fields, required this.validator})
+  final DateTime? selectedDate;
+
+  const FormFields(
+      {Key? key,
+      required this.fields,
+      required this.validator,
+      this.selectedDate,
+      this.disabledDates})
       : super(key: key);
 
   @override
@@ -31,10 +40,59 @@ class FormFields extends StatelessWidget {
                 UICard(
                   width: width,
                   children: [
-                    if (!field['label']
+                    if (field['label']
                         .toString()
                         .toLowerCase()
                         .contains('medical'))
+                      MedicalHistory(
+                        title: field['label'],
+                      )
+                    else if (field['label']
+                        .toString()
+                        .toLowerCase()
+                        .contains('date'))
+                      TextFormField(
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        readOnly: true,
+                        controller: field['controller'],
+                        decoration: const InputDecoration(
+                          labelText: 'Date',
+                        ),
+                        onTap: () {
+                          showDatePicker(
+                            context: context,
+                            initialDate: selectedDate!,
+                            firstDate: DateTime(DateTime.now().year - 13),
+                            lastDate: DateTime.now(),
+                            selectableDayPredicate: (DateTime date) {
+                              if (disabledDates == null ||
+                                  disabledDates!.isEmpty) {
+                                return true;
+                              } else {
+                                return !disabledDates!.contains(date);
+                              }
+                            },
+                          ).then((date) {
+                            if (date != null) {
+                              field['controller'].text =
+                                  DateFormat('dd-MM-yyyy').format(date);
+                            }
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a date';
+                          }
+                          final DateFormat format = DateFormat('dd-MM-yyyy');
+                          try {
+                            format.parseStrict(value);
+                          } catch (e) {
+                            return 'Please enter a valid date';
+                          }
+                          return null;
+                        },
+                      )
+                    else
                       TextFormField(
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         controller: field['controller'],
@@ -55,10 +113,6 @@ class FormFields extends StatelessWidget {
                         validator: (value) {
                           return validator(value, field['label']);
                         },
-                      )
-                    else
-                      MedicalHistory(
-                        title: field['label'],
                       )
                   ],
                 ),
@@ -84,7 +138,6 @@ class MedicalHistory extends StatefulWidget {
 }
 
 class _MedicalHistoryState extends State<MedicalHistory> {
-
   @override
   Widget build(BuildContext context) {
     return Column(
