@@ -3,11 +3,14 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:slimtrap/pages/body_form.dart';
 import 'package:slimtrap/pages/body_form_list.dart';
 import 'package:slimtrap/pages/cust_new_form.dart';
 import 'package:slimtrap/pages/profile.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../components/ui/appbar.dart';
 import 'login.dart';
@@ -21,6 +24,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool internet = true;
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
   Future<void> checkInternetAndAuth() async {
     bool hasInternet = await Method.checkInternetConnection(context);
     if (!hasInternet) {
@@ -55,7 +60,7 @@ class _HomePageState extends State<HomePage> {
         }
         getUserData();
         updateText();
-        // fetchUserPlans();
+        fetchUserPlans();
       });
     }
   }
@@ -93,35 +98,258 @@ class _HomePageState extends State<HomePage> {
         .join(' ');
   }
 
-  List<Map<String, dynamic>> remindUsers = [];
-
   void fetchUserPlans() async {
     if (!await Method.checkInternetConnection(context)) {
       return;
     }
-    // FirebaseFirestore.instance
-    //     .collection('Users')
-    //     .where('cid', isEqualTo: user!.uid)
-    //     .get()
-    //     .then((value) => {
-    //           for (var i = 0; i < value.docs.length; i++)
-    //             {
-    //               // check if user has a plan and it is about to expire
-    //               if (value.docs[i]['plan'] != null &&
-    //                   value.docs[i]['plan']['expiry'] != null)
-    //                 {
-    //                   if (value.docs[i]['plan']['expiry'].toDate().isBefore(
-    //                       DateTime.now().add(const Duration(days: 7))))
-    //                     {
-    //                       remindUsers.add({
-    //                         'name': value.docs[i]['name'],
-    //                         'phone': value.docs[i]['phone'],
-    //                         'expiry': value.docs[i]['plan']['expiry'],
-    //                       })
-    //                     }
-    //                 }
-    //             }
-    //         });
+    List<Map<String, dynamic>> remindUsers = [];
+    await FirebaseFirestore.instance
+        .collection('Users')
+        .where('cid', isEqualTo: user!.uid)
+        .get()
+        .then((value) {
+      for (var i = 0; i < value.docs.length; i++) {
+        final plans = value.docs[i].data()['plans'];
+        if (plans != null && plans.length > 0) {
+          // sort plans (List<dynamic>) by date
+          plans.sort((a, b) {
+            DateTime dateA =
+                a['started'] != null ? a['started'].toDate() : DateTime.now();
+            DateTime dateB =
+                b['started'] != null ? b['started'].toDate() : DateTime.now();
+            return dateA.compareTo(dateB);
+          });
+          // check if 0th index plan remaining days are less than 7
+          // difference between plan days and plan start date
+          DateTime startDate = plans[0]['started'].toDate();
+          int remainingDays =
+              plans[0]['days'] - DateTime.now().difference(startDate).inDays;
+          if (remainingDays < 7) {
+            remindUsers.add({
+              'name': value.docs[i].data()['name'],
+              'phone': value.docs[i].data()['phone'],
+              'plan': plans[0]['name'],
+              'gender': value.docs[i].data()['gender'],
+              'uid': value.docs[i].id,
+              'image': value.docs[i].data()['image'],
+              'remainingDays': remainingDays,
+            });
+          }
+        }
+      }
+    });
+
+    // show dialog if there are users to remind
+    if (remindUsers.isNotEmpty) {
+      final screenHeight =
+          MediaQuery.of(scaffoldKey.currentContext!).size.height;
+      showDialog(
+        context: scaffoldKey.currentContext!,
+        builder: (context) => AlertDialog(
+          // remove all padding
+          contentPadding: EdgeInsets.zero,
+          // dialog width to 95% of screen
+          insetPadding: EdgeInsets.zero,
+          title: Text(
+            'Plan Ending',
+            style: GoogleFonts.montserrat(),
+          ),
+          content: Padding(
+            padding: EdgeInsets.only(
+              top: screenHeight * 0.02,
+            ),
+            child: Expanded(
+              child: SizedBox(
+                height: screenHeight * 0.5,
+                width: MediaQuery.of(context).size.width * 0.9,
+                child: ListView.builder(
+                  itemCount: remindUsers.length,
+                  physics: const BouncingScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    double width = MediaQuery.of(context).size.width;
+                    final phone = remindUsers[index]['phone'];
+                    final name = remindUsers[index]['name'];
+                    final planName = remindUsers[index]['plan'];
+                    final image = remindUsers[index]['image'];
+                    final gender = remindUsers[index]['gender'];
+                    final remainingDays = remindUsers[index]['remainingDays'];
+                    return Slidable(
+                      startActionPane: ActionPane(
+                        motion: const BehindMotion(),
+                        // key: const ValueKey(2),
+                        children: [
+                          SlidableAction(
+                            backgroundColor: const Color(0xFF0392CF),
+                            foregroundColor: Colors.white,
+                            icon: Icons.phone,
+                            // label: 'Call',
+                            onPressed: (context) async {
+                              Future<void> makePhoneCall(
+                                  String phoneNumber) async {
+                                final Uri launchUri = Uri(
+                                  scheme: 'tel',
+                                  path: phoneNumber,
+                                );
+                                await launchUrl(launchUri);
+                              }
+
+                              // call
+                              await makePhoneCall(phone);
+                            },
+                          ),
+                          SlidableAction(
+                            backgroundColor: const Color(0xFF7BC043),
+                            foregroundColor: Colors.white,
+                            // whatsapp
+                            icon: FontAwesomeIcons.whatsapp,
+                            // label: 'WhatsApp',
+                            onPressed: (context) {
+                              Future<void> launchWhatsApp({
+                                required String phone,
+                                String? message,
+                              }) async {
+                                String url() {
+                                  if (message != null) {
+                                    return "whatsapp://send?phone=$phone&text=${Uri.parse(message)}";
+                                  } else {
+                                    return "whatsapp://send?phone=$phone";
+                                  }
+                                }
+
+                                final Uri uri = Uri.parse(url());
+
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri);
+                                } else {
+                                  await launchUrl(Uri.parse(
+                                      "https://play.google.com/store/apps/details?id=com.whatsapp"));
+                                }
+                              }
+
+                              // whatsapp
+                              launchWhatsApp(phone: phone);
+                            },
+                          ),
+                        ],
+                      ),
+                      // remove
+                      // remove
+                      child: Container(
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Color.fromARGB(52, 158, 158, 158),
+                                width: .8,
+                              ),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(width * 0.04),
+                            child: Row(
+                              children: [
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: width * 0.13,
+                                      height: width * 0.13,
+                                      child: ClipOval(
+                                        child: image != null && image.isNotEmpty
+                                            ? FadeInImage.assetNetwork(
+                                                fit: BoxFit.cover,
+                                                placeholder:
+                                                    'lib/assets/$gender.png',
+                                                image: image,
+                                              )
+                                            : Image.asset(
+                                                'lib/assets/$gender.png',
+                                                fit: BoxFit.cover,
+                                              ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(width: width * 0.03),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        style: GoogleFonts.raleway(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      Text(
+                                        "+91 $phone",
+                                        style: GoogleFonts.montserrat(
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 13),
+                                      ),
+                                      if (planName.isNotEmpty)
+                                        Text(
+                                          "Plan: $planName",
+                                          style: GoogleFonts.montserrat(
+                                              color: Colors.grey,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 13),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      "${remainingDays.toString()} days",
+                                      style: GoogleFonts.montserrat(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )),
+                    );
+
+                    // ListTile(
+                    //   title: Text(remindUsers[index]['name']),
+                    //   subtitle: Text(
+                    //     'Remaining Days: ${remindUsers[index]['remainingDays']}',
+                    //   ),
+                    //   trailing: IconButton(
+                    //     onPressed: () async {
+                    //       await FirebaseFirestore.instance
+                    //           .collection('Users')
+                    //           .doc(remindUsers[index]['uid'])
+                    //           .update({
+                    //         'plans': FieldValue.arrayRemove([
+                    //           {
+                    //             'name': remindUsers[index]['plan'],
+                    //             'started': DateTime.now(),
+                    //             'days': 30,
+                    //           }
+                    //         ])
+                    //       });
+                    //       Navigator.pop(scaffoldKey.currentContext!);
+                    //     },
+                    //     icon: const Icon(Icons.check),
+                    //   ),
+                    // );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -176,6 +404,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
     return Scaffold(
+      key: scaffoldKey,
       backgroundColor: Colors.white,
       // backgroundColor: const Color.fromARGB(255, 83, 98, 210),
       body: SingleChildScrollView(
