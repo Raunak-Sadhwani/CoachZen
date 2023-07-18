@@ -152,8 +152,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                 String plan = plans[0]['name'];
                 // make plan before 'created' key in userData
                 userData = Map.fromEntries([
-                  ...userData.entries
-                      .where((entry) => entry.key != 'created'),
+                  ...userData.entries.where((entry) => entry.key != 'created'),
                   MapEntry('plan', plan),
                   MapEntry('created', userData['created']),
                 ]);
@@ -582,7 +581,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                           updateFields.remove(entry.key);
                                         }
                                       } else {
-                                        _editData(entry.key, dialogTempValue);
+                                        _editData(entry.key, dialogTempValue.trim());
                                         if (dialogTempValue !=
                                             originalData[entry.key]) {
                                           updateFields[entry.key] =
@@ -614,9 +613,38 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                     if (!await Method.checkInternetConnection(context)) {
                       return;
                     }
-                    final userRef = FirebaseFirestore.instance
-                        .collection('Users')
-                        .doc(widget.uid);
+                    final users =
+                        FirebaseFirestore.instance.collection('Users');
+                    if (updateFields.containsKey('phone')) {
+                      final coaches =
+                          FirebaseFirestore.instance.collection('Coaches');
+                      // check if phone number already exists
+                      final phoneExistsInUsers = await users
+                          .where('phone', isEqualTo: updateFields['phone'])
+                          .get();
+                      final phoneExistsInCoaches = await coaches
+                          .where('phone', isEqualTo: updateFields['phone'])
+                          .get();
+                      if (phoneExistsInUsers.docs.isNotEmpty ||
+                          phoneExistsInCoaches.docs.isNotEmpty) {
+                        return Flushbar(
+                          margin: const EdgeInsets.all(7),
+                          borderRadius: BorderRadius.circular(15),
+                          flushbarStyle: FlushbarStyle.FLOATING,
+                          flushbarPosition: FlushbarPosition.BOTTOM,
+                          message: "Phone number already exists, please change",
+                          icon: Icon(
+                            Icons.phone_android_rounded,
+                            size: 28.0,
+                            color: Colors.red[300],
+                          ),
+                          duration: const Duration(milliseconds: 1500),
+                          leftBarIndicatorColor: Colors.red[300],
+                        ).show(scaffoldKey.currentContext!);
+                      }
+                    }
+
+                    final userRef = users.doc(widget.uid);
 
                     await userRef.update(updateFields);
                     setState(() {

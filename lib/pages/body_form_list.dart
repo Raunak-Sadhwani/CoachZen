@@ -79,42 +79,41 @@ class _BodyFormListState extends State<BodyFormList> {
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) {
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.5,
-          child: Drawer(
-            child: Column(
-              children: [
-                _buildDrawerHeader('Sort by Created Date'),
-                _buildDrawerItem(Icons.arrow_upward, 'Ascending',
-                    _sortAscending, true, () => _updateSortOrder(true, context),
-                    color: Colors.blue),
-                _buildDrawerItem(
-                    Icons.arrow_downward,
-                    'Descending',
-                    !_sortAscending,
-                    false,
-                    () => _updateSortOrder(false, context),
-                    color: Colors.red),
-                const Divider(),
-                _buildDrawerHeader('Plans'),
-                _buildDrawerItem(
-                    Icons.verified,
-                    'Active Plans',
-                    !_showExpiredPlans,
-                    false,
-                    () => _updatePlanStatus(false, context),
-                    color: Colors.blue),
-                _buildDrawerItem(
-                    Icons.all_inclusive,
-                    'All Plans',
-                    _showExpiredPlans,
-                    true,
-                    () => _updatePlanStatus(true, context),
-                    color: Colors.blueGrey),
-              ],
+        return IntrinsicHeight(
+            child: Drawer(
+              child: Column(
+                children: [
+                  _buildDrawerHeader('Sort by Created Date'),
+                  _buildDrawerItem(Icons.arrow_upward, 'Ascending',
+                      _sortAscending, true, () => _updateSortOrder(true, context),
+                      color: Colors.blue),
+                  _buildDrawerItem(
+                      Icons.arrow_downward,
+                      'Descending',
+                      !_sortAscending,
+                      false,
+                      () => _updateSortOrder(false, context),
+                      color: Colors.red),
+                  const Divider(),
+                  _buildDrawerHeader('Plans'),
+                  _buildDrawerItem(
+                      Icons.verified,
+                      'Active Plans',
+                      !_showExpiredPlans,
+                      false,
+                      () => _updatePlanStatus(false, context),
+                      color: Colors.blue),
+                  _buildDrawerItem(
+                      Icons.all_inclusive,
+                      'All Plans',
+                      _showExpiredPlans,
+                      true,
+                      () => _updatePlanStatus(true, context),
+                      color: Colors.blueGrey),
+                ],
+              ),
             ),
-          ),
-        );
+          );
       },
     );
   }

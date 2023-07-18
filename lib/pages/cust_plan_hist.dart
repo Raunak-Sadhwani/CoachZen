@@ -305,7 +305,7 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                             formatDate(
                                               plan['started'].toDate().add(
                                                     Duration(
-                                                      days: plan['days'],
+                                                      days: plan['days'] - 1,
                                                     ),
                                                   ),
                                             ),

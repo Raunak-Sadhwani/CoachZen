@@ -350,19 +350,11 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                               labelText: 'Product Name',
                                               hintText: 'Enter product name')),
                                   suggestionsCallback: (pattern) {
-                                    // if more than 3 suggestions, show only 3
-                                    if (pattern.length > 3) {
-                                      return allProducts
-                                          .where((element) => element
-                                              .toLowerCase()
-                                              .contains(pattern.toLowerCase()))
-                                          .toList()
-                                          .sublist(0, 3);
-                                    }
                                     return allProducts
                                         .where((element) => element
                                             .toLowerCase()
                                             .contains(pattern.toLowerCase()))
+                                        // .take(3)
                                         .toList();
                                   },
                                   // only max 5 suggestions
@@ -385,7 +377,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                   },
                                   validator: (value) {
                                     if (value!.isEmpty) {
-                                      return 'Please select a city';
+                                      return 'Please select a product';
                                     }
                                     return null;
                                   },
