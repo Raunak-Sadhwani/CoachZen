@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../components/services/notifi_service.dart';
 import '../components/ui/appbar.dart';
 
 class CustPlanHist extends StatefulWidget {
@@ -19,7 +20,7 @@ class CustPlanHist extends StatefulWidget {
 }
 
 String formatDate(DateTime dateTime) {
-  final DateFormat formatter = DateFormat('dd MMM yyyy - hh:mm a');
+  final DateFormat formatter = DateFormat('dd MMM yyyy');
   final String formatted = formatter.format(dateTime);
   return formatted;
 }
@@ -83,11 +84,11 @@ class _CustPlanHistState extends State<CustPlanHist> {
   // scaffold key
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  bool isFabEnabled = true;
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
-
     return Scaffold(
       key: _scaffoldKey,
       appBar: MyAppBar(
@@ -234,24 +235,19 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                   lastDate: DateTime.now(),
                                 );
                                 if (selected != null) {
-                                  final selectedTime = await showTimePicker(
-                                    context: context,
-                                    initialTime: TimeOfDay.now(),
-                                  );
-                                  if (selectedTime != null) {
-                                    setState(() {
-                                      DateTime selectedDateTime = DateTime(
-                                        selected.year,
-                                        selected.month,
-                                        selected.day,
-                                        selectedTime.hour,
-                                        selectedTime.minute,
-                                      );
-                                      plan['started'] =
-                                          Timestamp.fromDate(selectedDateTime);
-                                    });
-                                    isPlanModifiedFunc();
-                                  }
+                                  setState(() {
+                                    // set time to 12:01 am
+                                    DateTime selectedDateTime = DateTime(
+                                      selected.year,
+                                      selected.month,
+                                      selected.day,
+                                      0,
+                                      1,
+                                    );
+                                    plan['started'] =
+                                        Timestamp.fromDate(selectedDateTime);
+                                  });
+                                  isPlanModifiedFunc();
                                 }
                               },
                               child: Container(
@@ -386,39 +382,98 @@ class _CustPlanHistState extends State<CustPlanHist> {
       floatingActionButton:
           // (newPlans.isNotEmpty && widget.plans.isNotEmpty) && isPlanModified
           (newPlans.isNotEmpty || widget.plans.isNotEmpty) && isPlanModified
-              ? FloatingActionButton(
-                  child: const Icon(Icons.save),
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      if (!await Method.checkInternetConnection(context)) {
-                        return;
+              ? IgnorePointer(
+                  ignoring: !isFabEnabled,
+                  child: FloatingActionButton(
+                    child: const Icon(Icons.save),
+                    onPressed: () async {
+                      if (!isFabEnabled) {
+                        return; // Do nothing if the FAB is already disabled
                       }
-                      try {
-                        int activePlans = 0;
-                        // remove 'old' key if exists
-                        for (int i = 0; i < newPlans.length; i++) {
-                          if (newPlans[i]['old'] != null) {
-                            newPlans[i].remove('old');
-                          }
-                          newPlans[i]['name'] = planNameControllers[i].text;
-                          newPlans[i]['days'] =
-                              int.parse(planDaysControllers[i].text);
-                          if (DateTime.now()
-                                      .difference(
-                                          newPlans[i]['started'].toDate())
-                                      .inDays +
-                                  1 <=
-                              newPlans[i]['days']) {
-                            activePlans++;
-                          }
+                      setState(() {
+                        isFabEnabled = false;
+                      });
+                      if (_formKey.currentState!.validate()) {
+                        if (!await Method.checkInternetConnection(context)) {
+                          setState(() {
+                            isFabEnabled = true;
+                          });
+                          return;
                         }
-                        if (activePlans > 1) {
+                        try {
+                          int activePlans = 0;
+                          // remove 'old' key if exists
+                          for (int i = 0; i < newPlans.length; i++) {
+                            if (newPlans[i]['old'] != null) {
+                              newPlans[i].remove('old');
+                            }
+                            newPlans[i]['name'] = planNameControllers[i].text;
+                            newPlans[i]['days'] =
+                                int.parse(planDaysControllers[i].text);
+                            if (DateTime.now()
+                                        .difference(
+                                            newPlans[i]['started'].toDate())
+                                        .inDays +
+                                    1 <=
+                                newPlans[i]['days']) {
+                              activePlans++;
+                            }
+                          }
+                          if (activePlans > 1) {
+                            Flushbar(
+                              margin: const EdgeInsets.all(7),
+                              borderRadius: BorderRadius.circular(15),
+                              flushbarStyle: FlushbarStyle.FLOATING,
+                              flushbarPosition: FlushbarPosition.BOTTOM,
+                              message: "Only one active plan is allowed",
+                              icon: Icon(
+                                Icons.error_outline_rounded,
+                                size: 28.0,
+                                color: Colors.red[300],
+                              ),
+                              duration: const Duration(milliseconds: 1500),
+                              leftBarIndicatorColor: Colors.red[300],
+                            ).show(_scaffoldKey.currentContext!);
+                            setState(() {
+                              isFabEnabled = true;
+                            });
+                            return;
+                          }
+                          await FirebaseFirestore.instance
+                              .collection('Users')
+                              .doc(widget.uid)
+                              .update({
+                            'plans': newPlans,
+                          });
+                          debugPrint(newPlans.toString());
+                          Navigator.pop(_scaffoldKey.currentContext!);
                           Flushbar(
                             margin: const EdgeInsets.all(7),
                             borderRadius: BorderRadius.circular(15),
                             flushbarStyle: FlushbarStyle.FLOATING,
                             flushbarPosition: FlushbarPosition.BOTTOM,
-                            message: "Only one active plan is allowed",
+                            message: "Plan updated successfully",
+                            icon: Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 28.0,
+                              color: Colors.green[300],
+                            ),
+                            duration: const Duration(milliseconds: 1500),
+                            leftBarIndicatorColor: Colors.green[300],
+                          ).show(_scaffoldKey.currentContext!);
+                          await NotificationManager()
+                              .scheduleAllNotifications();
+                        } catch (e) {
+                          debugPrint(e.toString());
+                          setState(() {
+                            isFabEnabled = true;
+                          });
+                          Flushbar(
+                            margin: const EdgeInsets.all(7),
+                            borderRadius: BorderRadius.circular(15),
+                            flushbarStyle: FlushbarStyle.FLOATING,
+                            flushbarPosition: FlushbarPosition.BOTTOM,
+                            message: "Error updating user data",
                             icon: Icon(
                               Icons.error_outline_rounded,
                               size: 28.0,
@@ -427,48 +482,14 @@ class _CustPlanHistState extends State<CustPlanHist> {
                             duration: const Duration(milliseconds: 1500),
                             leftBarIndicatorColor: Colors.red[300],
                           ).show(_scaffoldKey.currentContext!);
-                          return;
                         }
-                        await FirebaseFirestore.instance
-                            .collection('Users')
-                            .doc(widget.uid)
-                            .update({
-                          'plans': newPlans,
+                      } else {
+                        setState(() {
+                          isFabEnabled = true;
                         });
-                        Navigator.pop(_scaffoldKey.currentContext!);
-                        Flushbar(
-                          margin: const EdgeInsets.all(7),
-                          borderRadius: BorderRadius.circular(15),
-                          flushbarStyle: FlushbarStyle.FLOATING,
-                          flushbarPosition: FlushbarPosition.BOTTOM,
-                          message: "Plan updated successfully",
-                          icon: Icon(
-                            Icons.check_circle_outline_rounded,
-                            size: 28.0,
-                            color: Colors.green[300],
-                          ),
-                          duration: const Duration(milliseconds: 1500),
-                          leftBarIndicatorColor: Colors.green[300],
-                        ).show(_scaffoldKey.currentContext!);
-                      } catch (e) {
-                        debugPrint(e.toString());
-                        Flushbar(
-                          margin: const EdgeInsets.all(7),
-                          borderRadius: BorderRadius.circular(15),
-                          flushbarStyle: FlushbarStyle.FLOATING,
-                          flushbarPosition: FlushbarPosition.BOTTOM,
-                          message: "Error updating user data",
-                          icon: Icon(
-                            Icons.error_outline_rounded,
-                            size: 28.0,
-                            color: Colors.red[300],
-                          ),
-                          duration: const Duration(milliseconds: 1500),
-                          leftBarIndicatorColor: Colors.red[300],
-                        ).show(_scaffoldKey.currentContext!);
                       }
-                    }
-                  },
+                    },
+                  ),
                 )
               : null,
     );

@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:slimtrap/pages/body_form_cust.dart';
+import 'package:coach_zen/pages/body_form_cust.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
@@ -80,40 +80,40 @@ class _BodyFormListState extends State<BodyFormList> {
       isScrollControlled: true,
       builder: (BuildContext context) {
         return IntrinsicHeight(
-            child: Drawer(
-              child: Column(
-                children: [
-                  _buildDrawerHeader('Sort by Created Date'),
-                  _buildDrawerItem(Icons.arrow_upward, 'Ascending',
-                      _sortAscending, true, () => _updateSortOrder(true, context),
-                      color: Colors.blue),
-                  _buildDrawerItem(
-                      Icons.arrow_downward,
-                      'Descending',
-                      !_sortAscending,
-                      false,
-                      () => _updateSortOrder(false, context),
-                      color: Colors.red),
-                  const Divider(),
-                  _buildDrawerHeader('Plans'),
-                  _buildDrawerItem(
-                      Icons.verified,
-                      'Active Plans',
-                      !_showExpiredPlans,
-                      false,
-                      () => _updatePlanStatus(false, context),
-                      color: Colors.blue),
-                  _buildDrawerItem(
-                      Icons.all_inclusive,
-                      'All Plans',
-                      _showExpiredPlans,
-                      true,
-                      () => _updatePlanStatus(true, context),
-                      color: Colors.blueGrey),
-                ],
-              ),
+          child: Drawer(
+            child: Column(
+              children: [
+                _buildDrawerHeader('Sort by Created Date'),
+                _buildDrawerItem(Icons.arrow_upward, 'Ascending',
+                    _sortAscending, true, () => _updateSortOrder(true, context),
+                    color: Colors.blue),
+                _buildDrawerItem(
+                    Icons.arrow_downward,
+                    'Descending',
+                    !_sortAscending,
+                    false,
+                    () => _updateSortOrder(false, context),
+                    color: Colors.red),
+                const Divider(),
+                _buildDrawerHeader('Plans'),
+                _buildDrawerItem(
+                    Icons.verified,
+                    'Active Plans',
+                    !_showExpiredPlans,
+                    false,
+                    () => _updatePlanStatus(false, context),
+                    color: Colors.blue),
+                _buildDrawerItem(
+                    Icons.all_inclusive,
+                    'All Plans',
+                    _showExpiredPlans,
+                    true,
+                    () => _updatePlanStatus(true, context),
+                    color: Colors.blueGrey),
+              ],
             ),
-          );
+          ),
+        );
       },
     );
   }
@@ -322,6 +322,36 @@ class _BodyFormListState extends State<BodyFormList> {
                     return daysSinceStarted <= plan['days'];
                   }).toList();
                   return activePlans.isEmpty;
+                });
+
+                filteredData.sort((a, b) {
+                  final planA = a.data()['plans'].firstWhere((plan) {
+                    final daysSinceStarted = DateTime.now()
+                            .difference(plan['started'].toDate())
+                            .inDays +
+                        1;
+                    return daysSinceStarted <= plan['days'];
+                  });
+                  final planB = b.data()['plans'].firstWhere((plan) {
+                    final daysSinceStarted = DateTime.now()
+                            .difference(plan['started'].toDate())
+                            .inDays +
+                        1;
+                    return daysSinceStarted <= plan['days'];
+                  });
+
+                  final remainingDaysA = planA['days'] -
+                      (DateTime.now()
+                              .difference(planA['started'].toDate())
+                              .inDays +
+                          1);
+                  final remainingDaysB = planB['days'] -
+                      (DateTime.now()
+                              .difference(planB['started'].toDate())
+                              .inDays +
+                          1);
+
+                  return remainingDaysA.compareTo(remainingDaysB);
                 });
               }
 

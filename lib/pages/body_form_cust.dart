@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:slimtrap/components/ui/appbar.dart';
+import 'package:coach_zen/components/ui/appbar.dart';
 import 'package:another_flushbar/flushbar.dart';
-import 'package:slimtrap/pages/cust_med_hist.dart';
-import 'package:slimtrap/pages/cust_plan_hist.dart';
-import 'package:slimtrap/pages/cust_product_hist.dart';
-import 'package:slimtrap/pages/cust_weight_hist.dart';
+import 'package:coach_zen/pages/cust_med_hist.dart';
+import 'package:coach_zen/pages/cust_plan_hist.dart';
+import 'package:coach_zen/pages/cust_product_hist.dart';
+import 'package:coach_zen/pages/cust_weight_hist.dart';
 
 class BodyFormCustomerWrap extends StatefulWidget {
   final String uid;
@@ -198,6 +198,7 @@ class BodyFormCustomer extends StatefulWidget {
 }
 
 class _BodyFormCustomerState extends State<BodyFormCustomer> {
+  bool isFabVisible = false;
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   final _formKey = GlobalKey<FormState>();
   DateFormat formatter = DateFormat('dd MMM yyyy');
@@ -514,6 +515,14 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                               });
                                             },
                                             initialValue: dialogTempValue,
+                                            maxLength: entry.key == 'phone'
+                                                ? 10
+                                                : entry.key == 'height'
+                                                    ? 3
+                                                    : null,
+                                            decoration: const InputDecoration(
+                                              counterText: '',
+                                            ),
                                             validator: (value) {
                                               if (entry.key == 'name') {
                                                 if (value!.length < 3 ||
@@ -581,7 +590,8 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                           updateFields.remove(entry.key);
                                         }
                                       } else {
-                                        _editData(entry.key, dialogTempValue.trim());
+                                        _editData(
+                                            entry.key, dialogTempValue.trim());
                                         if (dialogTempValue !=
                                             originalData[entry.key]) {
                                           updateFields[entry.key] =
@@ -606,11 +616,17 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
             ],
           ),
         ),
-        floatingActionButton: updateFields.isNotEmpty
+        floatingActionButton: updateFields.isNotEmpty && isFabVisible
             ? FloatingActionButton(
                 onPressed: () async {
+                  setState(() {
+                    isFabVisible = false;
+                  });
                   try {
                     if (!await Method.checkInternetConnection(context)) {
+                      setState(() {
+                        isFabVisible = true;
+                      });
                       return;
                     }
                     final users =
@@ -668,6 +684,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                     ).show(scaffoldKey.currentContext!);
                   } catch (error) {
                     debugPrint('Error updating user properties: $error');
+                    setState(() {
+                      isFabVisible = true;
+                    });
                     return Flushbar(
                       margin: const EdgeInsets.all(7),
                       borderRadius: BorderRadius.circular(15),
@@ -683,8 +702,6 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       leftBarIndicatorColor: Colors.red[300],
                     ).show(scaffoldKey.currentContext!);
                   }
-                  // updateUserProperties(userId, updatedData);
-                  // updateUser();
                 },
                 child: const Icon(Icons.save),
               )

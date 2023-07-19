@@ -8,10 +8,10 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:slimtrap/pages/body_form.dart';
-import 'package:slimtrap/pages/body_form_list.dart';
-import 'package:slimtrap/pages/cust_new_form.dart';
-import 'package:slimtrap/pages/profile.dart';
+import 'package:coach_zen/pages/body_form.dart';
+import 'package:coach_zen/pages/body_form_list.dart';
+import 'package:coach_zen/pages/cust_new_form.dart';
+import 'package:coach_zen/pages/profile.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../components/services/notifi_service.dart';
@@ -71,7 +71,7 @@ class _HomePageState extends State<HomePage> {
     if (!await Permission.notification.isGranted) {
       await Permission.notification.request();
       await NotificationManager().initNotification();
-      await Future.delayed(const Duration(milliseconds: 1500));
+      await Future.delayed(const Duration(milliseconds: 2000));
       if (!await Permission.notification.isGranted) {
         await openAppSettingsAndNavigateToPermissions();
       } else {
@@ -142,69 +142,20 @@ class _HomePageState extends State<HomePage> {
     if (!await Method.checkInternetConnection(context)) {
       return;
     }
-    List<Map<String, dynamic>> remindUsers = [];
-    await NotificationManager().cancelAllNotifications();
-    await FirebaseFirestore.instance
-        .collection('Users')
-        .where('cid', isEqualTo: user!.uid)
-        .get()
-        .then((value) async {
-      for (var i = 0; i < value.docs.length; i++) {
-        final plans = value.docs[i].data()['plans'];
-        if (plans != null && plans.length > 0) {
-          plans.sort((a, b) {
-            DateTime dateA = a['started'].toDate();
-            DateTime dateB = b['started'].toDate();
-            return dateB.compareTo(dateA);
-          });
-          //  sorted whole array in descending order
-          // check if 0th index plan remaining days are less than 7
-          // difference between plan days and plan start date
-          DateTime startDate = plans[0]['started'].toDate();
-          final daysSinceStarted = DateTime.now().difference(startDate).inDays;
-          int remainingDays = plans[0]['days'] - daysSinceStarted;
-          if (remainingDays < 7 && remainingDays > 0) {
-            final user = {
-              'name': value.docs[i].data()['name'],
-              'phone': value.docs[i].data()['phone'],
-              'plan': plans[0]['name'],
-              'gender': value.docs[i].data()['gender'],
-              'uid': value.docs[i].id,
-              'image': value.docs[i].data()['image'],
-              'remainingDays': remainingDays,
-            };
-            remindUsers.add(user);
 
-            Map<String, dynamic> payload = {
-              'uid': user['uid'],
-              'name': user['name'],
-              'plan': user['plan'],
-            };
-            // clear all pending notifications
-            // schedule notification
-
-            // if time is greater than 7:30 am then schedule notification for next day
-
-            await NotificationManager().scheduleNotification(
-              remainingDays,
-              payload,
-            );
-          }
-        }
-      }
-    });
-
-    await NotificationManager()
-        .getPendingNotifications()
-        .then(
-          (value) => value.forEach((element) {
-            // print(element.id);
-            // print(element.payload);
-          }),
-        )
-        .catchError((e) {
-      print(e);
-    });
+    List<Map<String, dynamic>> remindUsers =
+        await NotificationManager().scheduleAllNotifications();
+    // await NotificationManager()
+    //     .getPendingNotifications()
+    //     .then(
+    //       (value) => value.forEach((element) {
+    //         print(element.id);
+    //         print(element.payload);
+    //       }),
+    //     )
+    //     .catchError((e) {
+    //   print(e);
+    // });
 
     // show dialog if there are users to remind
     if (remindUsers.isNotEmpty) {
@@ -485,13 +436,6 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await NotificationManager().customScheduleNotification(
-              "Hey Raunak", "I am here after 30 seconds", 2, 30);
-        },
-        child: const Icon(Icons.schedule),
-      ),
       key: scaffoldKey,
       backgroundColor: Colors.white,
       // backgroundColor: const Color.fromARGB(255, 83, 98, 210),

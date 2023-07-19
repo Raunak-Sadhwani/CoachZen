@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:slimtrap/components/body_form/gender_switch.dart';
+import 'package:coach_zen/components/body_form/gender_switch.dart';
 
 import '../components/ui/appbar.dart';
 
@@ -28,8 +28,10 @@ class _CustNewFormState extends State<CustNewForm> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   bool autoValidate = false;
   bool isMale = true;
+  bool isFabEnabled = true;
 
   @override
   void dispose() {
@@ -41,6 +43,7 @@ class _CustNewFormState extends State<CustNewForm> {
     _emailController.dispose();
     _cityController.dispose();
     _ageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -59,6 +62,7 @@ class _CustNewFormState extends State<CustNewForm> {
         ),
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         child: Padding(
           padding: EdgeInsets.symmetric(
@@ -136,6 +140,7 @@ class _CustNewFormState extends State<CustNewForm> {
                 ),
                 CustomTextFormField(
                   labelText: 'Age',
+                  maxLength: 3,
                   controller: _ageController,
                   suffixText: 'years',
                   keyboardType: TextInputType.number,
@@ -153,6 +158,7 @@ class _CustNewFormState extends State<CustNewForm> {
                 CustomTextFormField(
                   controller: _weightController,
                   labelText: 'Weight',
+                  maxLength: 3,
                   suffixText: 'kg',
                   keyboardType: TextInputType.number,
                   validator: (value) {
@@ -173,6 +179,8 @@ class _CustNewFormState extends State<CustNewForm> {
                   labelText: 'Height',
                   suffixText: 'cm',
                   keyboardType: TextInputType.number,
+                  // max cahracters 3
+                  maxLength: 3,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter height';
@@ -190,6 +198,7 @@ class _CustNewFormState extends State<CustNewForm> {
                   controller: _phoneController,
                   labelText: 'Phone Number',
                   prefixText: '+91',
+                  maxLength: 10,
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -239,113 +248,143 @@ class _CustNewFormState extends State<CustNewForm> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          setState(() {
-            autoValidate = true;
-          });
-          if (_formKey.currentState!.validate()) {
-            // get all the values
-            try {
-              final DateFormat format = DateFormat('dd-MM-yyyy - hh:mm a');
-              DateTime created = format.parse(_dateController.text);
-              String cid = FirebaseAuth.instance.currentUser!.uid;
-              int age = int.parse(_ageController.text);
-              DateTime currentDate = DateTime.now();
-              DateTime dob = DateTime(
-                  currentDate.year - age, currentDate.month, currentDate.day);
-              List<Map<String, dynamic>> measurements = [
-                {
-                  'date': created,
-                  'weight': double.parse(_weightController.text),
-                }
-              ];
-              Map<String, dynamic> data = {
-                'name': _nameController.text.trim(),
-                'dob': dob,
-                'gender': isMale ? 'male' : 'female',
-                'height': int.parse(_heightController.text),
-                'measurements': measurements,
-                'phone': _phoneController.text.trim(),
-                'city': _cityController.text.trim(),
-                'email': _emailController.text.trim(),
-                'created': created,
-                'cid': cid,
-              };
-              QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-                  .collection('Users')
-                  .where('phone', isEqualTo: data['phone'])
-                  .get();
+      floatingActionButton: IgnorePointer(
+        ignoring: !isFabEnabled,
+        child: FloatingActionButton(
+          onPressed: () async {
+            if (!isFabEnabled) {
+              return; // Ignore button press if it's already disabled
+            }
 
-              QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
-                  .collection('Coaches')
-                  .where('phone', isEqualTo: data['phone'])
-                  .get();
-              if (userSnapshot.docs.isNotEmpty ||
-                  coachSnapshot.docs.isNotEmpty) {
-                return Flushbar(
+            setState(() {
+              autoValidate = true;
+              isFabEnabled = false; // Disable the button on press
+            });
+
+            if (_formKey.currentState!.validate()) {
+              // get all the values
+              try {
+                final DateFormat format = DateFormat('dd-MM-yyyy - hh:mm a');
+                DateTime created = format.parse(_dateController.text);
+                String cid = FirebaseAuth.instance.currentUser!.uid;
+                int age = int.parse(_ageController.text);
+                DateTime currentDate = DateTime.now();
+                DateTime dob = DateTime(
+                    currentDate.year - age, currentDate.month, currentDate.day);
+                List<Map<String, dynamic>> measurements = [
+                  {
+                    'date': created,
+                    'weight': double.parse(_weightController.text),
+                  }
+                ];
+                Map<String, dynamic> data = {
+                  'name': _nameController.text.trim(),
+                  'dob': dob,
+                  'gender': isMale ? 'male' : 'female',
+                  'height': int.parse(_heightController.text),
+                  'measurements': measurements,
+                  'phone': _phoneController.text.trim(),
+                  'city': _cityController.text.trim(),
+                  'email': _emailController.text.trim(),
+                  'created': created,
+                  'cid': cid,
+                };
+                QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+                    .collection('Users')
+                    .where('phone', isEqualTo: data['phone'])
+                    .get();
+
+                QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
+                    .collection('Coaches')
+                    .where('phone', isEqualTo: data['phone'])
+                    .get();
+                if (userSnapshot.docs.isNotEmpty ||
+                    coachSnapshot.docs.isNotEmpty) {
+                  return Flushbar(
+                    margin: const EdgeInsets.all(7),
+                    borderRadius: BorderRadius.circular(15),
+                    flushbarStyle: FlushbarStyle.FLOATING,
+                    flushbarPosition: FlushbarPosition.BOTTOM,
+                    message: "User with this phone number already exists!",
+                    icon: Icon(
+                      Icons.error_outline,
+                      size: 28.0,
+                      color: Colors.red[300],
+                    ),
+                    duration: const Duration(milliseconds: 4000),
+                    leftBarIndicatorColor: Colors.red[300],
+                  ).show(scaffoldKey.currentContext!);
+                }
+                await FirebaseFirestore.instance.collection('Users').add(data);
+                //  dispose all the controllers
+                _dateController.clear();
+                _nameController.clear();
+                _weightController.clear();
+                _heightController.clear();
+                _phoneController.clear();
+                _cityController.clear();
+                _emailController.clear();
+                _ageController.clear();
+                _dateController.clear();
+
+                Navigator.pop(scaffoldKey.currentContext!);
+                Flushbar(
                   margin: const EdgeInsets.all(7),
                   borderRadius: BorderRadius.circular(15),
                   flushbarStyle: FlushbarStyle.FLOATING,
                   flushbarPosition: FlushbarPosition.BOTTOM,
-                  message: "User with this phone number already exists!",
+                  message: "User added successfully",
                   icon: Icon(
-                    Icons.error_outline,
+                    Icons.check_circle_outline_rounded,
+                    size: 28.0,
+                    color: Colors.green[300],
+                  ),
+                  duration: const Duration(milliseconds: 1500),
+                  leftBarIndicatorColor: Colors.green[300],
+                ).show(scaffoldKey.currentContext!);
+              } catch (e) {
+                debugPrint(e.toString());
+                Flushbar(
+                  margin: const EdgeInsets.all(7),
+                  borderRadius: BorderRadius.circular(15),
+                  flushbarStyle: FlushbarStyle.FLOATING,
+                  flushbarPosition: FlushbarPosition.BOTTOM,
+                  message: "Error updating user data",
+                  icon: Icon(
+                    Icons.error_outline_rounded,
                     size: 28.0,
                     color: Colors.red[300],
                   ),
-                  duration: const Duration(milliseconds: 4000),
+                  duration: const Duration(milliseconds: 1500),
                   leftBarIndicatorColor: Colors.red[300],
-                ).show(scaffoldKey.currentContext!);
+                ).show(context);
+                setState(() {
+                  isFabEnabled = true;
+                });
+                return;
               }
-              await FirebaseFirestore.instance.collection('Users').add(data);
-              //  dispose all the controllers
-              _dateController.clear();
-              _nameController.clear();
-              _weightController.clear();
-              _heightController.clear();
-              _phoneController.clear();
-              _cityController.clear();
-              _emailController.clear();
-              _ageController.clear();
-              _dateController.clear();
-
-              Navigator.pop(scaffoldKey.currentContext!);
-              Flushbar(
-                margin: const EdgeInsets.all(7),
-                borderRadius: BorderRadius.circular(15),
-                flushbarStyle: FlushbarStyle.FLOATING,
-                flushbarPosition: FlushbarPosition.BOTTOM,
-                message: "User added successfully",
-                icon: Icon(
-                  Icons.check_circle_outline_rounded,
-                  size: 28.0,
-                  color: Colors.green[300],
-                ),
-                duration: const Duration(milliseconds: 1500),
-                leftBarIndicatorColor: Colors.green[300],
-              ).show(scaffoldKey.currentContext!);
-            } catch (e) {
-              debugPrint(e.toString());
-              Flushbar(
-                margin: const EdgeInsets.all(7),
-                borderRadius: BorderRadius.circular(15),
-                flushbarStyle: FlushbarStyle.FLOATING,
-                flushbarPosition: FlushbarPosition.BOTTOM,
-                message: "Error updating user data",
-                icon: Icon(
-                  Icons.error_outline_rounded,
-                  size: 28.0,
-                  color: Colors.red[300],
-                ),
-                duration: const Duration(milliseconds: 1500),
-                leftBarIndicatorColor: Colors.red[300],
-              ).show(context);
-              return;
+            } else {
+              // Enable the button if form validation failed
+              setState(() {
+                isFabEnabled = true;
+              });
+              final ScrollPosition position = _scrollController.position;
+              final double firstErrorFieldOffset = _formKey.currentContext!
+                  .findRenderObject()!
+                  .getTransformTo(null)
+                  .getTranslation()
+                  .y;
+              final double scrollOffset =
+                  position.pixels + firstErrorFieldOffset;
+              _scrollController.animateTo(
+                scrollOffset,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
             }
-          }
-        },
-        child: const Icon(Icons.save),
+          },
+          child: const Icon(Icons.save),
+        ),
       ),
     );
   }
@@ -360,6 +399,7 @@ class CustomTextFormField extends StatelessWidget {
   final TextInputType? keyboardType;
   final VoidCallback? onTap;
   final String? Function(String?)? validator;
+  final int? maxLength;
 
   const CustomTextFormField({
     Key? key,
@@ -371,6 +411,7 @@ class CustomTextFormField extends StatelessWidget {
     this.keyboardType,
     this.validator,
     this.onTap,
+    this.maxLength,
   }) : super(key: key);
 
   @override
@@ -391,6 +432,7 @@ class CustomTextFormField extends StatelessWidget {
             readOnly: readOnly,
             controller: controller,
             keyboardType: keyboardType,
+            maxLength: maxLength,
             onTap: onTap,
             // change font family
             style: GoogleFonts.raleway(
@@ -398,6 +440,7 @@ class CustomTextFormField extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
+              counterText: '',
               labelText: labelText,
               suffixText: suffixText,
               prefixText: prefixText,

@@ -5,8 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:slimtrap/pages/cust_add_weight.dart';
-import 'package:slimtrap/pages/home.dart';
+import 'package:coach_zen/pages/cust_add_weight.dart';
+import 'package:coach_zen/pages/home.dart';
 import '../components/body_form/body_form_1.dart';
 import '../components/body_form/body_form_2.dart';
 import '../components/body_form/body_form_3.dart';
@@ -36,6 +36,7 @@ class FormPage extends StatefulWidget {
 }
 
 class _FormPageState extends State<FormPage> {
+  bool onSubmitted = false;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final GlobalKey<FormState> formKey2 = GlobalKey<FormState>();
 
@@ -168,7 +169,16 @@ class _FormPageState extends State<FormPage> {
   }
 
   onSubmit() async {
+    if (onSubmitted) {
+      return;
+    }
+    setState(() {
+      onSubmitted = true;
+    });
     if (!await Method.checkInternetConnection(context)) {
+      setState(() {
+        onSubmitted = false;
+      });
       return;
     }
     bool formOneIsValid = formKey.currentState?.validate() ?? false;
@@ -180,6 +190,9 @@ class _FormPageState extends State<FormPage> {
           // ScaffoldMessenger.of(context).showSnackBar(
           //   const SnackBar(content: Text('BodyForm2 validation failed!')),
           // );
+          setState(() {
+            onSubmitted = false;
+          });
           return debugPrint('BodyForm2 validation failed');
         }
 
@@ -248,6 +261,9 @@ class _FormPageState extends State<FormPage> {
                 format.parseStrict(BodyForm2.allFields.last['controller'].text);
             measurements.last['date'] = date;
           } catch (e) {
+            setState(() {
+              onSubmitted = false;
+            });
             Flushbar(
               margin: const EdgeInsets.all(7),
               borderRadius: BorderRadius.circular(15),
@@ -282,6 +298,9 @@ class _FormPageState extends State<FormPage> {
               duration: const Duration(milliseconds: 410),
               curve: Curves.easeIn,
             );
+            setState(() {
+              onSubmitted = false;
+            });
             return Flushbar(
               margin: const EdgeInsets.all(7),
               borderRadius: BorderRadius.circular(15),
@@ -363,6 +382,9 @@ class _FormPageState extends State<FormPage> {
           ).show(context);
         } catch (e) {
           // SnackBar
+          setState(() {
+            onSubmitted = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Something went wrong4!'),
@@ -377,6 +399,9 @@ class _FormPageState extends State<FormPage> {
             content: Text('Something went wrong 2!'),
           ),
         );
+        setState(() {
+          onSubmitted = false;
+        });
         return debugPrint(e.toString());
       }
     } else {
@@ -385,12 +410,24 @@ class _FormPageState extends State<FormPage> {
         duration: const Duration(milliseconds: 410),
         curve: Curves.easeIn,
       );
+      setState(() {
+        onSubmitted = false;
+      });
       return debugPrint('Form1 validation failed');
     }
   }
 
   onSubmitUser() async {
+    if (onSubmitted) {
+      return;
+    }
+    setState(() {
+      onSubmitted = true;
+    });
     if (!await Method.checkInternetConnection(context)) {
+      setState(() {
+        onSubmitted = false;
+      });
       return;
     }
     bool formOneIsValid = formKey2.currentState?.validate() ?? false;
@@ -422,6 +459,9 @@ class _FormPageState extends State<FormPage> {
         date = format.parseStrict(BodyForm2.allFields.last['controller'].text);
         for (int i = 0; i < widget.measurements!.length; i++) {
           if (widget.measurements![i]['date'].toDate() == date) {
+            setState(() {
+              onSubmitted = false;
+            });
             return Flushbar(
               margin: const EdgeInsets.all(7),
               borderRadius: BorderRadius.circular(15),
@@ -454,6 +494,9 @@ class _FormPageState extends State<FormPage> {
           duration: const Duration(milliseconds: 2000),
           leftBarIndicatorColor: Colors.red[300],
         ).show(context);
+        setState(() {
+          onSubmitted = false;
+        });
         return debugPrint(e.toString());
       }
       widget.measurements!.add(data);
@@ -508,6 +551,9 @@ class _FormPageState extends State<FormPage> {
         return debugPrint(e.toString());
       }
     } else {
+      setState(() {
+        onSubmitted = false;
+      });
       debugPrint('Form1 validation failed');
     }
   }
