@@ -1,7 +1,8 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -253,13 +254,14 @@ class _FormPageState extends State<FormPage> {
         }
 
         try {
-          FieldValue timestamp = FieldValue.serverTimestamp();
+          // timestamp from firebase database
+          const timestamp = ServerValue.timestamp;
           DateTime date = DateTime.now();
           try {
             final DateFormat format = DateFormat('dd-MM-yyyy');
             date =
                 format.parseStrict(BodyForm2.allFields.last['controller'].text);
-            measurements.last['date'] = date;
+            measurements.last['date'] = date.toString();
           } catch (e) {
             setState(() {
               onSubmitted = false;
@@ -281,18 +283,22 @@ class _FormPageState extends State<FormPage> {
             return debugPrint(e.toString());
           }
 
-          // check if phone  exists in firestore
-          QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-              .collection('Users')
-              .where('phone', isEqualTo: data['phone'])
-              .get();
+          final userSnapshot = await FirebaseDatabase.instance
+              .ref()
+              .child('Users')
+              .orderByChild('phone')
+              .equalTo(data['phone'])
+              .once();
 
-          QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
-              .collection('Coaches')
-              .where('phone', isEqualTo: data['phone'])
-              .get();
+          final coachSnapshot = await FirebaseDatabase.instance
+              .ref()
+              .child('Coaches')
+              .orderByChild('phone')
+              .equalTo(data['phone'])
+              .once();
 
-          if (userSnapshot.docs.isNotEmpty || coachSnapshot.docs.isNotEmpty) {
+          if (userSnapshot.snapshot.value != null ||
+              coachSnapshot.snapshot.value != null) {
             controller.animateToPage(
               0,
               duration: const Duration(milliseconds: 410),
@@ -317,9 +323,7 @@ class _FormPageState extends State<FormPage> {
             ).show(context);
           }
 
-          // convert FieldValue timestamp to datetime
           User? coach = FirebaseAuth.instance.currentUser;
-          // add timestamp of firestore
           data['created'] = timestamp;
           data['measurements'] = measurements;
           data['medicalHistory'] = medicalHistory;
@@ -330,17 +334,18 @@ class _FormPageState extends State<FormPage> {
           DateTime currentDate = DateTime.now();
           DateTime dob = DateTime(
               currentDate.year - age, currentDate.month, currentDate.day);
-          data['dob'] = dob;
+          data['dob'] = dob.millisecondsSinceEpoch;
           // remove age from data
           data.remove('age');
 
-          // Create a Firestore document reference
-          final docRef = FirebaseFirestore.instance.collection('Users');
+          // add to firebase database
+          final ref = FirebaseDatabase.instance.ref().child('Users');
+          await ref.push().set(data);
 
-          // Set data to the document
-          await docRef.add(
-            data,
-          );
+          // // Set data to the document
+          // await docRef.add(
+          //   data,
+          // );
           // clear all fields
           for (var field in allFields) {
             if (field['label'] == 'Medical History (optional)') {
@@ -386,8 +391,8 @@ class _FormPageState extends State<FormPage> {
             onSubmitted = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Something went wrong4!'),
+            SnackBar(
+              content: Text('Something went wrong4!$e'),
             ),
           );
           return debugPrint(e.toString());
@@ -478,7 +483,7 @@ class _FormPageState extends State<FormPage> {
             ).show(context);
           }
         }
-        data['date'] = date;
+        data['date'] = date.toString();
       } catch (e) {
         Flushbar(
           margin: const EdgeInsets.all(7),
@@ -501,9 +506,9 @@ class _FormPageState extends State<FormPage> {
       }
       widget.measurements!.add(data);
 
-      final docRef = FirebaseFirestore.instance.collection('Users');
+      final docRef = FirebaseDatabase.instance.ref().child('Users');
       try {
-        await docRef.doc(widget.uid).update({
+        await docRef.child(widget.uid!).update({
           'measurements': widget.measurements,
         });
         for (var field in allFields) {

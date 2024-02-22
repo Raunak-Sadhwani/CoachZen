@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,7 +31,7 @@ class _BodyFormListState extends State<BodyFormList> {
   FocusNode searchFocusNode = FocusNode();
   double opacity = 0.0;
   DateFormat formatter = DateFormat('dd MMM yyyy');
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredData = [];
+  List<MapEntry<dynamic, dynamic>> _filteredData = [];
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Future<void> checkInternetConnection() async {
     if (!await Method.checkInternetConnection(context)) {
@@ -83,7 +84,10 @@ class _BodyFormListState extends State<BodyFormList> {
           child: Drawer(
             child: Column(
               children: [
-                _buildDrawerHeader('Sort by Created Date'),
+                if (_showExpiredPlans)
+                  _buildDrawerHeader('Sort by Created Date')
+                else
+                  _buildDrawerHeader('Sort by Remaining Days'),
                 _buildDrawerItem(Icons.arrow_upward, 'Ascending',
                     _sortAscending, true, () => _updateSortOrder(true, context),
                     color: Colors.blue),
@@ -270,18 +274,29 @@ class _BodyFormListState extends State<BodyFormList> {
               ),
           ],
         ),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection("Users")
-              .where('cid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
-              .snapshots(),
+        body: StreamBuilder(
+          stream: FirebaseDatabase.instance
+              .ref()
+              .child('Users')
+              .orderByChild("cid")
+              .equalTo(FirebaseAuth.instance.currentUser!.uid)
+              .onValue,
           builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-              final filteredData = snapshot.data!.docs.where((doc) {
-                final name = doc.data()['name'].toString().toLowerCase();
-                final city = doc.data()['city'].toString().toLowerCase();
-                final phone = doc.data()['phone'].toString().toLowerCase();
-                final email = doc.data()['email'].toString().toLowerCase();
+            if (snapshot.hasData) {
+              final userData =
+                  snapshot.data!.snapshot.value as Map<dynamic, dynamic>?;
+              if (userData == null) {
+                return Center(
+                  child: Text('Please add a customer to get started',
+                      style: selStyle),
+                );
+              }
+              final filteredData = userData.entries.where((entry) {
+                final Map<dynamic, dynamic> userData = entry.value;
+                final name = userData['name'].toString().toLowerCase();
+                final city = userData['city'].toString().toLowerCase();
+                final phone = userData['phone'].toString().toLowerCase();
+                final email = userData['email'].toString().toLowerCase();
                 final searchLower = searchQuery.toLowerCase();
                 return name.contains(searchLower) ||
                     city.contains(searchLower) ||
@@ -289,20 +304,10 @@ class _BodyFormListState extends State<BodyFormList> {
                     email.contains(searchLower);
               }).toList();
 
-              // filteredData.sort((a, b) {
-              //   final dateA = a.data()['created'];
-              //   final dateB = b.data()['created'];
-              //   return dateB
-              //       .toDate()
-              //       .compareTo(dateA.toDate()); // Compare in reverse order
-              // });
-
               filteredData.sort((a, b) {
-                final dateA = a.data()['created'];
-                final dateB = b.data()['created'];
-                final compareResult = dateA
-                    .toDate()
-                    .compareTo(dateB.toDate()); // Compare in ascending order
+                final dateA = a.value['created'];
+                final dateB = b.value['created'];
+                final compareResult = dateA.compareTo(dateB);
 
                 return _sortAscending ? compareResult : -compareResult;
               });
@@ -310,13 +315,14 @@ class _BodyFormListState extends State<BodyFormList> {
               // show only active plans
               if (!_showExpiredPlans) {
                 filteredData.removeWhere((doc) {
-                  final plans = doc.data()['plans'];
+                  final plans = doc.value['plans'];
                   if (plans == null) {
                     return true;
                   }
                   final activePlans = plans.where((plan) {
                     final daysSinceStarted = DateTime.now()
-                            .difference(plan['started'].toDate())
+                            .difference(DateTime.fromMillisecondsSinceEpoch(
+                                plan['started']))
                             .inDays +
                         1;
                     return daysSinceStarted <= plan['days'];
@@ -324,35 +330,79 @@ class _BodyFormListState extends State<BodyFormList> {
                   return activePlans.isEmpty;
                 });
 
-                filteredData.sort((a, b) {
-                  final planA = a.data()['plans'].firstWhere((plan) {
-                    final daysSinceStarted = DateTime.now()
-                            .difference(plan['started'].toDate())
-                            .inDays +
-                        1;
-                    return daysSinceStarted <= plan['days'];
-                  });
-                  final planB = b.data()['plans'].firstWhere((plan) {
-                    final daysSinceStarted = DateTime.now()
-                            .difference(plan['started'].toDate())
-                            .inDays +
-                        1;
-                    return daysSinceStarted <= plan['days'];
-                  });
-
-                  final remainingDaysA = planA['days'] -
-                      (DateTime.now()
-                              .difference(planA['started'].toDate())
+                if (_sortAscending) {
+                  filteredData.sort((a, b) {
+                    final planA = a.value['plans'].firstWhere((plan) {
+                      DateTime.fromMillisecondsSinceEpoch(plan['started']);
+                      final daysSinceStarted = DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  plan['started']))
                               .inDays +
-                          1);
-                  final remainingDaysB = planB['days'] -
-                      (DateTime.now()
-                              .difference(planB['started'].toDate())
+                          1;
+                      return daysSinceStarted <= plan['days'];
+                    });
+                    final planB = b.value['plans'].firstWhere((plan) {
+                      final daysSinceStarted = DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  plan['started']))
                               .inDays +
-                          1);
+                          1;
+                      return daysSinceStarted <= plan['days'];
+                    });
 
-                  return remainingDaysA.compareTo(remainingDaysB);
-                });
+                    final remainingDaysA = planA['days'] -
+                        (DateTime.now()
+                                .difference(DateTime.fromMillisecondsSinceEpoch(
+                                    planA['started']))
+                                .inDays +
+                            1);
+
+                    final remainingDaysB = planB['days'] -
+                        (DateTime.now()
+                                .difference(DateTime.fromMillisecondsSinceEpoch(
+                                    planB['started']))
+                                .inDays +
+                            1);
+
+                    return remainingDaysA.compareTo(remainingDaysB);
+                  });
+                } else {
+                  filteredData.sort((a, b) {
+                    final planA = a.value['plans'].firstWhere((plan) {
+                      DateTime.fromMillisecondsSinceEpoch(plan['started']);
+                      final daysSinceStarted = DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  plan['started']))
+                              .inDays +
+                          1;
+                      return daysSinceStarted <= plan['days'];
+                    });
+                    final planB = b.value['plans'].firstWhere((plan) {
+                      final daysSinceStarted = DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  plan['started']))
+                              .inDays +
+                          1;
+                      return daysSinceStarted <= plan['days'];
+                    });
+
+                    final remainingDaysA = planA['days'] -
+                        (DateTime.now()
+                                .difference(DateTime.fromMillisecondsSinceEpoch(
+                                    planA['started']))
+                                .inDays +
+                            1);
+
+                    final remainingDaysB = planB['days'] -
+                        (DateTime.now()
+                                .difference(DateTime.fromMillisecondsSinceEpoch(
+                                    planB['started']))
+                                .inDays +
+                            1);
+
+                    return remainingDaysB.compareTo(remainingDaysA);
+                  });
+                }
               }
 
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -364,13 +414,16 @@ class _BodyFormListState extends State<BodyFormList> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: _filteredData.length,
                 itemBuilder: (context, index) {
-                  final userInfo = _filteredData[index].data();
+                  // final userInfo = _filteredData[index].data();
+                  final userInfo = _filteredData[index].value;
                   final phone = "+91${userInfo['phone']}";
-                  final timeStamp = userInfo['created'].toDate();
+                  final DateTime timeStamp =
+                      DateTime.fromMillisecondsSinceEpoch(userInfo['created']);
+                  // final timeStamp = userInfo['created'].toDate();
                   final time = DateFormat('h:mm a').format(timeStamp);
                   final name = userInfo['name'];
                   DateTime selectedDate =
-                      DateTime.parse(userInfo['dob'].toDate().toString());
+                      DateTime.fromMillisecondsSinceEpoch(userInfo['dob']);
                   DateTime currentDate = DateTime.now();
                   int age = currentDate.year - selectedDate.year;
                   if (currentDate.month < selectedDate.month ||
@@ -379,39 +432,38 @@ class _BodyFormListState extends State<BodyFormList> {
                     age--;
                   }
                   if (userInfo['measurements'] != null) {
-                    userInfo['measurements'] =
-                        (userInfo['measurements'] as List)
-                            .cast<Map<String, dynamic>>()
-                            .toList();
+                    userInfo['measurements'] = List<Map<dynamic, dynamic>>.from(
+                        userInfo['measurements']);
                   } else {
                     userInfo['measurements'] =
-                        ([]).cast<Map<String, dynamic>>().toList();
+                        List<Map<dynamic, dynamic>>.from([])
+                            .cast<Map<dynamic, dynamic>>();
                   }
                   if (userInfo['productsHistory'] != null) {
                     userInfo['productsHistory'] =
-                        (userInfo['productsHistory'] as List)
-                            .cast<Map<String, dynamic>>()
-                            .toList();
+                        List<Map<dynamic, dynamic>>.from(
+                            userInfo['productsHistory']);
                   } else {
                     userInfo['productsHistory'] =
-                        ([]).cast<Map<String, dynamic>>().toList();
+                        List<Map<dynamic, dynamic>>.from([])
+                            .cast<Map<dynamic, dynamic>>();
                   }
-                  List<Map<String, dynamic>> plans = [];
-                  // Map<String, dynamic> plan = {};
+                  List<Map<dynamic, dynamic>> plans = [];
                   String planName = '';
                   String planStatus = '';
                   Color planColor = Colors.grey;
 
                   if (userInfo['plans'] != null &&
                       userInfo['plans'].isNotEmpty) {
-                    plans = List<Map<String, dynamic>>.from(userInfo['plans']);
+                    debugPrint('uid: ${_filteredData[index].key}');
+                    plans = List<Map<dynamic, dynamic>>.from(userInfo['plans']);
                     plans.sort((a, b) => b['started'].compareTo(a['started']));
-                    Map<String, dynamic> plan = plans[0];
+                    Map<dynamic, dynamic> plan = plans[0];
                     planName = plan['name'];
                     final daysSinceStarted = DateTime.now()
-                            .difference(plan['started'].toDate())
-                            .inDays +
-                        1;
+                        .difference(DateTime.fromMillisecondsSinceEpoch(
+                            plan['started']))
+                        .inDays;
                     final daysLeft = plan['days'] - daysSinceStarted;
                     planStatus = daysLeft < 0
                         ? 'Expired'
@@ -426,13 +478,12 @@ class _BodyFormListState extends State<BodyFormList> {
                       planColor = Colors.red;
                     }
                   }
-                  // var age = filteredData[index].data()['age'];
+                  // // var age = filteredData[index].data()['age'];
 
                   String? image = userInfo['image'];
-                  final uid = _filteredData[index].id;
-
-                  // String uid = _filteredData[index].id;
+                  final String uid = _filteredData[index].key;
                   String gender = userInfo['gender'];
+
                   return Slidable(
                     startActionPane: ActionPane(
                       motion: const BehindMotion(),
@@ -492,7 +543,6 @@ class _BodyFormListState extends State<BodyFormList> {
                         ),
                       ],
                     ),
-                    // remove
                     endActionPane: ActionPane(
                       motion: const BehindMotion(),
                       // key: const ValueKey(1),
@@ -648,16 +698,12 @@ class _BodyFormListState extends State<BodyFormList> {
                   );
                 },
               );
-            }
-            if (snapshot.data != null && snapshot.data!.docs.isEmpty) {
-              return Center(
-                  child: Text('Please add a customer to get started',
-                      style: selStyle));
             } else if (snapshot.hasError) {
               return const Text('Error');
             } else {
               return const Center(child: CircularProgressIndicator());
             }
+            // return const SizedBox.shrink();
           },
         ));
   }

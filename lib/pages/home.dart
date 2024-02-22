@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:coach_zen/pages/daily_attendance.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -534,10 +535,18 @@ class _HomePageState extends State<HomePage> {
                       height: height,
                       width: width,
                       imgPath: 'lib/assets/meas.jpg',
-                      page: const FormPage(),
+                      page: const DailyAttendance(),
                       openColor: Colors.yellow.shade800,
-                      label1: 'Customer',
-                      label2: 'Check-up'),
+                      label1: 'Daily',
+                      label2: 'Attendance'),
+                  // HomeButton(
+                  //     height: height,
+                  //     width: width,
+                  //     imgPath: 'lib/assets/meas.jpg',
+                  //     page: const FormPage(),
+                  //     openColor: Colors.yellow.shade800,
+                  //     label1: 'Customer',
+                  //     label2: 'Check-up'),
                   HomeButton(
                       height: height,
                       width: width,
@@ -549,7 +558,7 @@ class _HomePageState extends State<HomePage> {
                   HomeButton(
                       height: height,
                       width: width,
-                      page: const CustNewForm(),
+                      page: const NewCustWrapper(),
                       imgPath: 'lib/assets/new_cust.png',
                       openColor: Colors.green.shade800,
                       label1: 'New',
@@ -632,6 +641,71 @@ class HomeButton extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NewCustWrapper extends StatelessWidget {
+  final bool? attendance;
+  const NewCustWrapper({
+    Key? key,
+    this.attendance,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    double height = MediaQuery.of(context).size.height;
+    double width = MediaQuery.of(context).size.width;
+    return Scaffold(
+      appBar: MyAppBar(
+        // avatar
+        leftIcon: Container(
+          margin: const EdgeInsets.only(left: 10),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back_ios),
+            color: Colors.black26,
+            onPressed: () {
+              Navigator.pop(context);
+              if (attendance != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DailyAttendance(),
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+        title: 'Select An Option',
+      ),
+      body: Center(
+        child: Padding(
+          padding: EdgeInsets.all(width * 0.1),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              HomeButton(
+                  height: height,
+                  width: width,
+                  imgPath: 'lib/assets/meas.jpg',
+                  page: const FormPage(),
+                  openColor: Colors.yellow.shade800,
+                  label1: 'New Body',
+                  label2: 'Check-up'),
+              HomeButton(
+                  height: height,
+                  width: width,
+                  page: const CustNewForm(),
+                  imgPath: 'lib/assets/new_cust.png',
+                  openColor: Colors.green.shade800,
+                  label1: 'Simple',
+                  label2: 'Details'),
+            ],
           ),
         ),
       ),

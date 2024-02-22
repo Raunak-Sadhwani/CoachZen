@@ -1,10 +1,47 @@
 {
   "project_info": {
     "project_number": "1091415920513",
+    "firebase_url": "https://slimtrap-12284-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "slimtrap-12284",
     "storage_bucket": "slimtrap-12284.appspot.com"
   },
   "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1091415920513:android:bb47dddef7b423d43be280",
+        "android_client_info": {
+          "package_name": "com.example.angelwellness"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1091415920513-qv1tni3bvlaje01uscncjge1b0jmatt8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZApmKzencaF1JAGvW2fgQ-yIGJTXC91s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1091415920513-qv1tni3bvlaje01uscncjge1b0jmatt8.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1091415920513-c1jgff9bke2l7g6v5im3vo7vv6kuu4pu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.angelwellness"
+              }
+            }
+          ]
+        }
+      }
+    },
     {
       "client_info": {
         "mobilesdk_app_id": "1:1091415920513:android:7f3e462b6b79d44b3be280",
@@ -29,6 +66,13 @@
             {
               "client_id": "1091415920513-qv1tni3bvlaje01uscncjge1b0jmatt8.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1091415920513-c1jgff9bke2l7g6v5im3vo7vv6kuu4pu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.angelwellness"
+              }
             }
           ]
         }

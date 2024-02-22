@@ -1,10 +1,10 @@
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:coach_zen/components/body_form/gender_switch.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../components/ui/appbar.dart';
 
@@ -34,16 +34,35 @@ class _CustNewFormState extends State<CustNewForm> {
   bool isFabEnabled = true;
 
   @override
+  void initState() {
+    super.initState();
+    // snackbar if firebase is connected
+    FirebaseDatabase.instance
+        .ref()
+        .child('.info/connected')
+        .onValue
+        .listen((event) {
+      if (event.snapshot.value == true) {
+        Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.BOTTOM,
+          message: "Firebase connected",
+          icon: Icon(
+            Icons.check_circle_outline_rounded,
+            size: 28.0,
+            color: Colors.green[300],
+          ),
+          duration: const Duration(milliseconds: 1500),
+          leftBarIndicatorColor: Colors.green[300],
+        ).show(context);
+      }
+    });
+  }
+
+  @override
   void dispose() {
-    _dateController.dispose();
-    _nameController.dispose();
-    _weightController.dispose();
-    _heightController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _cityController.dispose();
-    _ageController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -266,40 +285,52 @@ class _CustNewFormState extends State<CustNewForm> {
               try {
                 final DateFormat format = DateFormat('dd-MM-yyyy - hh:mm a');
                 DateTime created = format.parse(_dateController.text);
+                int realtime = created.millisecondsSinceEpoch;
                 String cid = FirebaseAuth.instance.currentUser!.uid;
                 int age = int.parse(_ageController.text);
                 DateTime currentDate = DateTime.now();
                 DateTime dob = DateTime(
                     currentDate.year - age, currentDate.month, currentDate.day);
+                int dobTime = dob.millisecondsSinceEpoch;
                 List<Map<String, dynamic>> measurements = [
                   {
-                    'date': created,
+                    'date': realtime,
                     'weight': double.parse(_weightController.text),
                   }
                 ];
                 Map<String, dynamic> data = {
                   'name': _nameController.text.trim(),
-                  'dob': dob,
+                  'dob': dobTime,
                   'gender': isMale ? 'male' : 'female',
                   'height': int.parse(_heightController.text),
                   'measurements': measurements,
                   'phone': _phoneController.text.trim(),
                   'city': _cityController.text.trim(),
                   'email': _emailController.text.trim(),
-                  'created': created,
+                  'created': realtime,
                   'cid': cid,
                 };
-                QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-                    .collection('Users')
-                    .where('phone', isEqualTo: data['phone'])
-                    .get();
 
-                QuerySnapshot coachSnapshot = await FirebaseFirestore.instance
-                    .collection('Coaches')
-                    .where('phone', isEqualTo: data['phone'])
-                    .get();
-                if (userSnapshot.docs.isNotEmpty ||
-                    coachSnapshot.docs.isNotEmpty) {
+                // check if user already exists by phone
+                final userSnapshot = await FirebaseDatabase.instance
+                    .ref()
+                    .child('Users')
+                    .orderByChild('phone')
+                    .equalTo(_phoneController.text.trim())
+                    .once();
+
+                final coachSnapshot = await FirebaseDatabase.instance
+                    .ref()
+                    .child('Coaches')
+                    .orderByChild('phone')
+                    .equalTo(_phoneController.text.trim())
+                    .once();
+
+                if (userSnapshot.snapshot.value != null ||
+                    coachSnapshot.snapshot.value != null) {
+                  setState(() {
+                    isFabEnabled = true;
+                  });
                   return Flushbar(
                     margin: const EdgeInsets.all(7),
                     borderRadius: BorderRadius.circular(15),
@@ -315,8 +346,33 @@ class _CustNewFormState extends State<CustNewForm> {
                     leftBarIndicatorColor: Colors.red[300],
                   ).show(scaffoldKey.currentContext!);
                 }
-                await FirebaseFirestore.instance.collection('Users').add(data);
-                //  dispose all the controllers
+
+                try {
+                  await FirebaseDatabase.instance
+                      .ref()
+                      .child('Users')
+                      .push()
+                      .set(data);
+                } catch (e) {
+                  Flushbar(
+                    margin: const EdgeInsets.all(7),
+                    borderRadius: BorderRadius.circular(15),
+                    flushbarStyle: FlushbarStyle.FLOATING,
+                    flushbarPosition: FlushbarPosition.BOTTOM,
+                    message: "Something Went Wrong!$e",
+                    icon: Icon(
+                      Icons.error_outline,
+                      size: 28.0,
+                      color: Colors.red[300],
+                    ),
+                    duration: const Duration(milliseconds: 4000),
+                    leftBarIndicatorColor: Colors.red[300],
+                  ).show(scaffoldKey.currentContext!);
+                  setState(() {
+                    isFabEnabled = true;
+                  });
+                }
+
                 _dateController.clear();
                 _nameController.clear();
                 _weightController.clear();
@@ -325,7 +381,6 @@ class _CustNewFormState extends State<CustNewForm> {
                 _cityController.clear();
                 _emailController.clear();
                 _ageController.clear();
-                _dateController.clear();
 
                 Navigator.pop(scaffoldKey.currentContext!);
                 Flushbar(
@@ -357,7 +412,7 @@ class _CustNewFormState extends State<CustNewForm> {
                   ),
                   duration: const Duration(milliseconds: 1500),
                   leftBarIndicatorColor: Colors.red[300],
-                ).show(context);
+                ).show(scaffoldKey.currentContext!);
                 setState(() {
                   isFabEnabled = true;
                 });
