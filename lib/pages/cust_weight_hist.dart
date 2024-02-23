@@ -1,6 +1,8 @@
 import 'package:another_flushbar/flushbar.dart';
 import 'package:auto_size_text/auto_size_text.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +13,7 @@ import 'cust_meas.dart';
 
 class WHistory extends StatefulWidget {
   final int idealweight;
-  final List<Map<String, dynamic>> measurements;
+  final List<Map<dynamic, dynamic>> measurements;
   final String name;
   final List<Color> colors;
   final String uid;
@@ -35,9 +37,8 @@ class WHistory extends StatefulWidget {
   State<WHistory> createState() => _WHistoryState();
 }
 
-String formatDate(Timestamp timestamp) {
-  DateTime dateTime = timestamp.toDate();
-  String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
+String formatDate(DateTime timestamp) {
+  String formattedDate = DateFormat('dd MMM yyyy').format(timestamp);
   return formattedDate;
 }
 
@@ -45,12 +46,13 @@ class _WHistoryState extends State<WHistory> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   // scaffold key
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  late List<Map<String, dynamic>> updatedMeasurements;
+  late List<Map<dynamic, dynamic>> updatedMeasurements;
 
   @override
   void initState() {
     super.initState();
-    updatedMeasurements = List.from(widget.measurements);
+    // make a deep copy of the list
+    updatedMeasurements = List<Map<dynamic, dynamic>>.from(widget.measurements);
   }
 
   void _editWeight(int index) {
@@ -102,10 +104,11 @@ class _WHistoryState extends State<WHistory> {
                       setState(() {
                         updatedMeasurements[index]['weight'] = weight;
                       });
-                      // save to firestore
-                      final userRef = FirebaseFirestore.instance
-                          .collection('Users')
-                          .doc(widget.uid);
+                      // save to firebase
+                      final userRef = FirebaseDatabase.instance
+                          .ref()
+                          .child('Users')
+                          .child(widget.uid);
                       await userRef.update({
                         'measurements': updatedMeasurements,
                       });
@@ -243,6 +246,7 @@ class _WHistoryState extends State<WHistory> {
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: OpenContainerWrapper(
+                                openColor: Colors.amber[100],
                                 page: Meas(
                                   measurements: updatedMeasurements[index],
                                   index: index,
@@ -283,9 +287,8 @@ class _WHistoryState extends State<WHistory> {
               Column(
                 children: [
                   Text(
-                    formatDate(measurement['date'].runtimeType == DateTime
-                        ? Timestamp.fromDate(measurement['date'])
-                        : measurement['date']),
+                    formatDate(DateTime.fromMillisecondsSinceEpoch(
+                        measurement['date'])),
                     style: const TextStyle(
                       color: Colors.black,
                       fontSize: 14,
@@ -364,14 +367,15 @@ class _WHistoryState extends State<WHistory> {
                             setState(() {
                               updatedMeasurements.removeAt(index);
                             });
-                            // save to firestore
-                            final userRef = FirebaseFirestore.instance
-                                .collection('Users')
-                                .doc(widget.uid);
+                            // save to firebase
+                            final userRef = FirebaseDatabase.instance
+                                .ref()
+                                .child('Users')
+                                .child(widget.uid);
                             await userRef.update({
                               'measurements': updatedMeasurements,
                             });
-                            Navigator.pop(_scaffoldKey.currentContext!);
+                            Navigator.pop(context);
                             return Flushbar(
                               margin: const EdgeInsets.all(7),
                               borderRadius: BorderRadius.circular(15),

@@ -1,7 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:another_flushbar/flushbar.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +17,7 @@ class FormPage extends StatefulWidget {
   final double? height;
   final String? age;
   final bool? gender;
-  final List<Map<String, dynamic>>? measurements;
+  final List<Map<dynamic, dynamic>>? measurements;
   final String? name;
   final String? uid;
 
@@ -77,7 +76,7 @@ class _FormPageState extends State<FormPage> {
         totalPages = 2;
       });
       for (int i = 0; i < widget.measurements!.length; i++) {
-        DateTime date = widget.measurements![i]['date'].toDate();
+        DateTime date = DateTime.fromMillisecondsSinceEpoch(widget.measurements![i]['date']);
         // remove time if exists
         date = DateTime(date.year, date.month, date.day);
         disabledDates.add(date);
@@ -261,7 +260,7 @@ class _FormPageState extends State<FormPage> {
             final DateFormat format = DateFormat('dd-MM-yyyy');
             date =
                 format.parseStrict(BodyForm2.allFields.last['controller'].text);
-            measurements.last['date'] = date.toString();
+            measurements.last['date'] = date.millisecondsSinceEpoch;
           } catch (e) {
             setState(() {
               onSubmitted = false;
@@ -463,7 +462,7 @@ class _FormPageState extends State<FormPage> {
         final DateFormat format = DateFormat('dd-MM-yyyy');
         date = format.parseStrict(BodyForm2.allFields.last['controller'].text);
         for (int i = 0; i < widget.measurements!.length; i++) {
-          if (widget.measurements![i]['date'].toDate() == date) {
+          if (DateTime.fromMillisecondsSinceEpoch(widget.measurements![i]['date']) == date) {
             setState(() {
               onSubmitted = false;
             });
@@ -483,7 +482,7 @@ class _FormPageState extends State<FormPage> {
             ).show(context);
           }
         }
-        data['date'] = date.toString();
+        data['date'] = date.millisecondsSinceEpoch;
       } catch (e) {
         Flushbar(
           margin: const EdgeInsets.all(7),
@@ -568,7 +567,7 @@ class FormPageWrapper extends StatelessWidget {
   final double? heightx;
   final String? age;
   final bool? gender;
-  final List<Map<String, dynamic>>? measurements;
+  final List<Map<dynamic, dynamic>>? measurements;
   final String? name;
   final String? uid;
   final int? popIndex;

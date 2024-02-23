@@ -49,6 +49,7 @@ class OpenContainerWrapper extends StatelessWidget {
     required this.page,
     required this.content,
     this.openColor,
+    this.onClosed,
     // required this.onClosed,
   });
 
@@ -56,6 +57,7 @@ class OpenContainerWrapper extends StatelessWidget {
   final Widget page;
   final Widget content;
   final Color? openColor;
+  final VoidCallback? onClosed;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +72,10 @@ class OpenContainerWrapper extends StatelessWidget {
       tappable: false,
       closedBuilder: (BuildContext context, VoidCallback openContainer) {
         return GestureDetector(
-          onTap: openContainer,
+          onTap: () {
+            onClosed?.call();
+            openContainer();
+          },
           child: content,
         );
       },
@@ -96,7 +101,7 @@ class Method {
         ),
         duration: const Duration(milliseconds: 3000),
         leftBarIndicatorColor: Colors.blue[300],
-      ).show(context!);
+      ).show(context);
       return false;
     }
     return true;

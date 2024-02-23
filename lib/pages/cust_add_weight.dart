@@ -1,5 +1,5 @@
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -8,7 +8,7 @@ import '../components/ui/appbar.dart';
 class AddWeight extends StatefulWidget {
   final String name;
   final String uid;
-  final List<Map<String, dynamic>> measurements;
+  final List<Map<dynamic, dynamic>> measurements;
   final int popIndex;
   const AddWeight(
       {super.key,
@@ -49,7 +49,9 @@ class _AddWeightState extends State<AddWeight> {
         date = format.parseStrict(_dateController.text);
         // check in widget.measurements if duplicate date exists
         for (int i = 0; i < widget.measurements.length; i++) {
-          if (widget.measurements[i]['date'].toDate() == date) {
+          if (DateTime.fromMillisecondsSinceEpoch(
+                  widget.measurements[i]['date']) ==
+              date) {
             return Flushbar(
               margin: const EdgeInsets.all(7),
               borderRadius: BorderRadius.circular(15),
@@ -82,15 +84,15 @@ class _AddWeightState extends State<AddWeight> {
           leftBarIndicatorColor: Colors.red[300],
         ).show(scaffoldKey.currentContext!);
       }
-      Map<String, dynamic> data = {
+      Map<dynamic, dynamic> data = {
         'weight': weight,
-        'date': date,
+        'date': date.millisecondsSinceEpoch,
       };
       widget.measurements.add(data);
 
-      final docRef = FirebaseFirestore.instance.collection('Users');
+      final docRef = FirebaseDatabase.instance.ref().child('Users');
       try {
-        await docRef.doc(widget.uid).update({
+        await docRef.child(widget.uid).update({
           'measurements': widget.measurements,
         });
         for (int i = 0; i < widget.popIndex; i++) {
@@ -140,7 +142,8 @@ class _AddWeightState extends State<AddWeight> {
     super.initState();
     // disable dates
     for (int i = 0; i < widget.measurements.length; i++) {
-      DateTime date = widget.measurements[i]['date'].toDate();
+      DateTime date =
+          DateTime.fromMillisecondsSinceEpoch(widget.measurements[i]['date']);
       // remove time if exists
       date = DateTime(date.year, date.month, date.day);
       disabledDates.add(date);
@@ -189,6 +192,13 @@ class _AddWeightState extends State<AddWeight> {
                     // selectableDayPredicate: (DateTime date) {
                     //   return !disabledDates.contains(date);
                     // },
+                    selectableDayPredicate: (DateTime date) {
+                      if (disabledDates.isEmpty) {
+                        return true;
+                      } else {
+                        return !disabledDates.contains(date);
+                      }
+                    },
                   ).then((date) {
                     if (date != null) {
                       setState(() {

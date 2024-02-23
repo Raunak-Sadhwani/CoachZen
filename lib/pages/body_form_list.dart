@@ -455,7 +455,6 @@ class _BodyFormListState extends State<BodyFormList> {
 
                   if (userInfo['plans'] != null &&
                       userInfo['plans'].isNotEmpty) {
-                    debugPrint('uid: ${_filteredData[index].key}');
                     plans = List<Map<dynamic, dynamic>>.from(userInfo['plans']);
                     plans.sort((a, b) => b['started'].compareTo(a['started']));
                     Map<dynamic, dynamic> plan = plans[0];

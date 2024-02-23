@@ -2,7 +2,8 @@
 
 import 'package:another_flushbar/flushbar.dart';
 import 'package:auto_size_text/auto_size_text.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -12,7 +13,7 @@ import '../components/ui/appbar.dart';
 class CustOrderForm extends StatefulWidget {
   final String name;
   final String uid;
-  final List<Map<String, dynamic>> productsHistory;
+  final List<Map<dynamic, dynamic>> productsHistory;
   final int popIndex;
   final int? index;
   const CustOrderForm({
@@ -31,7 +32,7 @@ class CustOrderForm extends StatefulWidget {
 class _CustOrderFormState extends State<CustOrderForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  List<Map<String, dynamic>> tempList = [{}];
+  List<Map<dynamic, dynamic>> tempList = [{}];
   List<TextEditingController> productNameControllers = [];
   List<TextEditingController> productQuantityControllers = [];
   DateTime? selectedDateTime;
@@ -92,7 +93,8 @@ class _CustOrderFormState extends State<CustOrderForm> {
       }
     } else {
       final products = widget.productsHistory[widget.index!]['products'];
-      selectedDateTime = widget.productsHistory[widget.index!]['date'].toDate();
+      selectedDateTime = DateTime.fromMillisecondsSinceEpoch(
+          widget.productsHistory[widget.index!]['date']);
       tempList.clear();
       int subTotal = 0;
       for (var i = 0; i < products.length; i++) {
@@ -561,106 +563,104 @@ class _CustOrderFormState extends State<CustOrderForm> {
           ),
         ),
       ),
-      floatingActionButton: tempList.isNotEmpty
-          ? IgnorePointer(
-              ignoring: !isFabEnabled,
-              child: FloatingActionButton(
-                onPressed: () async {
-                  if (!isFabEnabled) {
-                    return; // Do nothing if the FAB is already disabled
-                  }
-                  setState(() {
-                    isFabEnabled = false;
-                    autoValidate = true;
-                  });
+      floatingActionButton: tempList.isNotEmpty && isFabEnabled
+          ? FloatingActionButton(
+              onPressed: () async {
+                if (!isFabEnabled) {
+                  return; // Do nothing if the FAB is already disabled
+                }
 
-                  if (_formKey.currentState!.validate() &&
-                      selectedDateTime != null) {
-                    if (!await Method.checkInternetConnection(context)) {
-                      setState(() {
-                        isFabEnabled = true;
-                      });
-                      return;
+                setState(() {
+                  // isFabEnabled = false;
+                  autoValidate = true;
+                });
+
+                if (_formKey.currentState!.validate() &&
+                    selectedDateTime != null) {
+                  // debugPrint("products.toString()");
+                  // return;
+                  if (!await Method.checkInternetConnection(context)) {
+                    setState(() {
+                      isFabEnabled = true;
+                    });
+                    return;
+                  }
+
+                  try {
+                    Map<String, dynamic> products = {};
+                    for (var i = 0; i < tempList.length; i++) {
+                      if (int.tryParse(
+                              productQuantityControllers[i].text.trim()) !=
+                          null) {
+                        products[productNameControllers[i].text.trim()] =
+                            int.parse(
+                                productQuantityControllers[i].text.trim());
+                      } else {
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            return AlertDialog(
+                              title: const Text('Invalid quantity'),
+                              content: const Text(
+                                  'Please enter a valid quantity for all products'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text('Ok'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                        setState(() {
+                          isFabEnabled = true;
+                        });
+                        return;
+                      }
                     }
+                    final timestamp = selectedDateTime!.millisecondsSinceEpoch;
+                    final newOrder = {
+                      'date': timestamp,
+                      'products': products,
+                      'total': total,
+                    };
+                    List newProductsHistory = [...widget.productsHistory];
+                    newProductsHistory.add(newOrder);
+                    // if (widget.index == null) {
+                    //   newProductsHistory.add(newOrder);
+                    // } else {
+                    //   newProductsHistory[widget.index!] = newOrder;
+                    // }
 
                     try {
-                      Map<String, dynamic> products = {};
-                      for (var i = 0; i < tempList.length; i++) {
-                        if (int.tryParse(
-                                productQuantityControllers[i].text.trim()) !=
-                            null) {
-                          products[productNameControllers[i].text.trim()] =
-                              int.parse(
-                                  productQuantityControllers[i].text.trim());
-                        } else {
-                          showDialog(
-                            context: context,
-                            builder: (context) {
-                              return AlertDialog(
-                                title: const Text('Invalid quantity'),
-                                content: const Text(
-                                    'Please enter a valid quantity for all products'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                    },
-                                    child: const Text('Ok'),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                          setState(() {
-                            isFabEnabled = true;
-                          });
-                          return;
-                        }
+                      await FirebaseDatabase.instance
+                          .ref()
+                          .child('Users')
+                          .child(widget.uid)
+                          .update({
+                        'productsHistory': newProductsHistory,
+                      });
+
+                      for (int i = 0; i < widget.popIndex; i++) {
+                        Navigator.pop(context);
                       }
 
-                      try {
-                        await FirebaseFirestore.instance
-                            .collection('Users')
-                            .doc(widget.uid)
-                            .update({
-                          'productsHistory': widget.productsHistory,
-                        });
-
-                        for (int i = 0; i < widget.popIndex; i++) {
-                          Navigator.pop(context);
-                        }
-
-                        Flushbar(
-                          margin: const EdgeInsets.all(7),
-                          borderRadius: BorderRadius.circular(15),
-                          flushbarStyle: FlushbarStyle.FLOATING,
-                          flushbarPosition: FlushbarPosition.BOTTOM,
-                          message: "Order added successfully",
-                          icon: Icon(
-                            Icons.check_circle_outline_rounded,
-                            size: 28.0,
-                            color: Colors.green[300],
-                          ),
-                          duration: const Duration(milliseconds: 1500),
-                          leftBarIndicatorColor: Colors.green[300],
-                        ).show(context);
-                      } catch (e) {
-                        debugPrint(e.toString());
-                        Flushbar(
-                          margin: const EdgeInsets.all(7),
-                          borderRadius: BorderRadius.circular(15),
-                          flushbarStyle: FlushbarStyle.FLOATING,
-                          flushbarPosition: FlushbarPosition.BOTTOM,
-                          message: "Error updating user data",
-                          icon: Icon(
-                            Icons.error_outline_rounded,
-                            size: 28.0,
-                            color: Colors.red[300],
-                          ),
-                          duration: const Duration(milliseconds: 1500),
-                          leftBarIndicatorColor: Colors.red[300],
-                        ).show(context);
-                      }
+                      Flushbar(
+                        margin: const EdgeInsets.all(7),
+                        borderRadius: BorderRadius.circular(15),
+                        flushbarStyle: FlushbarStyle.FLOATING,
+                        flushbarPosition: FlushbarPosition.BOTTOM,
+                        message: "Order added successfully",
+                        icon: Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 28.0,
+                          color: Colors.green[300],
+                        ),
+                        duration: const Duration(milliseconds: 1500),
+                        leftBarIndicatorColor: Colors.green[300],
+                      ).show(context);
                     } catch (e) {
                       debugPrint(e.toString());
                       Flushbar(
@@ -678,18 +678,34 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         leftBarIndicatorColor: Colors.red[300],
                       ).show(context);
                     }
-
-                    setState(() {
-                      isFabEnabled = true;
-                    });
-                  } else {
-                    setState(() {
-                      isFabEnabled = true;
-                    });
+                  } catch (e) {
+                    debugPrint(e.toString());
+                    Flushbar(
+                      margin: const EdgeInsets.all(7),
+                      borderRadius: BorderRadius.circular(15),
+                      flushbarStyle: FlushbarStyle.FLOATING,
+                      flushbarPosition: FlushbarPosition.BOTTOM,
+                      message: "Error updating user data",
+                      icon: Icon(
+                        Icons.error_outline_rounded,
+                        size: 28.0,
+                        color: Colors.red[300],
+                      ),
+                      duration: const Duration(milliseconds: 1500),
+                      leftBarIndicatorColor: Colors.red[300],
+                    ).show(context);
                   }
-                },
-                child: const Icon(Icons.save),
-              ),
+
+                  setState(() {
+                    isFabEnabled = true;
+                  });
+                } else {
+                  setState(() {
+                    isFabEnabled = true;
+                  });
+                }
+              },
+              child: const Icon(Icons.save),
             )
           : null,
     );

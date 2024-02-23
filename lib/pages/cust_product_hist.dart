@@ -1,18 +1,17 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../components/ui/appbar.dart';
 import 'cust_order_form.dart';
 
-String formatDate(Timestamp timestamp) {
-  DateTime dateTime = timestamp.toDate();
-  String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
+String formatDate(DateTime timestamp) {
+  String formattedDate = DateFormat('dd MMM yyyy').format(timestamp);
   return formattedDate;
 }
 
 class ProductsHistory extends StatelessWidget {
-  final List<Map<String, dynamic>> products;
+  final List<Map<dynamic, dynamic>> products;
   final String name;
   final String uid;
 
@@ -64,7 +63,7 @@ class ProductsHistory extends StatelessWidget {
             child: Column(
               children: products.map((product) {
                 return ProductExpansionTile(
-                  date: product['date'],
+                  date: DateTime.fromMillisecondsSinceEpoch(product['date']),
                   products: product['products'],
                   gradientColors: gradientColors,
                   onLongPress: (index) {
@@ -93,9 +92,9 @@ class ProductsHistory extends StatelessWidget {
 }
 
 class ProductExpansionTile extends StatefulWidget {
-  final Timestamp date;
+  final DateTime date;
   final int index;
-  final Map<String, dynamic> products;
+  final Map<dynamic, dynamic> products;
   final List<Color> gradientColors;
   final void Function(int) onLongPress;
 
@@ -121,7 +120,7 @@ class _ProductExpansionTileState extends State<ProductExpansionTile> {
     // calculate days from todays date - date
 
     DateTime now = DateTime.now();
-    DateTime date = widget.date.toDate();
+    DateTime date = widget.date;
     int days = now.difference(date).inDays;
     return GestureDetector(
       onLongPress: () {

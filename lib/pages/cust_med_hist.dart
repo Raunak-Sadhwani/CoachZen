@@ -1,5 +1,7 @@
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+
 import 'package:flutter/material.dart';
 import '../components/ui/appbar.dart';
 
@@ -121,9 +123,10 @@ class _CustMedHistState extends State<CustMedHist> {
                       if (!await Method.checkInternetConnection(context)) {
                         return;
                       }
-                      final userRef = FirebaseFirestore.instance
-                          .collection('Users')
-                          .doc(widget.uid);
+                      final userRef = FirebaseDatabase.instance
+                          .ref()
+                          .child('Users')
+                          .child(widget.uid);
                       await userRef.update({
                         'medicalHistory': medicalHistoryList,
                       });

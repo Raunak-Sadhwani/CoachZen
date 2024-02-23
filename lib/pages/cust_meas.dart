@@ -1,5 +1,6 @@
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -8,10 +9,10 @@ import '../components/ui/appbar.dart';
 final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
 class Meas extends StatefulWidget {
-  final Map<String, dynamic> measurements;
+  final Map<dynamic, dynamic> measurements;
   final Widget Function(Widget child) card;
   final String uid;
-  final List<Map<String, dynamic>> allmeasurements;
+  final List<Map<dynamic, dynamic>> allmeasurements;
   final int index;
   const Meas({
     Key? key,
@@ -33,9 +34,8 @@ String capitalize(String value) {
       .join(' ');
 }
 
-String formatDate(Timestamp timestamp) {
-  DateTime dateTime = timestamp.toDate();
-  String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
+String formatDate(DateTime timestamp) {
+  String formattedDate = DateFormat('dd MMM yyyy').format(timestamp);
   return formattedDate;
 }
 
@@ -49,6 +49,7 @@ class _MeasState extends State<Meas> {
   @override
   void initState() {
     super.initState();
+    // remove date from measurements
     updatedMeasurements = Map.from(widget.measurements);
     ogMeasurements = Map.from(widget.measurements);
   }
@@ -127,9 +128,10 @@ class _MeasState extends State<Meas> {
                     widget.allmeasurements[widget.index] = updatedMeasurements;
                     ogMeasurements = Map.from(updatedMeasurements);
                   });
-                  final userRef = FirebaseFirestore.instance
-                      .collection('Users')
-                      .doc(widget.uid);
+                  final userRef = FirebaseDatabase.instance
+                      .ref()
+                      .child('Users')
+                      .child(widget.uid);
                   await userRef.update({
                     'measurements': widget.allmeasurements,
                   });
@@ -173,7 +175,9 @@ class _MeasState extends State<Meas> {
             )
           : null,
       appBar: MyAppBar(
-        title: formatDate(widget.measurements['date']),
+        title: formatDate(
+          DateTime.fromMillisecondsSinceEpoch(widget.measurements['date']),
+        ),
         leftIcon: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           color: Colors.black26,
@@ -186,6 +190,10 @@ class _MeasState extends State<Meas> {
           padding: EdgeInsets.all(width * 0.04),
           child: Column(
             children: updatedMeasurements.entries.map((e) {
+              // if date, return nothing
+              if (e.key.toLowerCase().contains('date')) {
+                return const SizedBox();
+              }
               return Container(
                 margin: EdgeInsets.only(bottom: height * 0.02),
                 decoration: BoxDecoration(
@@ -226,7 +234,9 @@ class _MeasState extends State<Meas> {
                                   10), // Add some spacing between the two Text widgets
                           Text(
                             e.key == 'date'
-                                ? formatDate(e.value)
+                                ? formatDate(
+                                    DateTime.fromMillisecondsSinceEpoch(
+                                        e.value))
                                 : updatedMeasurements[e.key].toString(),
                             style: const TextStyle(
                               color: Colors.black,

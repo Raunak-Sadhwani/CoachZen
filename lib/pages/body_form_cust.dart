@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,11 +20,11 @@ class BodyFormCustomerWrap extends StatefulWidget {
   State<BodyFormCustomerWrap> createState() => _BodyFormCustomerWrapState();
 }
 
-String formatDate(Timestamp timestamp) {
-  DateTime dateTime = timestamp.toDate();
-  String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
-  return formattedDate;
-}
+// String formatDate(Timestamp timestamp) {
+//   DateTime dateTime = timestamp.toDate();
+//   String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
+//   return formattedDate;
+// }
 
 class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
   bool _hasInternet = true;
@@ -90,29 +90,48 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
       );
     }
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection("Users")
-            .doc(widget.uid)
-            .snapshots(),
+    return StreamBuilder(
+        stream: FirebaseDatabase.instance
+            .ref()
+            .child('Users')
+            .child(widget.uid)
+            .onValue,
         builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final user = snapshot.data!.data();
-            // Map<String, dynamic> updateFields = {};
-            // Map<String, dynamic> editedData = {};
-            // Map<String, dynamic> originalData = {};
-            Map<String, dynamic> userData = {};
+          if (snapshot.hasData) {
+            final user =
+                snapshot.data!.snapshot.value as Map<dynamic, dynamic>?;
+
+            if (user == null) {
+              return const Center(
+                child: Text(
+                    'Something went wrong, please contact support or try again later'),
+              );
+            }
+
+            Map<dynamic, dynamic> userData = {};
             // remove any list dataytype from filteredData and any exceptionList keys, add to userData
-            List exceptionList = ["cid", "reg", "cname", "image"];
-            user!.forEach((key, value) {
+            List exceptionList = [
+              "cid",
+              "reg",
+              "cname",
+              "image",
+              "measurements",
+              "productsHistory",
+              "plans",
+              "medicalHistory"
+            ];
+            user.forEach((key, value) {
               if (value.runtimeType != List && !exceptionList.contains(key)) {
                 userData[key] = value;
               }
               // if its last key, add id
               if (key == user.keys.last && userData[key] != 'created') {
-                Timestamp cr = userData['created'];
+                DateTime cr =
+                    DateTime.fromMillisecondsSinceEpoch(userData['created']);
+                String formattedcr =
+                    DateFormat('dd MMM yyyy - hh:mm a').format(cr);
                 userData.remove('created');
-                userData['created'] = cr;
+                userData['created'] = formattedcr;
               }
             });
             List toBeOnTop = ["name", "phone", "city", "dob"];
@@ -121,15 +140,15 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
               ...userData.entries
                   .where((entry) => !toBeOnTop.contains(entry.key))
             ]);
-            List<Map<String, dynamic>> measurements = [];
-            List<Map<String, dynamic>> products = [];
-            List<Map<String, dynamic>> plans = [];
+            List<Map<dynamic, dynamic>> measurements = [];
+            List<Map<dynamic, dynamic>> products = [];
+            List<Map<dynamic, dynamic>> plans = [];
             List medicalHistory = user['medicalHistory'] ?? [];
             String? image = user['image'];
 
             if (user['measurements'] != null) {
               measurements = (user['measurements'] as List)
-                  .cast<Map<String, dynamic>>()
+                  .cast<Map<dynamic, dynamic>>()
                   .toList()
                 ..forEach((e) {
                   final weight = {'weight': e['weight']};
@@ -139,13 +158,14 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             }
             if (user['productsHistory'] != null) {
               products = (user['productsHistory'] as List)
-                  .cast<Map<String, dynamic>>()
+                  .cast<Map<dynamic, dynamic>>()
                   .toList();
               products.sort((a, b) => b['date'].compareTo(a['date']));
             }
             if (user['plans'] != null && user['plans'].isNotEmpty) {
-              plans =
-                  (user['plans'] as List).cast<Map<String, dynamic>>().toList();
+              plans = (user['plans'] as List)
+                  .cast<Map<dynamic, dynamic>>()
+                  .toList();
               plans.sort((a, b) => b['started'].compareTo(a['started']));
               // if userdata does not have plan, add it
               if (userData['plan'] == null) {
@@ -158,6 +178,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                 ]);
               }
             }
+            measurements.sort((a, b) => a['date'].compareTo(b['date']));
             return BodyFormCustomer(
                 userData: userData,
                 measurements: measurements,
@@ -175,10 +196,10 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
 }
 
 class BodyFormCustomer extends StatefulWidget {
-  final Map<String, dynamic> userData;
-  final List<Map<String, dynamic>> measurements;
-  final List<Map<String, dynamic>> products;
-  final List<Map<String, dynamic>> plans;
+  final Map<dynamic, dynamic> userData;
+  final List<Map<dynamic, dynamic>> measurements;
+  final List<Map<dynamic, dynamic>> products;
+  final List<Map<dynamic, dynamic>> plans;
   final List medicalHistory;
   final String? image;
   final String uid;
@@ -198,7 +219,7 @@ class BodyFormCustomer extends StatefulWidget {
 }
 
 class _BodyFormCustomerState extends State<BodyFormCustomer> {
-  bool isFabVisible = false;
+  bool isFabVisible = true;
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   final _formKey = GlobalKey<FormState>();
   DateFormat formatter = DateFormat('dd MMM yyyy');
@@ -211,9 +232,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
         .join(' ');
   }
 
-  Map<String, dynamic> updateFields = {};
-  late Map<String, dynamic> editedData = Map.from(widget.userData);
-  late Map<String, dynamic> originalData = Map.from(widget.userData);
+  Map<dynamic, dynamic> updateFields = {};
+  late Map<dynamic, dynamic> editedData = Map.from(widget.userData);
+  late Map<dynamic, dynamic> originalData = Map.from(widget.userData);
   String tempValue = '';
   String dialogTempValue = '';
   void _editData(String key, dynamic value) {
@@ -235,7 +256,8 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
           : (originalData['height'] - 106);
     }
     DateTime selectedDate =
-        DateTime.parse(widget.userData['dob'].toDate().toString());
+        DateTime.fromMillisecondsSinceEpoch(widget.userData['dob']);
+
     DateTime currentDate = DateTime.now();
     int age = currentDate.year - selectedDate.year;
     if (currentDate.month < selectedDate.month ||
@@ -313,6 +335,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                   const Color(0xffff4d62),
                                 ],
                                 measurements: widget.measurements,
+                                // measurements: [],
                                 idealweight: idealweight,
                                 uid: widget.uid,
                               ),
@@ -359,7 +382,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             page: CustPlanHist(
                               name: widget.userData['name'],
                               uid: widget.uid,
-                              plans: widget.plans,
+                              plans: const [],
                             )),
                       ],
                     )
@@ -405,9 +428,11 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                   height: height * 0.01,
                                 ),
                                 Text(
-                                  entry.value.runtimeType == Timestamp
+                                  entry.key == 'dob'
                                       ? formatter
-                                          .format(entry.value.toDate())
+                                          .format(DateTime
+                                              .fromMillisecondsSinceEpoch(
+                                                  entry.value))
                                           .toString()
                                       : entry.value.toString(),
                                   style: GoogleFonts.dmSans(
@@ -445,15 +470,16 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       if (entry.key == 'created' || entry.key == 'plan') {
                         return;
                       }
+
                       showDialog(
                         context: context,
                         builder: (context) {
-                          String dialogTempValue =
-                              entry.value.runtimeType == Timestamp
-                                  ? formatter
-                                      .format(entry.value.toDate())
-                                      .toString()
-                                  : entry.value.toString();
+                          String dialogTempValue = entry.key == 'dob'
+                              ? formatter
+                                  .format(DateTime.fromMillisecondsSinceEpoch(
+                                      entry.value))
+                                  .toString()
+                              : entry.value.toString();
                           return StatefulBuilder(
                               builder: (context, StateSetter setState) {
                             return AlertDialog(
@@ -465,13 +491,21 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                 child: entry.key.toLowerCase().contains('dob')
                                     ? InkWell(
                                         onTap: () {
+                                          final dob = DateTime
+                                              .fromMillisecondsSinceEpoch(
+                                                  entry.value);
+                                          final lastYear =
+                                              dob.year > 2015 ? dob.year : 2015;
+                                          final lastDate =
+                                              DateTime.now().year == lastYear
+                                                  ? DateTime.now()
+                                                  : DateTime(lastYear);
                                           showDatePicker(
                                                   context: context,
                                                   initialDate:
-                                                      entry.value.toDate() ??
-                                                          DateTime.now(),
+                                                      dob, // Refer step 1
                                                   firstDate: DateTime(1930),
-                                                  lastDate: DateTime(2011))
+                                                  lastDate: lastDate)
                                               .then((selectedDate) {
                                             if (selectedDate != null) {
                                               String formattedDate =
@@ -575,18 +609,22 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                         DateTime selectedDateTime =
                                             DateFormat('dd MMM yyyy')
                                                 .parse(dialogTempValue);
-                                        Timestamp selectedTimestamp =
-                                            Timestamp.fromDate(
-                                                selectedDateTime);
-                                        if (selectedTimestamp !=
+                                        DateTime selectedTimestamp = DateTime(
+                                            selectedDateTime.year,
+                                            selectedDateTime.month,
+                                            selectedDateTime.day);
+                                        int selectedTimestampInt =
+                                            selectedTimestamp
+                                                .millisecondsSinceEpoch;
+                                        if (selectedTimestampInt !=
                                             originalData[entry.key]) {
                                           _editData(
-                                              entry.key, selectedTimestamp);
+                                              entry.key, selectedTimestampInt);
                                           updateFields[entry.key] =
-                                              selectedTimestamp;
+                                              selectedTimestampInt;
                                         } else {
                                           _editData(
-                                              entry.key, selectedTimestamp);
+                                              entry.key, selectedTimestampInt);
                                           updateFields.remove(entry.key);
                                         }
                                       } else {
@@ -630,19 +668,21 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       return;
                     }
                     final users =
-                        FirebaseFirestore.instance.collection('Users');
+                        FirebaseDatabase.instance.ref().child('Users');
                     if (updateFields.containsKey('phone')) {
                       final coaches =
-                          FirebaseFirestore.instance.collection('Coaches');
+                          FirebaseDatabase.instance.ref().child('Coaches');
                       // check if phone number already exists
                       final phoneExistsInUsers = await users
-                          .where('phone', isEqualTo: updateFields['phone'])
-                          .get();
+                          .orderByChild('phone')
+                          .equalTo(updateFields['phone'])
+                          .once();
                       final phoneExistsInCoaches = await coaches
-                          .where('phone', isEqualTo: updateFields['phone'])
-                          .get();
-                      if (phoneExistsInUsers.docs.isNotEmpty ||
-                          phoneExistsInCoaches.docs.isNotEmpty) {
+                          .orderByChild('phone')
+                          .equalTo(updateFields['phone'])
+                          .once();
+                      if (phoneExistsInUsers.snapshot.value != null ||
+                          phoneExistsInCoaches.snapshot.value != null) {
                         return Flushbar(
                           margin: const EdgeInsets.all(7),
                           borderRadius: BorderRadius.circular(15),
@@ -660,9 +700,10 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       }
                     }
 
-                    final userRef = users.doc(widget.uid);
+                    final userRef = users.child(widget.uid);
 
-                    await userRef.update(updateFields);
+                    await userRef
+                        .update(Map<String, Object?>.from(updateFields));
                     setState(() {
                       originalData = Map.from(editedData);
                       updateFields.clear();
@@ -746,6 +787,7 @@ class CustButton extends StatelessWidget {
   final String label;
   final Widget page;
   final Color? openColor;
+  final Function? onClosed;
 
   const CustButton({
     Key? key,
@@ -756,6 +798,7 @@ class CustButton extends StatelessWidget {
     required this.label,
     required this.page,
     this.openColor,
+    this.onClosed,
   }) : super(key: key);
 
   @override
@@ -771,6 +814,7 @@ class CustButton extends StatelessWidget {
       child: Card(
         elevation: 8.5,
         child: OpenContainerWrapper(
+            onClosed: onClosed as void Function()?,
             openColor: openColor ?? Colors.white,
             page: page,
             content: Container(
