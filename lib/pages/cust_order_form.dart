@@ -214,7 +214,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
           padding: EdgeInsets.symmetric(horizontal: width * 0.035),
           child: Column(
             children: [
-              if (total != 0)
+              if (total != 0 && tempList.isNotEmpty)
                 Container(
                     width: double.infinity,
                     margin: EdgeInsets.only(
@@ -229,7 +229,20 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                       fontWeight: FontWeight.w500,
                                       letterSpacing: .5,
                                       fontSize: 19.5)),
-                            )))),
+                            ))))
+              else if (tempList.isEmpty)
+                Container(
+                  margin:
+                      EdgeInsets.only(top: height * 0.1, bottom: height * 0.02),
+                  child: Center(
+                    child: Text(
+                        'No products added yet. ${widget.index != null ? '  \n  \nif you want to delete this order, please click on the delete button without adding any products' : ''}',
+                        style: GoogleFonts.workSans(
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: .5,
+                            fontSize: 19.5)),
+                  ),
+                ),
               Flexible(
                 child: ListView.builder(
                   controller: scrollController,
@@ -247,6 +260,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         productNameControllers.removeAt(index);
                         productQuantityControllers.removeAt(index);
                       });
+                      calcTotal();
                     }
 
                     // check if any of the textfields contains '₹'
@@ -563,7 +577,8 @@ class _CustOrderFormState extends State<CustOrderForm> {
           ),
         ),
       ),
-      floatingActionButton: tempList.isNotEmpty && isFabEnabled
+      floatingActionButton: (tempList.isNotEmpty && isFabEnabled) ||
+              widget.index != null
           ? FloatingActionButton(
               onPressed: () async {
                 if (!isFabEnabled) {
@@ -626,13 +641,19 @@ class _CustOrderFormState extends State<CustOrderForm> {
                       'products': products,
                       'total': total,
                     };
+                    String msg = "Order added successfully";
                     List newProductsHistory = [...widget.productsHistory];
-                    newProductsHistory.add(newOrder);
-                    // if (widget.index == null) {
-                    //   newProductsHistory.add(newOrder);
-                    // } else {
-                    //   newProductsHistory[widget.index!] = newOrder;
-                    // }
+                    if (widget.index == null) {
+                      newProductsHistory.add(newOrder);
+                    } else {
+                      if (newOrder[products] == null) {
+                        newProductsHistory.removeAt(widget.index!);
+                        msg = "Order deleted successfully";
+                      } else {
+                        newProductsHistory[widget.index!] = newOrder;
+                        msg = "Order updated successfully";
+                      }
+                    }
 
                     try {
                       await FirebaseDatabase.instance
@@ -652,7 +673,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         borderRadius: BorderRadius.circular(15),
                         flushbarStyle: FlushbarStyle.FLOATING,
                         flushbarPosition: FlushbarPosition.BOTTOM,
-                        message: "Order added successfully",
+                        message: msg,
                         icon: Icon(
                           Icons.check_circle_outline_rounded,
                           size: 28.0,
@@ -705,7 +726,9 @@ class _CustOrderFormState extends State<CustOrderForm> {
                   });
                 }
               },
-              child: const Icon(Icons.save),
+              child: widget.index != null && tempList.isEmpty
+                  ? const Icon(Icons.delete_rounded)
+                  : const Icon(Icons.save_rounded),
             )
           : null,
     );
