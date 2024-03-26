@@ -64,7 +64,9 @@ class ProductsHistory extends StatelessWidget {
               children: products.map((product) {
                 return ProductExpansionTile(
                   date: DateTime.fromMillisecondsSinceEpoch(product['date']),
+                  total: product['total'],
                   products: product['products'],
+                  given: product['given'],
                   gradientColors: gradientColors,
                   onLongPress: (index) {
                     Navigator.push(
@@ -94,6 +96,8 @@ class ProductsHistory extends StatelessWidget {
 class ProductExpansionTile extends StatefulWidget {
   final DateTime date;
   final int index;
+  final int total;
+  final int given;
   final Map<dynamic, dynamic> products;
   final List<Color> gradientColors;
   final void Function(int) onLongPress;
@@ -104,6 +108,8 @@ class ProductExpansionTile extends StatefulWidget {
     required this.gradientColors,
     required this.index,
     required this.onLongPress,
+    required this.total,
+    required this.given,
     Key? key,
   }) : super(key: key);
 
@@ -144,33 +150,48 @@ class _ProductExpansionTileState extends State<ProductExpansionTile> {
           iconColor: Colors.white.withOpacity(0.8),
           onExpansionChanged: (expanded) {
             setState(() {
-              expanded = expanded;
+              this.expanded = expanded;
             });
           },
-          title: Row(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              RichText(
-                  text: TextSpan(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  TextSpan(
-                    text: formatDate(widget.date),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextSpan(
-                    text: "  ($days days ago)",
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 15,
-                    ),
-                  ),
+                  RichText(
+                      text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: formatDate(widget.date),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextSpan(
+                        text: "  ($days days ago)",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  )),
                 ],
-              )),
+              ),
+              if (expanded)
+                Text(
+                  DateFormat("hh:mm a").format(widget.date),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 15,
+                  ),
+                ),
             ],
           ),
           children: [
@@ -208,6 +229,71 @@ class _ProductExpansionTileState extends State<ProductExpansionTile> {
                 }).toList(),
               ),
             ),
+            Padding(
+              padding: EdgeInsets.only(bottom: height * 0.02),
+              child: Column(
+                children: [
+                  Divider(
+                    color: Colors.white.withOpacity(0.5),
+                    thickness: 1,
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: width * 0.05,
+                      right: width * 0.05,
+                      top: width * 0.03,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Given At',
+                          style: TextStyle(
+                            color: Colors.black38,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '₹${widget.given}',
+                          style: const TextStyle(
+                            color: Colors.black38,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: width * 0.05,
+                      right: width * 0.05,
+                      top: width * 0.03,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total',
+                          style: TextStyle(
+                            color: Colors.black38,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '₹${widget.total}',
+                          style: const TextStyle(
+                            color: Colors.black38,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
           ],
         ),
       ),

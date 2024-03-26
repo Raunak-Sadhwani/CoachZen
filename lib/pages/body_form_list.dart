@@ -22,7 +22,10 @@ class BodyFormList extends StatefulWidget {
   State<BodyFormList> createState() => _BodyFormListState();
 }
 
-class _BodyFormListState extends State<BodyFormList> {
+class _BodyFormListState extends State<BodyFormList>
+    with SingleTickerProviderStateMixin {
+  late Future<Map<dynamic, dynamic>> userDataFuture;
+  late AnimationController controller;
   bool _hasInternet = true;
   bool _sortAscending = false; // Flag to track the sort order
   bool _showExpiredPlans = true; // Flag to track whether to show expired plans
@@ -63,11 +66,35 @@ class _BodyFormListState extends State<BodyFormList> {
   void initState() {
     super.initState();
     checkInternetConnection();
+    userDataFuture = fetchUserData();
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
   }
 
   @override
   void dispose() {
+    controller.dispose();
+    searchFocusNode.dispose();
     super.dispose();
+  }
+
+  // @override
+  // void didUpdateWidget(covariant BodyFormList oldWidget) {
+  //   super.didUpdateWidget(oldWidget);
+  //   debugPrint('didUpdateWidget');
+  //   userDataFuture = fetchUserData();
+  // }
+
+  Future<Map<dynamic, dynamic>> fetchUserData() async {
+    final dataSnapshot = await FirebaseDatabase.instance
+        .ref()
+        .child('Coaches')
+        .child(FirebaseAuth.instance.currentUser!.uid)
+        .child('users')
+        .once();
+    return dataSnapshot.snapshot.value as Map<dynamic, dynamic>;
   }
 
   TextStyle selStyle = GoogleFonts.montserrat(
@@ -193,517 +220,518 @@ class _BodyFormListState extends State<BodyFormList> {
       );
     }
     return Scaffold(
-        key: _scaffoldKey,
-        appBar: MyAppBar(
-          leftIcon: Container(
-            margin: const EdgeInsets.only(left: 10),
+      key: _scaffoldKey,
+      appBar: MyAppBar(
+        leftIcon: Container(
+          margin: const EdgeInsets.only(left: 10),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back_ios),
+            color: Colors.black26,
+            onPressed: () {
+              if (!isSearching) {
+                Navigator.pop(context);
+              } else {
+                setState(() {
+                  isSearching = false;
+                  searchQuery = '';
+                });
+              }
+            },
+          ),
+        ),
+        ftitle: isSearching
+            ? AnimatedOpacity(
+                opacity: opacity,
+                duration: const Duration(milliseconds: 1000),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Name, City, Phone, Email',
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      searchQuery = value.toLowerCase();
+                    });
+                  },
+                  focusNode: searchFocusNode,
+                ),
+              )
+            : const Text(
+                'My Customers',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
+                ),
+              ),
+        rightIcons: [
+          Container(
+            margin: isSearching ? EdgeInsets.only(right: width * 0.04) : null,
+            width: width * 0.085,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
+              splashRadius: 30,
+              icon: !isSearching
+                  ? const Icon(Icons.search_rounded)
+                  : const Icon(Icons.close_rounded),
               color: Colors.black26,
               onPressed: () {
-                if (!isSearching) {
-                  Navigator.pop(context);
-                } else {
-                  setState(() {
-                    isSearching = false;
-                    searchQuery = '';
-                  });
-                }
+                setState(() {
+                  isSearching = !isSearching;
+                  opacity = 1.0;
+
+                  if (isSearching) {
+                    // set interval to wait for animation to complete
+
+                    return searchFocusNode.requestFocus();
+                  }
+                  searchQuery = '';
+                  opacity = 0.0;
+                });
               },
             ),
           ),
-          ftitle: isSearching
-              ? AnimatedOpacity(
-                  opacity: opacity,
-                  duration: const Duration(milliseconds: 1000),
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Name, City, Phone, Email',
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        searchQuery = value.toLowerCase();
-                      });
-                    },
-                    focusNode: searchFocusNode,
-                  ),
-                )
-              : const Text(
-                  'My Customers',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-          rightIcons: [
-            Container(
-              margin: isSearching ? EdgeInsets.only(right: width * 0.04) : null,
-              width: width * 0.085,
+          if (!isSearching)
+            SizedBox(
               child: IconButton(
-                splashRadius: 30,
-                icon: !isSearching
-                    ? const Icon(Icons.search_rounded)
-                    : const Icon(Icons.close_rounded),
+                splashRadius: 25,
+                icon: const Icon(Icons.sort_rounded),
                 color: Colors.black26,
-                onPressed: () {
-                  setState(() {
-                    isSearching = !isSearching;
-                    opacity = 1.0;
-
-                    if (isSearching) {
-                      // set interval to wait for animation to complete
-
-                      return searchFocusNode.requestFocus();
-                    }
-                    searchQuery = '';
-                    opacity = 0.0;
-                  });
-                },
+                onPressed: () =>
+                    _openBottomDrawer(_scaffoldKey.currentContext!),
               ),
             ),
-            if (!isSearching)
-              SizedBox(
-                child: IconButton(
-                  splashRadius: 25,
-                  icon: const Icon(Icons.sort_rounded),
-                  color: Colors.black26,
-                  onPressed: () =>
-                      _openBottomDrawer(_scaffoldKey.currentContext!),
-                ),
-              ),
-          ],
-        ),
-        body: StreamBuilder(
-          stream: FirebaseDatabase.instance
-              .ref()
-              .child('Users')
-              .orderByChild("cid")
-              .equalTo(FirebaseAuth.instance.currentUser!.uid)
-              .onValue,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final userData =
-                  snapshot.data!.snapshot.value as Map<dynamic, dynamic>?;
-              if (userData == null) {
-                return Center(
-                  child: Text('Please add a customer to get started',
-                      style: selStyle),
-                );
-              }
-              final filteredData = userData.entries.where((entry) {
-                final Map<dynamic, dynamic> userData = entry.value;
-                final name = userData['name'].toString().toLowerCase();
-                final city = userData['city'].toString().toLowerCase();
-                final phone = userData['phone'].toString().toLowerCase();
-                final email = userData['email'].toString().toLowerCase();
-                final searchLower = searchQuery.toLowerCase();
-                return name.contains(searchLower) ||
-                    city.contains(searchLower) ||
-                    phone.contains(searchLower) ||
-                    email.contains(searchLower);
-              }).toList();
+        ],
+      ),
+      body: FutureBuilder(
+        future: userDataFuture,
+        builder: (context, AsyncSnapshot<Map<dynamic, dynamic>> snapshot) {
+          if (snapshot.hasData) {
+            final userData = snapshot.data!;
+            final filteredData = userData.entries.where((entry) {
+              final Map<dynamic, dynamic> userData = entry.value;
+              final name = userData['name'].toString().toLowerCase();
+              final city = userData['city'].toString().toLowerCase();
+              final phone = userData['phone'].toString().toLowerCase();
+              final email = userData['email'].toString().toLowerCase();
+              final searchLower = searchQuery.toLowerCase();
+              return name.contains(searchLower) ||
+                  city.contains(searchLower) ||
+                  phone.contains(searchLower) ||
+                  email.contains(searchLower);
+            }).toList();
 
-              filteredData.sort((a, b) {
-                final dateA = a.value['created'];
-                final dateB = b.value['created'];
-                final compareResult = dateA.compareTo(dateB);
+            filteredData.sort((a, b) {
+              final dateA = a.value['created'];
+              final dateB = b.value['created'];
+              final compareResult = dateA.compareTo(dateB);
 
-                return _sortAscending ? compareResult : -compareResult;
+              return _sortAscending ? compareResult : -compareResult;
+            });
+
+            // show only active plans
+            if (!_showExpiredPlans) {
+              filteredData.removeWhere((doc) {
+                final plans = doc.value['plans'];
+                if (plans == null) {
+                  return true;
+                }
+                final activePlans = plans.where((plan) {
+                  final daysSinceStarted = DateTime.now()
+                          .difference(DateTime.fromMillisecondsSinceEpoch(
+                              plan['started']))
+                          .inDays +
+                      1;
+                  return daysSinceStarted <= plan['days'];
+                }).toList();
+                return activePlans.isEmpty;
               });
 
-              // show only active plans
-              if (!_showExpiredPlans) {
-                filteredData.removeWhere((doc) {
-                  final plans = doc.value['plans'];
-                  if (plans == null) {
-                    return true;
-                  }
-                  final activePlans = plans.where((plan) {
+              if (_sortAscending) {
+                filteredData.sort((a, b) {
+                  final planA = a.value['plans'].firstWhere((plan) {
+                    DateTime.fromMillisecondsSinceEpoch(plan['started']);
                     final daysSinceStarted = DateTime.now()
                             .difference(DateTime.fromMillisecondsSinceEpoch(
                                 plan['started']))
                             .inDays +
                         1;
                     return daysSinceStarted <= plan['days'];
-                  }).toList();
-                  return activePlans.isEmpty;
-                });
-
-                if (_sortAscending) {
-                  filteredData.sort((a, b) {
-                    final planA = a.value['plans'].firstWhere((plan) {
-                      DateTime.fromMillisecondsSinceEpoch(plan['started']);
-                      final daysSinceStarted = DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  plan['started']))
-                              .inDays +
-                          1;
-                      return daysSinceStarted <= plan['days'];
-                    });
-                    final planB = b.value['plans'].firstWhere((plan) {
-                      final daysSinceStarted = DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  plan['started']))
-                              .inDays +
-                          1;
-                      return daysSinceStarted <= plan['days'];
-                    });
-
-                    final remainingDaysA = planA['days'] -
-                        (DateTime.now()
-                                .difference(DateTime.fromMillisecondsSinceEpoch(
-                                    planA['started']))
-                                .inDays +
-                            1);
-
-                    final remainingDaysB = planB['days'] -
-                        (DateTime.now()
-                                .difference(DateTime.fromMillisecondsSinceEpoch(
-                                    planB['started']))
-                                .inDays +
-                            1);
-
-                    return remainingDaysA.compareTo(remainingDaysB);
                   });
-                } else {
-                  filteredData.sort((a, b) {
-                    final planA = a.value['plans'].firstWhere((plan) {
-                      DateTime.fromMillisecondsSinceEpoch(plan['started']);
-                      final daysSinceStarted = DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  plan['started']))
-                              .inDays +
-                          1;
-                      return daysSinceStarted <= plan['days'];
-                    });
-                    final planB = b.value['plans'].firstWhere((plan) {
-                      final daysSinceStarted = DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  plan['started']))
-                              .inDays +
-                          1;
-                      return daysSinceStarted <= plan['days'];
-                    });
-
-                    final remainingDaysA = planA['days'] -
-                        (DateTime.now()
-                                .difference(DateTime.fromMillisecondsSinceEpoch(
-                                    planA['started']))
-                                .inDays +
-                            1);
-
-                    final remainingDaysB = planB['days'] -
-                        (DateTime.now()
-                                .difference(DateTime.fromMillisecondsSinceEpoch(
-                                    planB['started']))
-                                .inDays +
-                            1);
-
-                    return remainingDaysB.compareTo(remainingDaysA);
-                  });
-                }
-              }
-
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                setState(() {
-                  _filteredData = filteredData;
-                });
-              });
-              return ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                itemCount: _filteredData.length,
-                itemBuilder: (context, index) {
-                  // final userInfo = _filteredData[index].data();
-                  final userInfo = _filteredData[index].value;
-                  final phone = "+91${userInfo['phone']}";
-                  final DateTime timeStamp =
-                      DateTime.fromMillisecondsSinceEpoch(userInfo['created']);
-                  // final timeStamp = userInfo['created'].toDate();
-                  final time = DateFormat('h:mm a').format(timeStamp);
-                  final name = userInfo['name'];
-                  DateTime selectedDate =
-                      DateTime.fromMillisecondsSinceEpoch(userInfo['dob']);
-                  DateTime currentDate = DateTime.now();
-                  int age = currentDate.year - selectedDate.year;
-                  if (currentDate.month < selectedDate.month ||
-                      (currentDate.month == selectedDate.month &&
-                          currentDate.day < selectedDate.day)) {
-                    age--;
-                  }
-                  if (userInfo['measurements'] != null) {
-                    userInfo['measurements'] = List<Map<dynamic, dynamic>>.from(
-                        userInfo['measurements']);
-                  } else {
-                    userInfo['measurements'] =
-                        List<Map<dynamic, dynamic>>.from([])
-                            .cast<Map<dynamic, dynamic>>();
-                  }
-                  if (userInfo['productsHistory'] != null) {
-                    userInfo['productsHistory'] =
-                        List<Map<dynamic, dynamic>>.from(
-                            userInfo['productsHistory']);
-                  } else {
-                    userInfo['productsHistory'] =
-                        List<Map<dynamic, dynamic>>.from([])
-                            .cast<Map<dynamic, dynamic>>();
-                  }
-                  List<Map<dynamic, dynamic>> plans = [];
-                  String planName = '';
-                  String planStatus = '';
-                  Color planColor = Colors.grey;
-
-                  if (userInfo['plans'] != null &&
-                      userInfo['plans'].isNotEmpty) {
-                    plans = List<Map<dynamic, dynamic>>.from(userInfo['plans']);
-                    plans.sort((a, b) => b['started'].compareTo(a['started']));
-                    Map<dynamic, dynamic> plan = plans[0];
-                    planName = plan['name'];
+                  final planB = b.value['plans'].firstWhere((plan) {
                     final daysSinceStarted = DateTime.now()
-                        .difference(DateTime.fromMillisecondsSinceEpoch(
-                            plan['started']))
-                        .inDays;
-                    final daysLeft = plan['days'] - daysSinceStarted;
-                    planStatus = daysLeft < 0
-                        ? 'Expired'
-                        : daysLeft > 0
-                            ? '$daysLeft days left'
-                            : 'Expires today';
-                    if (daysLeft > 7) {
-                      planColor = Colors.green;
-                    } else if (daysLeft > 0) {
-                      planColor = Colors.orange;
-                    } else {
-                      planColor = Colors.red;
-                    }
+                            .difference(DateTime.fromMillisecondsSinceEpoch(
+                                plan['started']))
+                            .inDays +
+                        1;
+                    return daysSinceStarted <= plan['days'];
+                  });
+
+                  final remainingDaysA = planA['days'] -
+                      (DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  planA['started']))
+                              .inDays +
+                          1);
+
+                  final remainingDaysB = planB['days'] -
+                      (DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  planB['started']))
+                              .inDays +
+                          1);
+
+                  return remainingDaysA.compareTo(remainingDaysB);
+                });
+              } else {
+                filteredData.sort((a, b) {
+                  final planA = a.value['plans'].firstWhere((plan) {
+                    DateTime.fromMillisecondsSinceEpoch(plan['started']);
+                    final daysSinceStarted = DateTime.now()
+                            .difference(DateTime.fromMillisecondsSinceEpoch(
+                                plan['started']))
+                            .inDays +
+                        1;
+                    return daysSinceStarted <= plan['days'];
+                  });
+                  final planB = b.value['plans'].firstWhere((plan) {
+                    final daysSinceStarted = DateTime.now()
+                            .difference(DateTime.fromMillisecondsSinceEpoch(
+                                plan['started']))
+                            .inDays +
+                        1;
+                    return daysSinceStarted <= plan['days'];
+                  });
+
+                  final remainingDaysA = planA['days'] -
+                      (DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  planA['started']))
+                              .inDays +
+                          1);
+
+                  final remainingDaysB = planB['days'] -
+                      (DateTime.now()
+                              .difference(DateTime.fromMillisecondsSinceEpoch(
+                                  planB['started']))
+                              .inDays +
+                          1);
+
+                  return remainingDaysB.compareTo(remainingDaysA);
+                });
+              }
+            }
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              setState(() {
+                _filteredData = filteredData;
+              });
+            });
+            return ListView.builder(
+              physics: const BouncingScrollPhysics(),
+              itemCount: _filteredData.length,
+              itemBuilder: (context, index) {
+                // final userInfo = _filteredData[index].data();
+                final userInfo = _filteredData[index].value;
+                final phone = "+91${userInfo['phone']}";
+                final DateTime timeStamp =
+                    DateTime.fromMillisecondsSinceEpoch(userInfo['created']);
+                // final timeStamp = userInfo['created'].toDate();
+                final time = DateFormat('h:mm a').format(timeStamp);
+                final name = userInfo['name'];
+                DateTime selectedDate =
+                    DateTime.fromMillisecondsSinceEpoch(userInfo['dob']);
+                DateTime currentDate = DateTime.now();
+                int age = currentDate.year - selectedDate.year;
+                if (currentDate.month < selectedDate.month ||
+                    (currentDate.month == selectedDate.month &&
+                        currentDate.day < selectedDate.day)) {
+                  age--;
+                }
+                if (userInfo['measurements'] != null) {
+                  userInfo['measurements'] = List<Map<dynamic, dynamic>>.from(
+                      userInfo['measurements']);
+                } else {
+                  userInfo['measurements'] =
+                      List<Map<dynamic, dynamic>>.from([])
+                          .cast<Map<dynamic, dynamic>>();
+                }
+                if (userInfo['productsHistory'] != null) {
+                  userInfo['productsHistory'] =
+                      List<Map<dynamic, dynamic>>.from(
+                          userInfo['productsHistory']);
+                } else {
+                  userInfo['productsHistory'] =
+                      List<Map<dynamic, dynamic>>.from([])
+                          .cast<Map<dynamic, dynamic>>();
+                }
+                List<Map<dynamic, dynamic>> plans = [];
+                String planName = '';
+                String planStatus = '';
+                Color planColor = Colors.grey;
+
+                if (userInfo['plans'] != null && userInfo['plans'].isNotEmpty) {
+                  plans = List<Map<dynamic, dynamic>>.from(userInfo['plans']);
+                  plans.sort((a, b) => b['started'].compareTo(a['started']));
+                  Map<dynamic, dynamic> plan = plans[0];
+                  planName = plan['name'];
+                  final daysSinceStarted = DateTime.now()
+                      .difference(
+                          DateTime.fromMillisecondsSinceEpoch(plan['started']))
+                      .inDays;
+                  final daysLeft = plan['days'] - daysSinceStarted;
+                  planStatus = daysLeft < 0
+                      ? 'Expired'
+                      : daysLeft > 0
+                          ? '$daysLeft days left'
+                          : 'Expires today';
+                  if (daysLeft > 7) {
+                    planColor = Colors.green;
+                  } else if (daysLeft > 0) {
+                    planColor = Colors.orange;
+                  } else {
+                    planColor = Colors.red;
                   }
-                  // // var age = filteredData[index].data()['age'];
+                }
+                // // var age = filteredData[index].data()['age'];
 
-                  String? image = userInfo['image'];
-                  final String uid = _filteredData[index].key;
-                  String gender = userInfo['gender'];
+                String? image = userInfo['image'];
+                final String uid = _filteredData[index].key;
+                String gender = userInfo['gender'];
 
-                  return Slidable(
-                    startActionPane: ActionPane(
-                      motion: const BehindMotion(),
-                      // key: const ValueKey(2),
-                      children: [
-                        SlidableAction(
-                          backgroundColor: const Color(0xFF0392CF),
-                          foregroundColor: Colors.white,
-                          icon: Icons.phone,
-                          label: 'Call',
-                          onPressed: (context) async {
-                            Future<void> makePhoneCall(
-                                String phoneNumber) async {
-                              final Uri launchUri = Uri(
-                                scheme: 'tel',
-                                path: phoneNumber,
-                              );
-                              await launchUrl(launchUri);
-                            }
+                return Slidable(
+                  startActionPane: ActionPane(
+                    motion: const BehindMotion(),
+                    // key: const ValueKey(2),
+                    children: [
+                      SlidableAction(
+                        backgroundColor: const Color(0xFF0392CF),
+                        foregroundColor: Colors.white,
+                        icon: Icons.phone,
+                        label: 'Call',
+                        onPressed: (context) async {
+                          Future<void> makePhoneCall(String phoneNumber) async {
+                            final Uri launchUri = Uri(
+                              scheme: 'tel',
+                              path: phoneNumber,
+                            );
+                            await launchUrl(launchUri);
+                          }
 
-                            // call
-                            await makePhoneCall(phone);
-                          },
-                        ),
-                        SlidableAction(
-                          backgroundColor: const Color(0xFF7BC043),
-                          foregroundColor: Colors.white,
-                          // whatsapp
-                          icon: FontAwesomeIcons.whatsapp,
-                          label: 'WhatsApp',
-                          onPressed: (context) {
-                            Future<void> launchWhatsApp({
-                              required String phone,
-                              String? message,
-                            }) async {
-                              String url() {
-                                if (message != null) {
-                                  return "whatsapp://send?phone=$phone&text=${Uri.parse(message)}";
-                                } else {
-                                  return "whatsapp://send?phone=$phone";
-                                }
-                              }
-
-                              final Uri uri = Uri.parse(url());
-
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri);
+                          // call
+                          await makePhoneCall(phone);
+                        },
+                      ),
+                      SlidableAction(
+                        backgroundColor: const Color(0xFF7BC043),
+                        foregroundColor: Colors.white,
+                        // whatsapp
+                        icon: FontAwesomeIcons.whatsapp,
+                        label: 'WhatsApp',
+                        onPressed: (context) {
+                          Future<void> launchWhatsApp({
+                            required String phone,
+                            String? message,
+                          }) async {
+                            String url() {
+                              if (message != null) {
+                                return "whatsapp://send?phone=$phone&text=${Uri.parse(message)}";
                               } else {
-                                await launchUrl(Uri.parse(
-                                    "https://play.google.com/store/apps/details?id=com.whatsapp"));
+                                return "whatsapp://send?phone=$phone";
                               }
                             }
 
-                            // whatsapp
-                            launchWhatsApp(phone: phone);
-                          },
-                        ),
-                      ],
-                    ),
-                    endActionPane: ActionPane(
-                      motion: const BehindMotion(),
-                      // key: const ValueKey(1),
-                      children: [
-                        SlidableAction(
-                          backgroundColor:
-                              const Color.fromARGB(255, 125, 3, 207),
-                          foregroundColor: Colors.white,
-                          icon: Icons.add,
-                          label: 'Check-up',
-                          onPressed: (context) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => FormPageWrapper(
-                                  uid: uid,
-                                  age: age.toString(),
-                                  measurements: userInfo['measurements'],
-                                  heightx: double.parse(
-                                      userInfo['height'].toString()),
-                                  popIndex: 2,
-                                  gender: gender == 'male',
-                                  name: name,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        SlidableAction(
-                          backgroundColor:
-                              const Color.fromARGB(255, 244, 155, 54),
-                          foregroundColor: Colors.black,
-                          icon: Icons.add,
-                          label: 'Order',
-                          onPressed: (context) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CustOrderForm(
-                                  uid: uid,
-                                  productsHistory: userInfo['productsHistory'],
-                                  name: name,
-                                  popIndex: 1,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    child: OpenContainerWrapper(
-                      page: BodyFormCustomerWrap(uid: uid),
-                      content: Container(
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                color: Color.fromARGB(52, 158, 158, 158),
-                                width: .8,
+                            final Uri uri = Uri.parse(url());
+
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            } else {
+                              await launchUrl(Uri.parse(
+                                  "https://play.google.com/store/apps/details?id=com.whatsapp"));
+                            }
+                          }
+
+                          // whatsapp
+                          launchWhatsApp(phone: phone);
+                        },
+                      ),
+                    ],
+                  ),
+                  endActionPane: ActionPane(
+                    motion: const BehindMotion(),
+                    // key: const ValueKey(1),
+                    children: [
+                      SlidableAction(
+                        backgroundColor: const Color.fromARGB(255, 125, 3, 207),
+                        foregroundColor: Colors.white,
+                        icon: Icons.add,
+                        label: 'Check-up',
+                        onPressed: (context) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FormPageWrapper(
+                                uid: uid,
+                                age: age.toString(),
+                                measurements: userInfo['measurements'],
+                                heightx:
+                                    double.parse(userInfo['height'].toString()),
+                                popIndex: 2,
+                                gender: gender == 'male',
+                                name: name,
                               ),
                             ),
+                          );
+                        },
+                      ),
+                      SlidableAction(
+                        backgroundColor:
+                            const Color.fromARGB(255, 244, 155, 54),
+                        foregroundColor: Colors.black,
+                        icon: Icons.add,
+                        label: 'Order',
+                        onPressed: (context) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CustOrderForm(
+                                uid: uid,
+                                productsHistory: userInfo['productsHistory'],
+                                name: name,
+                                popIndex: 1,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  child: OpenContainerWrapper(
+                    page:
+                        BodyFormCustomerWrap(uid: uid, callback: handleRefresh),
+                    content: Container(
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Color.fromARGB(52, 158, 158, 158),
+                              width: .8,
+                            ),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(width * 0.04),
-                            child: Row(
-                              children: [
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(width * 0.04),
+                          child: Row(
+                            children: [
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: width * 0.13,
+                                    height: width * 0.13,
+                                    child: ClipOval(
+                                      child: image != null && image.isNotEmpty
+                                          ? FadeInImage.assetNetwork(
+                                              fit: BoxFit.cover,
+                                              placeholder:
+                                                  'lib/assets/$gender.png',
+                                              image: image,
+                                            )
+                                          : Image.asset(
+                                              'lib/assets/$gender.png',
+                                              fit: BoxFit.cover,
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(width: width * 0.03),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    SizedBox(
-                                      width: width * 0.13,
-                                      height: width * 0.13,
-                                      child: ClipOval(
-                                        child: image != null && image.isNotEmpty
-                                            ? FadeInImage.assetNetwork(
-                                                fit: BoxFit.cover,
-                                                placeholder:
-                                                    'lib/assets/$gender.png',
-                                                image: image,
-                                              )
-                                            : Image.asset(
-                                                'lib/assets/$gender.png',
-                                                fit: BoxFit.cover,
-                                              ),
+                                    Text(
+                                      name,
+                                      style: GoogleFonts.raleway(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                SizedBox(width: width * 0.03),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        name,
-                                        style: GoogleFonts.raleway(
-                                          fontSize: 17,
+                                    Text(
+                                      "+91 ${phone.substring(3)}",
+                                      style: GoogleFonts.montserrat(
+                                          color: Colors.grey,
                                           fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
+                                          fontSize: 13),
+                                    ),
+                                    if (planName.isNotEmpty)
                                       Text(
-                                        "+91 ${phone.substring(3)}",
+                                        "Plan: $planName",
                                         style: GoogleFonts.montserrat(
                                             color: Colors.grey,
                                             fontWeight: FontWeight.w500,
                                             fontSize: 13),
                                       ),
-                                      if (planName.isNotEmpty)
-                                        Text(
-                                          "Plan: $planName",
-                                          style: GoogleFonts.montserrat(
-                                              color: Colors.grey,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 13),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      formatter.format(
-                                        timeStamp,
-                                      ),
-                                      style: GoogleFonts.montserrat(
-                                          color: Colors.black,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 12.5),
-                                    ),
-                                    Text(
-                                      time,
-                                      style: GoogleFonts.montserrat(
-                                          color: Colors.grey,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 12),
-                                    ),
-                                    if (planName.isNotEmpty)
-                                      Text(
-                                        planStatus,
-                                        style: GoogleFonts.montserrat(
-                                            color: planColor,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 13),
-                                      ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          )),
-                    ),
-                  );
-                },
-              );
-            } else if (snapshot.hasError) {
-              return const Text('Error');
-            } else {
-              return const Center(child: CircularProgressIndicator());
-            }
-            // return const SizedBox.shrink();
-          },
-        ));
+                              ),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    formatter.format(
+                                      timeStamp,
+                                    ),
+                                    style: GoogleFonts.montserrat(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12.5),
+                                  ),
+                                  Text(
+                                    time,
+                                    style: GoogleFonts.montserrat(
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12),
+                                  ),
+                                  if (planName.isNotEmpty)
+                                    Text(
+                                      planStatus,
+                                      style: GoogleFonts.montserrat(
+                                          color: planColor,
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 13),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        )),
+                  ),
+                );
+              },
+            );
+          } else if (snapshot.hasError) {
+            return const Center(child: Text('No User Data Found'));
+          } else {
+            return const Center(child: CircularProgressIndicator());
+          }
+          // return const SizedBox.shrink();
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: handleRefresh,
+        tooltip: 'Refresh',
+        child: RotationTransition(
+            turns: Tween(begin: 0.0, end: 2.0).animate(controller),
+            child: const Icon(Icons.refresh)),
+      ),
+    );
+  }
+
+  void handleRefresh() {
+    controller.reset();
+    controller.forward(from: 0.0);
+    setState(() {
+      userDataFuture = fetchUserData();
+    });
   }
 }

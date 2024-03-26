@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-
 import '../components/services/notifi_service.dart';
 import '../components/ui/appbar.dart';
 
@@ -176,7 +175,6 @@ class _CustPlanHistState extends State<CustPlanHist> {
                                         planDaysControllers.removeAt(index);
                                       });
                                       Navigator.pop(context);
-
                                       isPlanModifiedFunc();
                                     },
                                     child: const Text('Yes'),
@@ -445,7 +443,6 @@ class _CustPlanHistState extends State<CustPlanHist> {
                               .update({
                             'plans': newPlans,
                           });
-                          debugPrint(newPlans.toString());
                           Navigator.pop(_scaffoldKey.currentContext!);
                           Flushbar(
                             margin: const EdgeInsets.all(7),

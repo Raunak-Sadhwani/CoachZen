@@ -1,10 +1,12 @@
 import 'package:another_flushbar/flushbar.dart';
 import 'package:coach_zen/pages/home.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../components/ui/appbar.dart';
 import 'package:data_table_2/data_table_2.dart';
 
@@ -19,14 +21,22 @@ class DailyAttendance extends StatefulWidget {
 }
 
 class _DailyAttendanceState extends State<DailyAttendance> {
-  final List<String> users = [
-    'Raunak Sadhwani',
-    'user2',
-    'user3',
-  ];
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  // scaffold key
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
+  final String cid = FirebaseAuth.instance.currentUser!.uid;
+  final DatabaseReference coachDb =
+      FirebaseDatabase.instance.ref().child('Coaches');
+  List<dynamic> users = [];
   DateTime selectedDate = DateTime.now();
-  List<String> presentStudents = [];
+  List<Map<dynamic, dynamic>> clubFees = [];
+  List<String> presentStudentsUID = [];
   bool isEdit = false;
+  String initalPlan = '0 day';
+  TextEditingController amount = TextEditingController();
+  TextEditingController customPlan = TextEditingController();
+  String initalMode = 'Cash';
 
   @override
   void initState() {
@@ -35,6 +45,57 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    getUsers();
+    coachDb
+        .child(cid)
+        .child('attendance')
+        .child(DateFormat('ddMMyy').format(selectedDate))
+        .onValue
+        .listen((event) {
+      debugPrint('Data: ${event.snapshot.value}');
+      if (mounted) {
+        setState(() {
+          presentStudentsUID.clear();
+          Object? data = event.snapshot.value;
+          if (data != null) {
+            Map<dynamic, dynamic> attendanceData =
+                Map<dynamic, dynamic>.from(data as Map<dynamic, dynamic>);
+            List<dynamic> students = attendanceData['students'];
+            presentStudentsUID = List<String>.from(students);
+          }
+        });
+      }
+    });
+  }
+
+  void getUsers() async {
+    final DatabaseReference dbRef = coachDb.child(cid).child('users');
+    dbRef.once().then((DatabaseEvent event) {
+      Object? usersData = event.snapshot.value;
+      if (usersData != null) {
+        // users.add({
+        //     'id': key,
+        //     'name': userData['name'],
+        //     'phone': userData['phone'],
+        //     // Add other user fields as needed
+        //   });
+        // Cast usersData to Map<String, dynamic> and then iterate through it
+        Map<dynamic, dynamic> usersDataMap =
+            Map<dynamic, dynamic>.from(usersData as Map<dynamic, dynamic>);
+        usersDataMap.forEach((key, userData) {
+          // userIdToNameMap[key] = userData['name'];
+          users.add({
+            'id': key,
+            'name': userData['name'],
+            'phone': userData['phone'],
+            'balance': userData['balance'],
+            // Add other user fields as needed
+          });
+        });
+      }
+      // Now you have a list of user objects in the users list
+      // Do whatever you want with the users list here
+    });
   }
 
   @override
@@ -53,6 +114,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
     return OrientationBuilder(
       builder: (context, orientation) {
         return Scaffold(
+          key: scaffoldKey,
           appBar: MyAppBar(
             leftIcon: Container(
               margin: const EdgeInsets.only(left: 10),
@@ -184,16 +246,32 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   ),
                   minCharsForSuggestions: 1,
                   hideOnEmpty: true,
+                  // Suggestions callback for TypeAheadField
                   suggestionsCallback: (pattern) {
-                    return users
-                        .where((user) =>
-                            user.toLowerCase().contains(pattern.toLowerCase()))
-                        .toList();
+                    if (users.isNotEmpty) {
+                      return users
+                          .where((user) =>
+                              user['name']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(pattern.toLowerCase()) ||
+                              user['phone']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(pattern.toLowerCase()))
+                          .map((user) => {
+                                'id': user['id'],
+                                'name': user['name'],
+                              })
+                          .toList();
+                    } else {
+                      return [];
+                    }
                   },
                   itemBuilder: (context, suggestion) {
                     return ListTile(
                       title: Text(
-                        suggestion,
+                        suggestion['name'],
                         maxLines: 1,
                         style: GoogleFonts.montserrat(
                           fontWeight: FontWeight.w400,
@@ -201,19 +279,46 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       ),
                     );
                   },
-                  onSuggestionSelected: (suggestion) {
-                    // 2. select the user
-                    setState(() {
-                      presentStudents.add(suggestion);
-                    });
-                    debugPrint('presentStudents: $presentStudents');
+                  onSuggestionSelected: (suggestion) async {
+                    String selectedUserId = suggestion['id'];
+                    if (!presentStudentsUID.contains(selectedUserId)) {
+                      setState(() {
+                        presentStudentsUID.add(selectedUserId);
+                      });
+                    } else {
+                      return;
+                    }
+                    // add to firebase
+                    try {
+                      final DatabaseReference dbRef = coachDb
+                          .child(cid)
+                          .child('attendance')
+                          .child(DateFormat('ddMMyy').format(selectedDate))
+                          .child('students');
+                      dbRef.set(presentStudentsUID);
+                    } catch (e) {
+                      setState(() {
+                        presentStudentsUID.remove(suggestion);
+                      });
+                      Flushbar(
+                        margin: const EdgeInsets.all(7),
+                        borderRadius: BorderRadius.circular(15),
+                        flushbarStyle: FlushbarStyle.FLOATING,
+                        flushbarPosition: FlushbarPosition.TOP,
+                        message:
+                            "Error adding $suggestion to the attendance list",
+                        icon: Icon(
+                          Icons.error_outline_rounded,
+                          size: 28.0,
+                          color: Colors.red[300],
+                        ),
+                        duration: const Duration(milliseconds: 3000),
+                        leftBarIndicatorColor: Colors.red[300],
+                      ).show(context);
+                    }
                   },
                 ),
               ),
-
-              // 3. add the user to the list
-              // data table of present students
-              // columns - name, type, days, action
               Expanded(
                 child: DataTable2(
                   columnSpacing: screenWidth * 0.02,
@@ -264,23 +369,30 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         size: ColumnSize.S,
                       ),
                   ],
-                  rows: List<DataRow>.generate(
-                    presentStudents.length,
-                    (index) => DataRow(
+                  rows: List<DataRow>.generate(presentStudentsUID.length,
+                      (index) {
+                    // get user
+                    final user = users.firstWhere(
+                        (user) => user['id'] == presentStudentsUID[index]);
+                    String id = user['id'];
+                    String name = user['name'];
+                    String balance = user['balance'].toString();
+                    return DataRow(
                       cells: <DataCell>[
                         DataCell(
                           Text((index + 1).toString()),
                         ),
                         DataCell(
-                          Text(presentStudents[index]),
+                          // get name from users list
+                          Text(name),
                           onLongPress: () {
                             // 4. edit the user
                             showDialog(
                               context: context,
                               builder: (BuildContext context) {
                                 return AlertDialog(
-                                  title: Text(
-                                      '${presentStudents[index].split(' ')[0]}\'s Action'),
+                                  title:
+                                      Text('${name.split(' ')[0]}\'s Action'),
                                   content: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -288,14 +400,247 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                           width: double.infinity,
                                           child: TextButton(
                                               onPressed: () {
-                                                // snack bar
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('Club Fees'),
-                                                    duration:
-                                                        Duration(seconds: 2),
-                                                  ),
+                                                // open a new dialog to enter the cash amount
+                                                Navigator.of(context).pop();
+                                                showDialog(
+                                                  barrierDismissible: true,
+                                                  context: context,
+                                                  builder: (BuildContext cxt) {
+                                                    return SingleChildScrollView(
+                                                      child: Positioned(
+                                                        top: 0,
+                                                        child: StatefulBuilder(
+                                                            builder: (context,
+                                                                setState) {
+                                                          {
+                                                            return Padding(
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .all(16),
+                                                              child: Material(
+                                                                // color: Colors.green,
+                                                                shape: RoundedRectangleBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            15)),
+                                                                child: Padding(
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .all(
+                                                                          16),
+                                                                  child: Column(
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    children: [
+                                                                      Row(
+                                                                        children: [
+                                                                          Expanded(
+                                                                              child: Container(
+                                                                            margin:
+                                                                                const EdgeInsets.only(bottom: 10),
+                                                                            child:
+                                                                                const Text(
+                                                                              'Club Fees 💵',
+                                                                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.greenAccent),
+                                                                            ),
+                                                                          )),
+                                                                        ],
+                                                                      ),
+                                                                      Form(
+                                                                        key:
+                                                                            formKey,
+                                                                        autovalidateMode:
+                                                                            AutovalidateMode.onUserInteraction,
+                                                                        child:
+                                                                            Column(
+                                                                          children: [
+                                                                            Row(
+                                                                              children: [
+                                                                                Expanded(
+                                                                                  child: TextFormField(
+                                                                                    keyboardType: TextInputType.number,
+                                                                                    controller: amount,
+                                                                                    validator: (value) {
+                                                                                      if (value == null || value.isEmpty) {
+                                                                                        return 'Please enter the amount';
+                                                                                      } else if (int.tryParse(value) == null) {
+                                                                                        return 'Please enter a valid amount';
+                                                                                      } else if (int.tryParse(value)! < 0) {
+                                                                                        return 'Please enter a valid amount';
+                                                                                      } else if (int.tryParse(value)! > 50000) {
+                                                                                        return 'Please enter a valid amount';
+                                                                                      }
+                                                                                      return null;
+                                                                                    },
+                                                                                    decoration: const InputDecoration(
+                                                                                      contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                      isDense: true,
+                                                                                      labelText: 'Amount (₹)',
+                                                                                    ),
+                                                                                  ),
+                                                                                ),
+                                                                                const SizedBox(
+                                                                                  width: 10,
+                                                                                ),
+                                                                                // select plan dropdown
+                                                                                Expanded(
+                                                                                  child: DropdownButtonFormField<String>(
+                                                                                    decoration: const InputDecoration(
+                                                                                      contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                      isDense: true,
+                                                                                      labelText: 'Mode',
+                                                                                    ),
+                                                                                    value: initalMode,
+                                                                                    items: [
+                                                                                      'Cash',
+                                                                                      'Online',
+                                                                                      'Cheque',
+                                                                                    ].map((String value) {
+                                                                                      return DropdownMenuItem<String>(
+                                                                                        value: value,
+                                                                                        child: Text(value),
+                                                                                      );
+                                                                                    }).toList(),
+                                                                                    onChanged: (String? newValue) {
+                                                                                      setState(() {
+                                                                                        initalMode = newValue ?? '';
+                                                                                      });
+                                                                                    },
+                                                                                  ),
+                                                                                ),
+                                                                              ],
+                                                                            ),
+                                                                            Row(
+                                                                              children: [
+                                                                                Expanded(
+                                                                                  child: DropdownButtonFormField<String>(
+                                                                                    decoration: const InputDecoration(
+                                                                                      labelText: 'Program',
+                                                                                    ),
+                                                                                    value: initalPlan,
+                                                                                    items: [
+                                                                                      '0 day',
+                                                                                      '3 day',
+                                                                                      'Gold UMS',
+                                                                                      'Plat UMS',
+                                                                                      'Other', // Add 'Other' option
+                                                                                    ].map((String value) {
+                                                                                      return DropdownMenuItem<String>(
+                                                                                        value: value,
+                                                                                        child: Text(value),
+                                                                                      );
+                                                                                    }).toList(),
+                                                                                    onChanged: (String? newValue) {
+                                                                                      debugPrint('New Value: $newValue');
+                                                                                      setState(() {
+                                                                                        initalPlan = newValue ?? '';
+                                                                                      });
+                                                                                    },
+                                                                                  ),
+                                                                                ),
+                                                                                if (initalPlan == 'Other')
+                                                                                  Expanded(
+                                                                                    child: Container(
+                                                                                      margin: const EdgeInsets.only(left: 10),
+                                                                                      child: TextFormField(
+                                                                                        controller: customPlan,
+                                                                                        decoration: const InputDecoration(
+                                                                                          labelText: 'Custom Plan',
+                                                                                        ),
+                                                                                        validator: (value) {
+                                                                                          if (value == null || value.isEmpty) {
+                                                                                            return 'Please enter the plan';
+                                                                                          } else if (value.length < 3) {
+                                                                                            return 'Please enter a valid plan';
+                                                                                          }
+                                                                                          return null;
+                                                                                        },
+                                                                                      ),
+                                                                                    ),
+                                                                                  ),
+                                                                              ],
+                                                                            ),
+                                                                            // 2 buttons
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                      Row(
+                                                                        mainAxisAlignment:
+                                                                            MainAxisAlignment.spaceAround,
+                                                                        crossAxisAlignment:
+                                                                            CrossAxisAlignment.center,
+                                                                        children: [
+                                                                          Expanded(
+                                                                            child:
+                                                                                TextButton(
+                                                                              onPressed: () {
+                                                                                Navigator.of(context).pop();
+                                                                              },
+                                                                              child: const Text('Cancel'),
+                                                                            ),
+                                                                          ),
+                                                                          Expanded(
+                                                                            child:
+                                                                                TextButton(
+                                                                              onPressed: () async {
+                                                                                if (formKey.currentState!.validate()) {
+                                                                                  // save the data
+                                                                                  // save to firebase
+                                                                                  // add to firebase
+                                                                                  try {
+                                                                                    if (initalPlan == 'Other') {
+                                                                                      initalPlan = customPlan.text.trim();
+                                                                                    }
+                                                                                    // balance
+                                                                                    int newBalance = int.parse(balance) - int.parse(amount.text.trim());
+                                                                                    final DatabaseReference dbRef = coachDb.child(cid);
+                                                                                    await dbRef.child('attendance').child(DateFormat('ddMMyy').format(selectedDate)).child('fees').push().set({
+                                                                                      'uid': id,
+                                                                                      'program': initalPlan,
+                                                                                      'amount': int.parse(amount.text.trim()),
+                                                                                      'mode': initalMode,
+                                                                                      'balance': newBalance,
+                                                                                    });
+                                                                                    // set user balance
+                                                                                    await dbRef.child('users').child(id).update({
+                                                                                      'balance': newBalance,
+                                                                                    });
+                                                                                    getUsers();
+                                                                                    Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                  } catch (e) {
+                                                                                    Flushbar(
+                                                                                      margin: const EdgeInsets.all(7),
+                                                                                      borderRadius: BorderRadius.circular(15),
+                                                                                      flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                      flushbarPosition: FlushbarPosition.TOP,
+                                                                                      message: "Please check the data and try again or contact support",
+                                                                                      icon: Icon(
+                                                                                        Icons.error_outline_rounded,
+                                                                                        size: 28.0,
+                                                                                        color: Colors.red[300],
+                                                                                      ),
+                                                                                      duration: const Duration(milliseconds: 3000),
+                                                                                      leftBarIndicatorColor: Colors.red[300],
+                                                                                    ).show(scaffoldKey.currentContext!);
+                                                                                  }
+                                                                                }
+                                                                              },
+                                                                              child: const Text('Save'),
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }
+                                                        }),
+                                                      ),
+                                                    );
+                                                  },
                                                 );
                                               },
                                               child: const Text('Club Fees 💵',
@@ -353,8 +698,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         const DataCell(
                           Text('25/30', style: TextStyle(letterSpacing: 1.8)),
                         ),
-                        const DataCell(
-                          Text('1000', style: TextStyle(color: Colors.red)),
+                        DataCell(
+                          Text(balance,
+                              style: TextStyle(
+                                  color: int.tryParse(balance) == 0
+                                      ? Colors.black
+                                      : Colors.red)),
                         ),
                         if (isEdit)
                           DataCell(
@@ -369,7 +718,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                       return AlertDialog(
                                         title: const Text('Confirmation'),
                                         content: Text(
-                                            'Are you sure you want to delete ${presentStudents[index]}?'),
+                                            'Are you sure you want to delete ${presentStudentsUID[index]}?'),
                                         actions: [
                                           TextButton(
                                             child: const Text('Cancel'),
@@ -381,7 +730,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                             child: const Text('Delete'),
                                             onPressed: () {
                                               setState(() {
-                                                presentStudents.removeAt(index);
+                                                presentStudentsUID
+                                                    .removeAt(index);
                                               });
                                               Navigator.of(context).pop();
                                             },
@@ -395,8 +745,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                             ),
                           ),
                       ],
-                    ),
-                  ),
+                    );
+                  }),
                 ),
               ),
             ],
@@ -796,6 +1146,8 @@ class _DailyDetailsState extends State<DailyDetails> {
       ),
     );
   }
+
+  void showCustomDialog(BuildContext context, String message) {}
 }
 
 class GradientBox extends StatelessWidget {

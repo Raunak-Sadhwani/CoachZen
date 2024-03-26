@@ -88,20 +88,22 @@ class Method {
   static Future<bool> checkInternetConnection(BuildContext context) async {
     var connectivityResult = await (Connectivity().checkConnectivity());
     if (connectivityResult == ConnectivityResult.none) {
-      Flushbar(
-        margin: const EdgeInsets.all(7),
-        borderRadius: BorderRadius.circular(15),
-        flushbarStyle: FlushbarStyle.FLOATING,
-        flushbarPosition: FlushbarPosition.TOP,
-        message: "No internet connection",
-        icon: Icon(
-          Icons.wifi_off,
-          size: 28.0,
-          color: Colors.blue[300],
-        ),
-        duration: const Duration(milliseconds: 3000),
-        leftBarIndicatorColor: Colors.blue[300],
-      ).show(context);
+      if (context.mounted) {
+        Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.TOP,
+          message: "No internet connection",
+          icon: Icon(
+            Icons.wifi_off,
+            size: 28.0,
+            color: Colors.blue[300],
+          ),
+          duration: const Duration(milliseconds: 3000),
+          leftBarIndicatorColor: Colors.blue[300],
+        ).show(context);
+      }
       return false;
     }
     return true;

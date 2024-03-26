@@ -76,9 +76,9 @@ class _BodyFormState extends State<BodyForm> {
 
   @override
   void dispose() {
-    BodyForm.ageController.text = '25';
-    BodyForm.height = 170;
-    BodyForm.isMale = true;
+    // BodyForm.ageController.text = '25';
+    // BodyForm.height = 170;
+    // BodyForm.isMale = true;
     super.dispose();
   }
 

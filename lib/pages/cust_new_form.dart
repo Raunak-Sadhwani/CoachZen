@@ -34,34 +34,6 @@ class _CustNewFormState extends State<CustNewForm> {
   bool isFabEnabled = true;
 
   @override
-  void initState() {
-    super.initState();
-    // snackbar if firebase is connected
-    FirebaseDatabase.instance
-        .ref()
-        .child('.info/connected')
-        .onValue
-        .listen((event) {
-      if (event.snapshot.value == true) {
-        Flushbar(
-          margin: const EdgeInsets.all(7),
-          borderRadius: BorderRadius.circular(15),
-          flushbarStyle: FlushbarStyle.FLOATING,
-          flushbarPosition: FlushbarPosition.BOTTOM,
-          message: "Firebase connected",
-          icon: Icon(
-            Icons.check_circle_outline_rounded,
-            size: 28.0,
-            color: Colors.green[300],
-          ),
-          duration: const Duration(milliseconds: 1500),
-          leftBarIndicatorColor: Colors.green[300],
-        ).show(context);
-      }
-    });
-  }
-
-  @override
   void dispose() {
     super.dispose();
   }
@@ -304,30 +276,77 @@ class _CustNewFormState extends State<CustNewForm> {
                   'gender': isMale ? 'male' : 'female',
                   'height': int.parse(_heightController.text),
                   'measurements': measurements,
-                  'phone': _phoneController.text.trim(),
+                  'phone': int.parse(_phoneController.text.trim()),
                   'city': _cityController.text.trim(),
                   'email': _emailController.text.trim(),
                   'created': realtime,
                   'cid': cid,
+                  'balance': 200,
                 };
 
+                String? newUserUid = FirebaseDatabase.instance.ref().push().key;
+                if (newUserUid == null) {
+                  Flushbar(
+                    margin: const EdgeInsets.all(7),
+                    borderRadius: BorderRadius.circular(15),
+                    flushbarStyle: FlushbarStyle.FLOATING,
+                    flushbarPosition: FlushbarPosition.BOTTOM,
+                    message: "Something Went Wrong! Try Again",
+                    icon: Icon(
+                      Icons.error_outline_rounded,
+                      size: 28.0,
+                      color: Colors.red[300],
+                    ),
+                    duration: const Duration(milliseconds: 1500),
+                    leftBarIndicatorColor: Colors.red[300],
+                  ).show(scaffoldKey.currentContext!);
+                  setState(() {
+                    isFabEnabled = true;
+                  });
+                  return;
+                }
                 // check if user already exists by phone
-                final userSnapshot = await FirebaseDatabase.instance
-                    .ref()
-                    .child('Users')
-                    .orderByChild('phone')
-                    .equalTo(_phoneController.text.trim())
-                    .once();
-
-                final coachSnapshot = await FirebaseDatabase.instance
-                    .ref()
-                    .child('Coaches')
-                    .orderByChild('phone')
-                    .equalTo(_phoneController.text.trim())
-                    .once();
-
-                if (userSnapshot.snapshot.value != null ||
-                    coachSnapshot.snapshot.value != null) {
+                try {
+                  //  try putting number in phone collection
+                  // if it fails, then user already exists
+                  await FirebaseDatabase.instance
+                      .ref()
+                      .child('Phones')
+                      .child(_phoneController.text.trim())
+                      .set({
+                    'cid': cid,
+                    'uid': newUserUid,
+                    'user': true,
+                    'created': realtime
+                  });
+                  try {
+                    await FirebaseDatabase.instance
+                        .ref()
+                        .child('Coaches')
+                        .child(FirebaseAuth.instance.currentUser!.uid)
+                        .child('users')
+                        .child(newUserUid)
+                        .set(data);
+                  } catch (e) {
+                    Flushbar(
+                      margin: const EdgeInsets.all(7),
+                      borderRadius: BorderRadius.circular(15),
+                      flushbarStyle: FlushbarStyle.FLOATING,
+                      flushbarPosition: FlushbarPosition.BOTTOM,
+                      message: "Something Went Wrong!$e",
+                      icon: Icon(
+                        Icons.error_outline,
+                        size: 28.0,
+                        color: Colors.red[300],
+                      ),
+                      duration: const Duration(milliseconds: 4000),
+                      leftBarIndicatorColor: Colors.red[300],
+                    ).show(scaffoldKey.currentContext!);
+                    setState(() {
+                      isFabEnabled = true;
+                    });
+                  }
+                } catch (e) {
                   setState(() {
                     isFabEnabled = true;
                   });
@@ -346,33 +365,6 @@ class _CustNewFormState extends State<CustNewForm> {
                     leftBarIndicatorColor: Colors.red[300],
                   ).show(scaffoldKey.currentContext!);
                 }
-
-                try {
-                  await FirebaseDatabase.instance
-                      .ref()
-                      .child('Users')
-                      .push()
-                      .set(data);
-                } catch (e) {
-                  Flushbar(
-                    margin: const EdgeInsets.all(7),
-                    borderRadius: BorderRadius.circular(15),
-                    flushbarStyle: FlushbarStyle.FLOATING,
-                    flushbarPosition: FlushbarPosition.BOTTOM,
-                    message: "Something Went Wrong!$e",
-                    icon: Icon(
-                      Icons.error_outline,
-                      size: 28.0,
-                      color: Colors.red[300],
-                    ),
-                    duration: const Duration(milliseconds: 4000),
-                    leftBarIndicatorColor: Colors.red[300],
-                  ).show(scaffoldKey.currentContext!);
-                  setState(() {
-                    isFabEnabled = true;
-                  });
-                }
-
                 _dateController.clear();
                 _nameController.clear();
                 _weightController.clear();
@@ -382,7 +374,7 @@ class _CustNewFormState extends State<CustNewForm> {
                 _emailController.clear();
                 _ageController.clear();
 
-                Navigator.pop(scaffoldKey.currentContext!);
+                if (context.mounted) Navigator.of(context).pop();
                 Flushbar(
                   margin: const EdgeInsets.all(7),
                   borderRadius: BorderRadius.circular(15),
@@ -397,6 +389,9 @@ class _CustNewFormState extends State<CustNewForm> {
                   duration: const Duration(milliseconds: 1500),
                   leftBarIndicatorColor: Colors.green[300],
                 ).show(scaffoldKey.currentContext!);
+                setState(() {
+                  isFabEnabled = true;
+                });
               } catch (e) {
                 debugPrint(e.toString());
                 Flushbar(

@@ -97,9 +97,24 @@ class FormFields extends StatelessWidget {
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         controller: field['controller'],
                         decoration: InputDecoration(
+                          counterText: "",
                           labelText: field['label'],
+                          prefixText: field['label']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains('phone')
+                              ? "+91  "
+                              : null,
                           suffixText: field['unit'],
                         ),
+                        maxLength: field['label']
+                                .toString()
+                                .toLowerCase()
+                                .contains('phone')
+                            ? 10
+                            : null,
+                        // hide max length 0/10
+
                         keyboardType:
                             field['label'].toString().contains('Email')
                                 ? TextInputType.emailAddress

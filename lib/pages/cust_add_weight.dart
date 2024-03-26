@@ -1,4 +1,5 @@
 import 'package:another_flushbar/flushbar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -90,7 +91,11 @@ class _AddWeightState extends State<AddWeight> {
       };
       widget.measurements.add(data);
 
-      final docRef = FirebaseDatabase.instance.ref().child('Users');
+      final docRef = FirebaseDatabase.instance
+          .ref()
+          .child('Coaches')
+          .child(FirebaseAuth.instance.currentUser!.uid)
+          .child('users');
       try {
         await docRef.child(widget.uid).update({
           'measurements': widget.measurements,

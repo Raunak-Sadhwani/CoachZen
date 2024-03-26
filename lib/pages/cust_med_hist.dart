@@ -1,4 +1,5 @@
 import 'package:another_flushbar/flushbar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 
@@ -125,7 +126,9 @@ class _CustMedHistState extends State<CustMedHist> {
                       }
                       final userRef = FirebaseDatabase.instance
                           .ref()
-                          .child('Users')
+                          .child('Coaches')
+                          .child(FirebaseAuth.instance.currentUser!.uid)
+                          .child('users')
                           .child(widget.uid);
                       await userRef.update({
                         'medicalHistory': medicalHistoryList,

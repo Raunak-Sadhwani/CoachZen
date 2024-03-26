@@ -76,7 +76,8 @@ class _FormPageState extends State<FormPage> {
         totalPages = 2;
       });
       for (int i = 0; i < widget.measurements!.length; i++) {
-        DateTime date = DateTime.fromMillisecondsSinceEpoch(widget.measurements![i]['date']);
+        DateTime date = DateTime.fromMillisecondsSinceEpoch(
+            widget.measurements![i]['date']);
         // remove time if exists
         date = DateTime(date.year, date.month, date.day);
         disabledDates.add(date);
@@ -281,31 +282,51 @@ class _FormPageState extends State<FormPage> {
             ).show(context);
             return debugPrint(e.toString());
           }
-
-          final userSnapshot = await FirebaseDatabase.instance
-              .ref()
-              .child('Users')
-              .orderByChild('phone')
-              .equalTo(data['phone'])
-              .once();
-
-          final coachSnapshot = await FirebaseDatabase.instance
-              .ref()
-              .child('Coaches')
-              .orderByChild('phone')
-              .equalTo(data['phone'])
-              .once();
-
-          if (userSnapshot.snapshot.value != null ||
-              coachSnapshot.snapshot.value != null) {
+          User? coach = FirebaseAuth.instance.currentUser;
+          String? newUserUid = FirebaseDatabase.instance.ref().push().key;
+          if (newUserUid == null) {
+            Flushbar(
+              margin: const EdgeInsets.all(7),
+              borderRadius: BorderRadius.circular(15),
+              flushbarStyle: FlushbarStyle.FLOATING,
+              flushbarPosition: FlushbarPosition.BOTTOM,
+              message: "Something Went Wrong! Try Again",
+              icon: Icon(
+                Icons.error_outline_rounded,
+                size: 28.0,
+                color: Colors.red[300],
+              ),
+              duration: const Duration(milliseconds: 1500),
+              leftBarIndicatorColor: Colors.red[300],
+            ).show(context);
+            setState(() {
+              onSubmitted = false;
+            });
+            return;
+          }
+          // check if user already exists by phone
+          try {
+            //  try putting number in phone collection
+            // if it fails, then user already exists
+            await FirebaseDatabase.instance
+                .ref()
+                .child('Phones')
+                .child(data['phone'].trim())
+                .set({
+              'cid': coach!.uid,
+              'uid': newUserUid,
+              'user': true,
+              'created': timestamp
+            });
+          } catch (e) {
+            setState(() {
+              onSubmitted = false;
+            });
             controller.animateToPage(
               0,
               duration: const Duration(milliseconds: 410),
               curve: Curves.easeIn,
             );
-            setState(() {
-              onSubmitted = false;
-            });
             return Flushbar(
               margin: const EdgeInsets.all(7),
               borderRadius: BorderRadius.circular(15),
@@ -317,34 +338,43 @@ class _FormPageState extends State<FormPage> {
                 size: 28.0,
                 color: Colors.red[300],
               ),
-              duration: const Duration(milliseconds: 4500),
+              duration: const Duration(milliseconds: 4000),
               leftBarIndicatorColor: Colors.red[300],
             ).show(context);
           }
 
-          User? coach = FirebaseAuth.instance.currentUser;
           data['created'] = timestamp;
           data['measurements'] = measurements;
           data['medicalHistory'] = medicalHistory;
           data['reg'] = 'false';
-          data['cid'] = coach!.uid;
+          data['cid'] = coach.uid;
           // convert age to date of birth
           int age = data['age'];
           DateTime currentDate = DateTime.now();
           DateTime dob = DateTime(
               currentDate.year - age, currentDate.month, currentDate.day);
           data['dob'] = dob.millisecondsSinceEpoch;
+          data['balance'] = 200;
+          data['plans'] = [
+            {
+              'name': 'Zero Day',
+              'price': 200,
+              'days': 2,
+              'started': timestamp,
+            }
+          ];
           // remove age from data
           data.remove('age');
 
           // add to firebase database
-          final ref = FirebaseDatabase.instance.ref().child('Users');
-          await ref.push().set(data);
+          await FirebaseDatabase.instance
+              .ref()
+              .child('Coaches')
+              .child(coach.uid)
+              .child('users')
+              .child(newUserUid)
+              .set(data);
 
-          // // Set data to the document
-          // await docRef.add(
-          //   data,
-          // );
           // clear all fields
           for (var field in allFields) {
             if (field['label'] == 'Medical History (optional)') {
@@ -462,7 +492,9 @@ class _FormPageState extends State<FormPage> {
         final DateFormat format = DateFormat('dd-MM-yyyy');
         date = format.parseStrict(BodyForm2.allFields.last['controller'].text);
         for (int i = 0; i < widget.measurements!.length; i++) {
-          if (DateTime.fromMillisecondsSinceEpoch(widget.measurements![i]['date']) == date) {
+          if (DateTime.fromMillisecondsSinceEpoch(
+                  widget.measurements![i]['date']) ==
+              date) {
             setState(() {
               onSubmitted = false;
             });
@@ -505,7 +537,11 @@ class _FormPageState extends State<FormPage> {
       }
       widget.measurements!.add(data);
 
-      final docRef = FirebaseDatabase.instance.ref().child('Users');
+      final docRef = FirebaseDatabase.instance
+          .ref()
+          .child('Coaches')
+          .child(FirebaseAuth.instance.currentUser!.uid)
+          .child('users');
       try {
         await docRef.child(widget.uid!).update({
           'measurements': widget.measurements,

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,13 +13,19 @@ import 'package:coach_zen/pages/cust_plan_hist.dart';
 import 'package:coach_zen/pages/cust_product_hist.dart';
 import 'package:coach_zen/pages/cust_weight_hist.dart';
 
+final String uid = FirebaseAuth.instance.currentUser!.uid;
+
 class BodyFormCustomerWrap extends StatefulWidget {
   final String uid;
-  const BodyFormCustomerWrap({Key? key, required this.uid}) : super(key: key);
+  final VoidCallback callback;
+  const BodyFormCustomerWrap(
+      {Key? key, required this.uid, required this.callback})
+      : super(key: key);
 
   @override
   State<BodyFormCustomerWrap> createState() => _BodyFormCustomerWrapState();
 }
+
 
 // String formatDate(Timestamp timestamp) {
 //   DateTime dateTime = timestamp.toDate();
@@ -28,11 +35,24 @@ class BodyFormCustomerWrap extends StatefulWidget {
 
 class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
   bool _hasInternet = true;
+  late Future<Map<dynamic, dynamic>> userDataFuture;
 
   @override
   void initState() {
     super.initState();
     checkInternetConnection();
+    userDataFuture = fetchUserData();
+  }
+
+  Future<Map<dynamic, dynamic>> fetchUserData() async {
+    final dataSnapshot = await FirebaseDatabase.instance
+        .ref()
+        .child('Coaches')
+        .child(uid)
+        .child('users')
+        .child(widget.uid)
+        .once();
+    return dataSnapshot.snapshot.value as Map<dynamic, dynamic>;
   }
 
   Future<void> checkInternetConnection() async {
@@ -90,112 +110,119 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
       );
     }
 
-    return StreamBuilder(
-        stream: FirebaseDatabase.instance
-            .ref()
-            .child('Users')
-            .child(widget.uid)
-            .onValue,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            final user =
-                snapshot.data!.snapshot.value as Map<dynamic, dynamic>?;
+    return
+        // StreamBuilder(
+        //     stream: FirebaseDatabase.instance
+        //         .ref()
+        //         .child('Users')
+        //         .child(widget.uid)
+        //         .onValue,
+        //     builder: (context, snapshot) {
+        FutureBuilder(
+            future: userDataFuture,
+            builder: (context, AsyncSnapshot<Map<dynamic, dynamic>> snapshot) {
+              if (snapshot.hasData) {
+                final user = snapshot.data;
 
-            if (user == null) {
-              return const Center(
-                child: Text(
-                    'Something went wrong, please contact support or try again later'),
-              );
-            }
+                if (user == null) {
+                  return const Center(
+                    child: Text(
+                        'Something went wrong, please contact support or try again later'),
+                  );
+                }
 
-            Map<dynamic, dynamic> userData = {};
-            // remove any list dataytype from filteredData and any exceptionList keys, add to userData
-            List exceptionList = [
-              "cid",
-              "reg",
-              "cname",
-              "image",
-              "measurements",
-              "productsHistory",
-              "plans",
-              "medicalHistory"
-            ];
-            user.forEach((key, value) {
-              if (value.runtimeType != List && !exceptionList.contains(key)) {
-                userData[key] = value;
-              }
-              // if its last key, add id
-              if (key == user.keys.last && userData[key] != 'created') {
-                DateTime cr =
-                    DateTime.fromMillisecondsSinceEpoch(userData['created']);
-                String formattedcr =
-                    DateFormat('dd MMM yyyy - hh:mm a').format(cr);
-                userData.remove('created');
-                userData['created'] = formattedcr;
+                Map<dynamic, dynamic> userData = {};
+                // remove any list dataytype from filteredData and any exceptionList keys, add to userData
+                List exceptionList = [
+                  "cid",
+                  "reg",
+                  "cname",
+                  "image",
+                  "measurements",
+                  "productsHistory",
+                  "plans",
+                  "medicalHistory"
+                ];
+                user.forEach((key, value) {
+                  if (value.runtimeType != List &&
+                      !exceptionList.contains(key)) {
+                    userData[key] = value;
+                  }
+                  // if its last key, add id
+                  if (key == user.keys.last && userData[key] != 'created') {
+                    DateTime cr = DateTime.fromMillisecondsSinceEpoch(
+                        userData['created']);
+                    String formattedcr =
+                        DateFormat('dd MMM yyyy - hh:mm a').format(cr);
+                    userData.remove('created');
+                    userData['created'] = formattedcr;
+                  }
+                });
+                List toBeOnTop = ["name", "phone", "city", "dob"];
+                userData = Map.fromEntries([
+                  ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
+                  ...userData.entries
+                      .where((entry) => !toBeOnTop.contains(entry.key))
+                ]);
+                List<Map<dynamic, dynamic>> measurements = [];
+                List<Map<dynamic, dynamic>> products = [];
+                List<Map<dynamic, dynamic>> plans = [];
+                List medicalHistory = user['medicalHistory'] ?? [];
+                String? image = user['image'];
+
+                if (user['measurements'] != null) {
+                  measurements = (user['measurements'] as List)
+                      .cast<Map<dynamic, dynamic>>()
+                      .toList()
+                    ..forEach((e) {
+                      final weight = {'weight': e['weight']};
+                      e.remove('weight');
+                      e.addAll(weight);
+                    });
+                }
+                if (user['productsHistory'] != null) {
+                  products = (user['productsHistory'] as List)
+                      .cast<Map<dynamic, dynamic>>()
+                      .toList();
+                  products.sort((a, b) => b['date'].compareTo(a['date']));
+                }
+                if (user['plans'] != null && user['plans'].isNotEmpty) {
+                  plans = (user['plans'] as List)
+                      .cast<Map<dynamic, dynamic>>()
+                      .toList();
+                  plans.sort((a, b) => b['started'].compareTo(a['started']));
+                  // if userdata does not have plan, add it
+                  if (userData['plan'] == null) {
+                    String plan = plans[0]['name'];
+                    // make plan before 'created' key in userData
+                    userData = Map.fromEntries([
+                      ...userData.entries
+                          .where((entry) => entry.key != 'created'),
+                      MapEntry('plan', plan),
+                      MapEntry('created', userData['created']),
+                    ]);
+                  }
+                }
+                measurements.sort((a, b) => a['date'].compareTo(b['date']));
+                return BodyFormCustomer(
+                    callback: widget.callback,
+                    userData: userData,
+                    measurements: measurements,
+                    products: products,
+                    plans: plans,
+                    medicalHistory: medicalHistory,
+                    uid: widget.uid,
+                    image: image);
+              } else {
+                // Handle loading or empty state...
+                return const CircularProgressIndicator();
               }
             });
-            List toBeOnTop = ["name", "phone", "city", "dob"];
-            userData = Map.fromEntries([
-              ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
-              ...userData.entries
-                  .where((entry) => !toBeOnTop.contains(entry.key))
-            ]);
-            List<Map<dynamic, dynamic>> measurements = [];
-            List<Map<dynamic, dynamic>> products = [];
-            List<Map<dynamic, dynamic>> plans = [];
-            List medicalHistory = user['medicalHistory'] ?? [];
-            String? image = user['image'];
-
-            if (user['measurements'] != null) {
-              measurements = (user['measurements'] as List)
-                  .cast<Map<dynamic, dynamic>>()
-                  .toList()
-                ..forEach((e) {
-                  final weight = {'weight': e['weight']};
-                  e.remove('weight');
-                  e.addAll(weight);
-                });
-            }
-            if (user['productsHistory'] != null) {
-              products = (user['productsHistory'] as List)
-                  .cast<Map<dynamic, dynamic>>()
-                  .toList();
-              products.sort((a, b) => b['date'].compareTo(a['date']));
-            }
-            if (user['plans'] != null && user['plans'].isNotEmpty) {
-              plans = (user['plans'] as List)
-                  .cast<Map<dynamic, dynamic>>()
-                  .toList();
-              plans.sort((a, b) => b['started'].compareTo(a['started']));
-              // if userdata does not have plan, add it
-              if (userData['plan'] == null) {
-                String plan = plans[0]['name'];
-                // make plan before 'created' key in userData
-                userData = Map.fromEntries([
-                  ...userData.entries.where((entry) => entry.key != 'created'),
-                  MapEntry('plan', plan),
-                  MapEntry('created', userData['created']),
-                ]);
-              }
-            }
-            measurements.sort((a, b) => a['date'].compareTo(b['date']));
-            return BodyFormCustomer(
-                userData: userData,
-                measurements: measurements,
-                products: products,
-                plans: plans,
-                medicalHistory: medicalHistory,
-                uid: widget.uid,
-                image: image);
-          } else {
-            // Handle loading or empty state...
-            return const CircularProgressIndicator();
-          }
-        });
   }
 }
 
 class BodyFormCustomer extends StatefulWidget {
+  final VoidCallback callback;
   final Map<dynamic, dynamic> userData;
   final List<Map<dynamic, dynamic>> measurements;
   final List<Map<dynamic, dynamic>> products;
@@ -212,6 +239,7 @@ class BodyFormCustomer extends StatefulWidget {
     required this.uid,
     required this.image,
     required this.medicalHistory,
+    required this.callback,
   }) : super(key: key);
 
   @override
@@ -278,7 +306,10 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
           leftIcon: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             color: Colors.black26,
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              widget.callback();
+              Navigator.pop(context);
+            },
           ),
         ),
         body: Container(
@@ -667,8 +698,12 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       });
                       return;
                     }
-                    final users =
-                        FirebaseDatabase.instance.ref().child('Users');
+                    final users = FirebaseDatabase.instance
+                        .ref()
+                        .child('Coaches')
+                        .child(uid)
+                        .child('users')
+                        .child(widget.uid);
                     if (updateFields.containsKey('phone')) {
                       final coaches =
                           FirebaseDatabase.instance.ref().child('Coaches');
@@ -708,6 +743,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       originalData = Map.from(editedData);
                       updateFields.clear();
                     });
+                    widget.callback();
 
                     return Flushbar(
                       margin: const EdgeInsets.all(7),

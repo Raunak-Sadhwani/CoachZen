@@ -83,8 +83,8 @@ class _BodyForm2State extends State<BodyForm2>
         selectedDate = selectedDate.subtract(const Duration(days: 1));
       }
     }
-       BodyForm2.fields.last['controller'].text =
-          DateFormat('dd-MM-yyyy').format(selectedDate);
+    BodyForm2.fields.last['controller'].text =
+        DateFormat('dd-MM-yyyy').format(selectedDate);
   }
 
   @override
@@ -100,7 +100,7 @@ class _BodyForm2State extends State<BodyForm2>
                 selectedDate: selectedDate,
                 disabledDates: widget.disabledDates,
                 fields: BodyForm2.fields,
-                validator: _validateField,
+                validator: validateField,
               ),
             )),
         floatingActionButton: widget.onSubmit != null
@@ -111,11 +111,28 @@ class _BodyForm2State extends State<BodyForm2>
             : null);
   }
 
-  String? _validateField(String? value, String label) {
+  String? validateField(String? value, String label) {
     if (value == null || value.isEmpty) {
       return 'Please enter a value';
-    } else if (value.length > 5 || double.tryParse(value) == null) {
+    }
+    double? numericValue = double.tryParse(value);
+    if (numericValue == null) {
       return 'Please enter a valid number';
+    }
+    String lowerCaseLabel = label.toLowerCase();
+    if ((lowerCaseLabel.contains('total') &&
+            (numericValue > 70 || numericValue < 10)) ||
+        (lowerCaseLabel.contains('visceral') && numericValue > 50) ||
+        (lowerCaseLabel.contains('bmi') &&
+            (numericValue > 50 || numericValue < 10)) ||
+        (lowerCaseLabel.contains('resting') &&
+            (numericValue > 3000 || numericValue < 500)) ||
+        (lowerCaseLabel.contains('age') &&
+            (numericValue > 100 || numericValue < 13)) ||
+        (lowerCaseLabel.contains('trunk') && numericValue > 70) ||
+        (lowerCaseLabel.contains('skeletal') &&
+            (numericValue > 60 || numericValue < 10))) {
+      return 'Please enter a valid value';
     }
     return null;
   }

@@ -25,6 +25,7 @@
     </queries>
     <application
         android:label="CoachZen"
+        android:enableOnBackInvokedCallback="true"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

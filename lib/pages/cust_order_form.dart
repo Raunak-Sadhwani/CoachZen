@@ -2,6 +2,7 @@
 
 import 'package:another_flushbar/flushbar.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import 'package:flutter/material.dart';
@@ -81,6 +82,8 @@ class _CustOrderFormState extends State<CustOrderForm> {
     "Control (₹3584)"
   ];
   int total = 0;
+  int given = 0;
+  bool isGivenChanged = false;
   @override
   void initState() {
     super.initState();
@@ -96,7 +99,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
       selectedDateTime = DateTime.fromMillisecondsSinceEpoch(
           widget.productsHistory[widget.index!]['date']);
       tempList.clear();
-      int subTotal = 0;
       for (var i = 0; i < products.length; i++) {
         tempList.add(products);
         final productNameController = TextEditingController(
@@ -107,20 +109,10 @@ class _CustOrderFormState extends State<CustOrderForm> {
         );
         productNameControllers.add(productNameController);
         productQuantityControllers.add(productQuantityController);
-        try {
-          final product = productNameController.text.trim();
-          final quantity = int.parse(productQuantityController.text.trim());
-          if (product.contains('₹')) {
-            final price = int.parse(product.substring(
-                product.indexOf('₹') + 1, product.indexOf(')')));
-            subTotal += price * quantity;
-          }
-        } catch (e) {
-          debugPrint(e.toString());
-        }
       }
       setState(() {
-        total = subTotal;
+        total = widget.productsHistory[widget.index!]['total'];
+        given = widget.productsHistory[widget.index!]['given'];
       });
     }
   }
@@ -178,6 +170,9 @@ class _CustOrderFormState extends State<CustOrderForm> {
     }
     setState(() {
       total = subTotal;
+      if (!isGivenChanged) {
+        given = total;
+      }
     });
   }
 
@@ -229,7 +224,63 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                       fontWeight: FontWeight.w500,
                                       letterSpacing: .5,
                                       fontSize: 19.5)),
-                            ))))
+                            )))),
+              if (total != 0 && tempList.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    // open a dialog to change the given amount
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text('Change Giving At:'),
+                          content: TextFormField(
+                            initialValue: given.toString(),
+                            onChanged: (value) {
+                              if (value.isNotEmpty) {
+                                setState(() {
+                                  given = int.parse(value);
+                                  isGivenChanged = true;
+                                });
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              labelText: 'Given amount',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Ok'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: Container(
+                      width: double.infinity,
+                      margin: EdgeInsets.only(
+                          top: height * 0.01, bottom: height * 0.02),
+                      child: Card(
+                          elevation: 5,
+                          child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Center(
+                                child: Text('Giving At:  ₹$given',
+                                    style: GoogleFonts.workSans(
+                                        color: (given > total) ||
+                                                (given < total / 2)
+                                            ? Colors.red
+                                            : Colors.black,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: .5,
+                                        fontSize: 19.5)),
+                              )))),
+                )
               else if (tempList.isEmpty)
                 Container(
                   margin:
@@ -524,6 +575,8 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                       validator: (value) {
                                         if (value!.isEmpty) {
                                           return 'Please select a product';
+                                        } else if (!value.contains('₹')) {
+                                          return 'Please enter a valid product';
                                         }
                                         return null;
                                       },
@@ -586,7 +639,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                 }
 
                 setState(() {
-                  // isFabEnabled = false;
+                  isFabEnabled = false;
                   autoValidate = true;
                 });
 
@@ -600,8 +653,50 @@ class _CustOrderFormState extends State<CustOrderForm> {
                     });
                     return;
                   }
+                  // if given is greater than total or given is less than 50% of total
 
                   try {
+                    if (total == 0 && tempList.isNotEmpty) {
+                      Flushbar(
+                        margin: const EdgeInsets.all(7),
+                        borderRadius: BorderRadius.circular(15),
+                        flushbarStyle: FlushbarStyle.FLOATING,
+                        flushbarPosition: FlushbarPosition.BOTTOM,
+                        message: "Please enter valid products",
+                        icon: Icon(
+                          Icons.error_outline_rounded,
+                          size: 28.0,
+                          color: Colors.red[300],
+                        ),
+                        duration: const Duration(milliseconds: 1500),
+                        leftBarIndicatorColor: Colors.red[300],
+                      ).show(context);
+                      setState(() {
+                        isFabEnabled = true;
+                      });
+                      return;
+                    }
+                    if ((given > total) || (given < total / 2)) {
+                      Flushbar(
+                        margin: const EdgeInsets.all(7),
+                        borderRadius: BorderRadius.circular(15),
+                        flushbarStyle: FlushbarStyle.FLOATING,
+                        flushbarPosition: FlushbarPosition.BOTTOM,
+                        message: "Given amount Invalid",
+                        icon: Icon(
+                          Icons.error_outline_rounded,
+                          size: 28.0,
+                          color: Colors.red[300],
+                        ),
+                        duration: const Duration(milliseconds: 1500),
+                        leftBarIndicatorColor: Colors.red[300],
+                      ).show(context);
+                      setState(() {
+                        isFabEnabled = true;
+                      });
+                      return;
+                    }
+
                     Map<String, dynamic> products = {};
                     for (var i = 0; i < tempList.length; i++) {
                       if (int.tryParse(
@@ -640,13 +735,14 @@ class _CustOrderFormState extends State<CustOrderForm> {
                       'date': timestamp,
                       'products': products,
                       'total': total,
+                      'given': given,
                     };
                     String msg = "Order added successfully";
                     List newProductsHistory = [...widget.productsHistory];
                     if (widget.index == null) {
                       newProductsHistory.add(newOrder);
                     } else {
-                      if (newOrder[products] == null) {
+                      if (newOrder[products] == null && tempList.isEmpty) {
                         newProductsHistory.removeAt(widget.index!);
                         msg = "Order deleted successfully";
                       } else {
@@ -658,7 +754,9 @@ class _CustOrderFormState extends State<CustOrderForm> {
                     try {
                       await FirebaseDatabase.instance
                           .ref()
-                          .child('Users')
+                          .child('Coaches')
+                          .child(FirebaseAuth.instance.currentUser!.uid)
+                          .child('users')
                           .child(widget.uid)
                           .update({
                         'productsHistory': newProductsHistory,
@@ -717,6 +815,24 @@ class _CustOrderFormState extends State<CustOrderForm> {
                     ).show(context);
                   }
 
+                  setState(() {
+                    isFabEnabled = true;
+                  });
+                } else if (selectedDateTime == null) {
+                  Flushbar(
+                    margin: const EdgeInsets.all(7),
+                    borderRadius: BorderRadius.circular(15),
+                    flushbarStyle: FlushbarStyle.FLOATING,
+                    flushbarPosition: FlushbarPosition.BOTTOM,
+                    message: "Please select a date and time",
+                    icon: Icon(
+                      Icons.error_outline_rounded,
+                      size: 28.0,
+                      color: Colors.red[300],
+                    ),
+                    duration: const Duration(milliseconds: 1500),
+                    leftBarIndicatorColor: Colors.red[300],
+                  ).show(context);
                   setState(() {
                     isFabEnabled = true;
                   });
