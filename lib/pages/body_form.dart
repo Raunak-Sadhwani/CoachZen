@@ -354,7 +354,7 @@ class _FormPageState extends State<FormPage> {
           DateTime dob = DateTime(
               currentDate.year - age, currentDate.month, currentDate.day);
           data['dob'] = dob.millisecondsSinceEpoch;
-          data['balance'] = 200;
+          // data['paid'] = 0;
           data['plans'] = [
             {
               'name': 'Zero Day',

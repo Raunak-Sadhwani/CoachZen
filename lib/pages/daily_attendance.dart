@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:another_flushbar/flushbar.dart';
 import 'package:coach_zen/pages/cust_order_form.dart';
 import 'package:coach_zen/pages/home.dart';
@@ -22,13 +24,14 @@ class DailyAttendance extends StatefulWidget {
 }
 
 class _DailyAttendanceState extends State<DailyAttendance> {
+  StreamSubscription? _streamSubscription;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   // scaffold key
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   final String cid = FirebaseAuth.instance.currentUser!.uid;
   final DatabaseReference coachDb =
       FirebaseDatabase.instance.ref().child('Coaches');
-  late dynamic mystream;
+  late Stream mystream;
   List<dynamic> users = [];
   DateTime selectedDate = DateTime.now();
   List<Map<dynamic, dynamic>> clubFees = [];
@@ -43,6 +46,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   TextEditingController customPlan = TextEditingController();
   String initalMode = 'Cash';
   bool submitted = false;
+  Color studentBox = const Color.fromARGB(255, 189, 189, 189);
 
   void changeSubmitted() {
     setState(() {
@@ -59,7 +63,112 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    setupDataListener(selectedDate);
+  }
+
+  void setupDataListener(DateTime selectedDate) {
+    // Close the previous listener if it exists
+    _streamSubscription?.cancel();
+
     mystream = coachDb.child(cid).onValue;
+    // Set up the new listener
+    _streamSubscription = mystream.listen((event) {
+      if (mounted) {
+        datas += 1;
+        debugPrint('got data - $datas');
+        // get users
+        dynamic usersData = event.snapshot.value['users'];
+        Map<dynamic, dynamic> usersDataMap =
+            Map<dynamic, dynamic>.from(usersData as Map<dynamic, dynamic>);
+        setState(() {
+          users = [];
+          zdays = 0;
+        });
+        final List<Map<String, dynamic>> updatedUsers = [];
+        usersDataMap.forEach((key, userData) {
+          // int totalDays = -1;
+          // int day = -1;
+          // int amountPaidTillNow = 0;
+          final allDays = (userData['days'] as Map?)?.entries.where((entry) {
+                final dateString = entry.key.toString();
+                final dayx = int.parse(dateString.substring(0, 2));
+                final month = int.parse(dateString.substring(2, 4));
+                final year = int.parse(dateString.substring(4, 6)) + 2000;
+                final keyDate = DateTime(year, month, dayx);
+                return keyDate.isBefore(selectedDate) ||
+                    keyDate.isAtSameMomentAs(selectedDate);
+              }).length ??
+              0;
+          final totalDays = allDays - 1;
+
+          final userPayments = Map.from(userData['payments'] ?? {});
+          final amountPaidTillNow = userPayments.values.fold(0, (sum, payment) {
+            final dateString = payment['date'].toString();
+            if ((userData['days'] as Map?)?.containsKey(dateString) ?? false) {
+              return sum + (payment['totalAmount'] as int);
+            }
+            return sum;
+          });
+          studentsNameUID[key] = userData['name'];
+          updatedUsers.add({
+            'id': key,
+            'name': userData['name'],
+            'phone': userData['phone'],
+            'paid': userData['paid'],
+            'productsHistory': List<Map<dynamic, dynamic>>.from(userData['productsHistory'] ?? []) ,
+            'days': userData['days'],
+            'payments': userData['payments'],
+            'totalDays': totalDays,
+            'amountPaidTillNow': amountPaidTillNow,
+            // Add other user fields as needed
+          });
+        });
+        dynamic data = event.snapshot.value['attendance']
+            [DateFormat('ddMMyy').format(selectedDate)];
+        setState(() {
+          users = updatedUsers;
+          presentStudentsUID = [];
+        });
+        if (data != null) {
+          Map<dynamic, dynamic> attendanceData =
+              Map<dynamic, dynamic>.from(data as Map<dynamic, dynamic>);
+          List<dynamic> students = attendanceData['students'];
+          if (students.isNotEmpty) {
+            for (var student in students) {
+              presentStudentsUID.add(student);
+              if (users.firstWhere(
+                      (user) => user['id'] == student)['totalDays'] ==
+                  0) {
+                zdays += 1;
+              }
+            }
+          }
+          // get club fees
+          setState(() {
+            clubFees = [];
+            revenue = 0;
+          });
+          dynamic clubFeesData = data['fees'];
+          if (clubFeesData != null) {
+            Map<dynamic, dynamic> clubFeesDataMap = Map<dynamic, dynamic>.from(
+                clubFeesData as Map<dynamic, dynamic>);
+            clubFeesDataMap.forEach((key, clubFeeData) {
+              revenue += clubFeeData['amount'] as int;
+              setState(() {
+                clubFees.add({
+                  'uid': clubFeeData['uid'],
+                  'program': clubFeeData['program'],
+                  'mode': clubFeeData['mode'],
+                  'amount': clubFeeData['amount'],
+                  'balance': clubFeeData['balance'],
+                  'paymentId': key,
+                });
+              });
+            });
+          }
+        }
+      }
+    });
   }
 
   @override
@@ -68,6 +177,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+    _streamSubscription?.cancel();
     super.dispose();
   }
 
@@ -117,6 +227,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     setState(() {
                       selectedDate = date;
                     });
+                    setupDataListener(selectedDate);
                   }
                 });
               },
@@ -200,653 +311,679 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               ),
             ],
           ),
-          body: StreamBuilder(
-              stream: mystream,
-              builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-                if (snapshot.hasData) {
-                  datas += 1;
-                  debugPrint('got data - $datas');
-                  // get users
-                  dynamic usersData = snapshot.data.snapshot.value['users'];
-                  Map<dynamic, dynamic> usersDataMap =
-                      Map<dynamic, dynamic>.from(
-                          usersData as Map<dynamic, dynamic>);
-                  users = [];
-                  usersDataMap.forEach((key, userData) {
-                    if (userData['productsHistory'] != null) {
-                      userData['productsHistory'] =
-                          List<Map<dynamic, dynamic>>.from(
-                              userData['productsHistory']);
-                    } else {
-                      userData['productsHistory'] =
-                          List<Map<dynamic, dynamic>>.from([])
-                              .cast<Map<dynamic, dynamic>>();
-                    }
-                    studentsNameUID[key] = userData['name'];
-                    users.add({
-                      'id': key,
-                      'name': userData['name'],
-                      'phone': userData['phone'],
-                      'balance': userData['balance'],
-                      'productsHistory': userData['productsHistory'],
-                      // Add other user fields as needed
-                    });
-                  });
-                  presentStudentsUID = [];
-                  dynamic data = snapshot.data.snapshot.value['attendance']
-                      [DateFormat('ddMMyy').format(selectedDate)];
-                  if (data != null) {
-                    Map<dynamic, dynamic> attendanceData =
-                        Map<dynamic, dynamic>.from(
-                            data as Map<dynamic, dynamic>);
-                    List<dynamic> students = attendanceData['students'];
-                    presentStudentsUID = List<String>.from(students);
-                    // get club fees
-                    dynamic clubFeesData = data['fees'];
-                    if (clubFeesData != null) {
-                      Map<dynamic, dynamic> clubFeesDataMap =
-                          Map<dynamic, dynamic>.from(
-                              clubFeesData as Map<dynamic, dynamic>);
-                      clubFees = [];
-                      clubFeesDataMap.forEach((key, clubFeeData) {
-                        revenue +=
-                            int.tryParse(clubFeeData['amount'].toString())!;
-                        clubFees.add({
-                          'uid': clubFeeData['uid'],
-                          'program': clubFeeData['program'],
-                          'mode': clubFeeData['mode'],
-                          'amount': clubFeeData['amount'],
-                          'balance': clubFeeData['balance'],
-                        });
-                      });
-                    }
-                  }
-
-                  return Column(
-                    children: [
-                      // 1. search for the user
-                      Padding(
-                        padding: EdgeInsets.all(screenWidth * 0.04),
-                        child: TypeAheadField(
-                          direction: AxisDirection.up,
-                          textFieldConfiguration: TextFieldConfiguration(
-                            autofocus: true,
-                            decoration: InputDecoration(
-                              isDense: true,
-                              labelText: 'Student Name',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+          body: Column(
+            children: [
+              // 1. search for the user
+              Padding(
+                padding: EdgeInsets.only(
+                  left: screenWidth * 0.02,
+                  right: screenWidth * 0.02,
+                  top: screenWidth * 0.01,
+                ),
+                child: Container(
+                  margin: EdgeInsets.only(bottom: screenWidth * 0.02),
+                  child: TypeAheadField(
+                    direction: AxisDirection.up,
+                    textFieldConfiguration: TextFieldConfiguration(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: screenWidth * 0.01,
+                          horizontal:
+                              screenWidth * 0.02, // Add horizontal padding
+                        ),
+                        isDense: true,
+                        labelText: 'Student Name',
+                        // border color grey
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: studentBox,
                           ),
-                          minCharsForSuggestions: 1,
-                          hideOnEmpty: true,
-                          // Suggestions callback for TypeAheadField
-                          suggestionsCallback: (pattern) {
-                            if (users.isNotEmpty) {
-                              return users
-                                  .where((user) =>
-                                      user['name']
-                                          .toString()
-                                          .toLowerCase()
-                                          .contains(pattern.toLowerCase()) ||
-                                      user['phone']
-                                          .toString()
-                                          .toLowerCase()
-                                          .contains(pattern.toLowerCase()))
-                                  .map((user) => {
-                                        'id': user['id'],
-                                        'name': user['name'],
-                                      })
-                                  .toList();
-                            } else {
-                              return [];
-                            }
-                          },
-                          itemBuilder: (context, suggestion) {
-                            return ListTile(
-                              title: Text(
-                                suggestion['name'],
-                                maxLines: 1,
-                                style: GoogleFonts.montserrat(
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                            );
-                          },
-                          onSuggestionSelected: (suggestion) async {
-                            String selectedUserId = suggestion['id'];
-                            if (!presentStudentsUID.contains(selectedUserId)) {
-                              setState(() {
-                                presentStudentsUID.add(selectedUserId);
-                              });
-                            } else {
-                              return;
-                            }
-                            // add to firebase
-                            try {
-                              final DatabaseReference dbRef =
-                                  coachDb.child(cid);
-                              await dbRef
-                                  .child('attendance')
-                                  .child(
-                                      DateFormat('ddMMyy').format(selectedDate))
-                                  .child('students')
-                                  .set(presentStudentsUID);
-                              // add one timestamp in days of student
-                              await dbRef
-                                  .child('users')
-                                  .child(selectedUserId)
-                                  .child('days')
-                                  .set({
-                                DateFormat('ddMMyy').format(selectedDate): true,
-                              });
-                            } catch (e) {
-                              setState(() {
-                                presentStudentsUID.remove(suggestion);
-                              });
-                              Flushbar(
-                                margin: const EdgeInsets.all(7),
-                                borderRadius: BorderRadius.circular(15),
-                                flushbarStyle: FlushbarStyle.FLOATING,
-                                flushbarPosition: FlushbarPosition.TOP,
-                                message:
-                                    "Error adding $suggestion to the attendance list",
-                                icon: Icon(
-                                  Icons.error_outline_rounded,
-                                  size: 28.0,
-                                  color: Colors.red[300],
-                                ),
-                                duration: const Duration(milliseconds: 3000),
-                                leftBarIndicatorColor: Colors.red[300],
-                              ).show(scaffoldKey.currentContext!);
-                            }
-                          },
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: studentBox,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: studentBox,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      Expanded(
-                        child: DataTable2(
-                          columnSpacing: screenWidth * 0.02,
-                          horizontalMargin: screenWidth * 0.02,
-                          border: TableBorder.all(
-                            color: Colors.black12,
-                            width: 1,
+                    ),
+                    minCharsForSuggestions: 1,
+                    hideOnEmpty: true,
+                    // Suggestions callback for TypeAheadField
+                    suggestionsCallback: (pattern) {
+                      if (users.isNotEmpty) {
+                        return users
+                            .where((user) =>
+                                user['name']
+                                    .toString()
+                                    .toLowerCase()
+                                    .contains(pattern.toLowerCase()) ||
+                                user['phone']
+                                    .toString()
+                                    .toLowerCase()
+                                    .contains(pattern.toLowerCase()))
+                            .map((user) => {
+                                  'id': user['id'],
+                                  'name': user['name'],
+                                })
+                            .toList();
+                      } else {
+                        return [];
+                      }
+                    },
+                    itemBuilder: (context, suggestion) {
+                      return ListTile(
+                        title: Text(
+                          suggestion['name'],
+                          maxLines: 1,
+                          style: GoogleFonts.montserrat(
+                            fontWeight: FontWeight.w400,
                           ),
-                          headingTextStyle: GoogleFonts.raleway(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                        ),
+                      );
+                    },
+                    onSuggestionSelected: (suggestion) async {
+                      String selectedUserId = suggestion['id'];
+                      if (!presentStudentsUID.contains(selectedUserId)) {
+                        setState(() {
+                          presentStudentsUID.add(selectedUserId);
+                        });
+                      } else {
+                        return;
+                      }
+                      // add to firebase
+                      try {
+                        final DatabaseReference dbRef = coachDb.child(cid);
+                        // await dbRef
+                        //     .child('attendance')
+                        //     .child(DateFormat('ddMMyy').format(selectedDate))
+                        //     .child('students')
+                        //     .set(presentStudentsUID);
+                        // // add one timestamp in days of student
+                        // await dbRef
+                        //     .child('users')
+                        //     .child(selectedUserId)
+                        //     .child('days')
+                        //     .set({
+                        //   DateFormat('ddMMyy').format(selectedDate): true,
+                        // });
+                        Map<String, dynamic> updates = {
+                          'attendance/${DateFormat('ddMMyy').format(selectedDate)}/students':
+                              presentStudentsUID,
+                          'users/$selectedUserId/days/${DateFormat('ddMMyy').format(selectedDate)}':
+                              ServerValue.timestamp,
+                        };
+                        await dbRef.update(updates);
+                      } catch (e) {
+                        setState(() {
+                          presentStudentsUID.remove(suggestion);
+                        });
+                        Flushbar(
+                          margin: const EdgeInsets.all(7),
+                          borderRadius: BorderRadius.circular(15),
+                          flushbarStyle: FlushbarStyle.FLOATING,
+                          flushbarPosition: FlushbarPosition.TOP,
+                          message:
+                              "Error adding $suggestion to the attendance list",
+                          icon: Icon(
+                            Icons.error_outline_rounded,
+                            size: 28.0,
+                            color: Colors.red[300],
                           ),
-                          dataTextStyle: GoogleFonts.montserrat(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                          headingRowHeight:
-                              MediaQuery.of(context).size.width * 0.045,
-                          dataRowHeight:
-                              MediaQuery.of(context).size.width * 0.045,
-                          headingRowColor:
-                              MaterialStateProperty.all(Colors.grey[200]),
-                          dividerThickness: 1.5,
-                          minWidth: screenWidth * 0.01,
-                          columns: <DataColumn2>[
-                            const DataColumn2(
-                              label: Text('No'),
-                              size: ColumnSize.S,
-                            ),
-                            const DataColumn2(
-                              label: Text('Name'),
-                              size: ColumnSize.L,
-                            ),
-                            const DataColumn2(
-                              label: Text('Type'),
-                              size: ColumnSize.S,
-                            ),
-                            const DataColumn2(
-                              label: Text('Days'),
-                              size: ColumnSize.S,
-                            ),
-                            const DataColumn2(
-                              label: Text('Balance'),
-                              size: ColumnSize.S,
-                            ),
-                            if (isEdit)
-                              const DataColumn2(
-                                label: Text('Delete'),
-                                size: ColumnSize.S,
-                              ),
-                          ],
-                          rows: List<DataRow>.generate(
-                              presentStudentsUID.length, (index) {
-                            // get user
-                            final user = users.firstWhere((user) =>
-                                user['id'] == presentStudentsUID[index]);
-                            String id = user['id'];
-                            String name = user['name'];
-                            String balance = user['balance'].toString();
-                            return DataRow(
-                              cells: <DataCell>[
-                                DataCell(
-                                  Text((index + 1).toString()),
-                                ),
-                                DataCell(
-                                  // get name from users list
-                                  Text(name),
-                                  onLongPress: () {
-                                    // 4. edit the user
-                                    showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: Text(
-                                              '${name.split(' ')[0]}\'s Action'),
-                                          content: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  child: TextButton(
-                                                      onPressed: () {
-                                                        // open a new dialog to enter the cash amount
-                                                        Navigator.of(context)
-                                                            .pop();
-                                                        showDialog(
-                                                          barrierDismissible:
-                                                              true,
-                                                          context: context,
-                                                          builder: (BuildContext
-                                                              cxt) {
-                                                            return SingleChildScrollView(
-                                                              child: Positioned(
-                                                                top: 0,
-                                                                child: StatefulBuilder(
-                                                                    builder:
-                                                                        (context,
-                                                                            setState) {
-                                                                  return Padding(
-                                                                    padding:
-                                                                        const EdgeInsets
-                                                                            .all(
-                                                                            16),
-                                                                    child:
-                                                                        Material(
-                                                                      // color: Colors.green,
-                                                                      shape: RoundedRectangleBorder(
-                                                                          borderRadius:
-                                                                              BorderRadius.circular(15)),
+                          duration: const Duration(milliseconds: 3000),
+                          leftBarIndicatorColor: Colors.red[300],
+                        ).show(scaffoldKey.currentContext!);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              Expanded(
+                child: DataTable2(
+                  columnSpacing: screenWidth * 0.02,
+                  horizontalMargin: screenWidth * 0.02,
+                  border: TableBorder.all(
+                    color: Colors.black12,
+                    width: 1,
+                  ),
+                  headingTextStyle: GoogleFonts.raleway(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                  dataTextStyle: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                  headingRowHeight: MediaQuery.of(context).size.width * 0.045,
+                  dataRowHeight: MediaQuery.of(context).size.width * 0.045,
+                  headingRowColor: MaterialStateProperty.all(Colors.grey[200]),
+                  dividerThickness: 1.5,
+                  minWidth: screenWidth * 0.01,
+                  columns: <DataColumn2>[
+                    const DataColumn2(
+                      label: Text('No'),
+                      size: ColumnSize.S,
+                    ),
+                    const DataColumn2(
+                      label: Text('Name'),
+                      size: ColumnSize.L,
+                    ),
+                    const DataColumn2(
+                      label: Text('Type'),
+                      size: ColumnSize.S,
+                    ),
+                    const DataColumn2(
+                      label: Text('Days'),
+                      size: ColumnSize.S,
+                    ),
+                    const DataColumn2(
+                      label: Text('Balance'),
+                      size: ColumnSize.S,
+                    ),
+                    if (isEdit)
+                      const DataColumn2(
+                        label: Text('Delete'),
+                        size: ColumnSize.S,
+                      ),
+                  ],
+                  rows: List<DataRow>.generate(presentStudentsUID.length,
+                      (index) {
+                    // get user
+                    final user = users.firstWhere(
+                        (user) => user['id'] == presentStudentsUID[index]);
+                    String id = user['id'];
+                    String name = user['name'];
+                    int amountPaidTillNow = user['amountPaidTillNow'];
+                    int day = user['totalDays'];
+
+                    // get all previous days till selected date in user['days']
+
+                    String days = getPlan(day)['day'];
+                    int paid = user['paid'] ?? 0;
+                    int totalBalance = getPlan(day)['balance'];
+                    debugPrint('Total Balance: $totalBalance');
+                    int realBalance = totalBalance - paid;
+                    String balance = realBalance.toString();
+                    // check if its today selected date, check dates not time
+                    if (!(selectedDate.day == today.day &&
+                        selectedDate.month == today.month &&
+                        selectedDate.year == today.year)) {
+                      realBalance = totalBalance - amountPaidTillNow;
+                      balance = realBalance.toString();
+                    }
+
+                    return DataRow(
+                      cells: <DataCell>[
+                        DataCell(
+                          Text((index + 1).toString()),
+                        ),
+                        DataCell(
+                          // get name from users list
+                          Text(name),
+                          onLongPress: () {
+                            // 4. edit the user
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title:
+                                      Text('${name.split(' ')[0]}\'s Action'),
+                                  content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: TextButton(
+                                              onPressed: () {
+                                                // open a new dialog to enter the cash amount
+                                                Navigator.of(context).pop();
+                                                showDialog(
+                                                  barrierDismissible: true,
+                                                  context: context,
+                                                  builder: (BuildContext cxt) {
+                                                    return SingleChildScrollView(
+                                                      child: Positioned(
+                                                        top: 0,
+                                                        child: StatefulBuilder(
+                                                            builder: (context,
+                                                                setState) {
+                                                          return Padding(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(16),
+                                                            child: Material(
+                                                              // color: Colors.green,
+                                                              shape: RoundedRectangleBorder(
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              15)),
+                                                              child: Padding(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .all(
+                                                                        16),
+                                                                child: Column(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Row(
+                                                                      children: [
+                                                                        Expanded(
+                                                                            child:
+                                                                                Container(
+                                                                          margin: const EdgeInsets
+                                                                              .only(
+                                                                              bottom: 10),
+                                                                          child:
+                                                                              const Text(
+                                                                            'Club Fees 💵',
+                                                                            style: TextStyle(
+                                                                                fontSize: 16,
+                                                                                fontWeight: FontWeight.w600,
+                                                                                color: Colors.greenAccent),
+                                                                          ),
+                                                                        )),
+                                                                      ],
+                                                                    ),
+                                                                    Form(
+                                                                      key:
+                                                                          formKey,
+                                                                      autovalidateMode:
+                                                                          AutovalidateMode
+                                                                              .onUserInteraction,
                                                                       child:
-                                                                          Padding(
-                                                                        padding: const EdgeInsets
-                                                                            .all(
-                                                                            16),
-                                                                        child:
-                                                                            Column(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.min,
-                                                                          children: [
-                                                                            Row(
-                                                                              children: [
-                                                                                Expanded(
-                                                                                    child: Container(
-                                                                                  margin: const EdgeInsets.only(bottom: 10),
-                                                                                  child: const Text(
-                                                                                    'Club Fees 💵',
-                                                                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.greenAccent),
+                                                                          Column(
+                                                                        children: [
+                                                                          Row(
+                                                                            children: [
+                                                                              Expanded(
+                                                                                child: TextFormField(
+                                                                                  keyboardType: TextInputType.number,
+                                                                                  controller: amount,
+                                                                                  validator: (value) {
+                                                                                    if (value == null || value.isEmpty) {
+                                                                                      return 'Please enter the amount';
+                                                                                    } else if (int.tryParse(value) == null) {
+                                                                                      return 'Please enter a valid amount';
+                                                                                    } else if (int.tryParse(value)! < -50000) {
+                                                                                      return 'Please enter a valid amount';
+                                                                                    } else if (int.tryParse(value)! > 50000) {
+                                                                                      return 'Please enter a valid amount';
+                                                                                    }
+                                                                                    return null;
+                                                                                  },
+                                                                                  decoration: const InputDecoration(
+                                                                                    contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                    isDense: true,
+                                                                                    labelText: 'Amount (₹)',
                                                                                   ),
-                                                                                )),
-                                                                              ],
-                                                                            ),
-                                                                            Form(
-                                                                              key: formKey,
-                                                                              autovalidateMode: AutovalidateMode.onUserInteraction,
-                                                                              child: Column(
-                                                                                children: [
-                                                                                  Row(
-                                                                                    children: [
-                                                                                      Expanded(
-                                                                                        child: TextFormField(
-                                                                                          keyboardType: TextInputType.number,
-                                                                                          controller: amount,
-                                                                                          validator: (value) {
-                                                                                            if (value == null || value.isEmpty) {
-                                                                                              return 'Please enter the amount';
-                                                                                            } else if (int.tryParse(value) == null) {
-                                                                                              return 'Please enter a valid amount';
-                                                                                            } else if (int.tryParse(value)! < -50000) {
-                                                                                              return 'Please enter a valid amount';
-                                                                                            } else if (int.tryParse(value)! > 50000) {
-                                                                                              return 'Please enter a valid amount';
-                                                                                            }
-                                                                                            return null;
-                                                                                          },
-                                                                                          decoration: const InputDecoration(
-                                                                                            contentPadding: EdgeInsets.zero, // Remove any content padding
-                                                                                            isDense: true,
-                                                                                            labelText: 'Amount (₹)',
-                                                                                          ),
-                                                                                        ),
-                                                                                      ),
-                                                                                      const SizedBox(
-                                                                                        width: 10,
-                                                                                      ),
-                                                                                      // select plan dropdown
-                                                                                      Expanded(
-                                                                                        child: DropdownButtonFormField<String>(
-                                                                                          decoration: const InputDecoration(
-                                                                                            contentPadding: EdgeInsets.zero, // Remove any content padding
-                                                                                            isDense: true,
-                                                                                            labelText: 'Mode',
-                                                                                          ),
-                                                                                          value: initalMode,
-                                                                                          items: [
-                                                                                            'Cash',
-                                                                                            'Online',
-                                                                                            'Cheque',
-                                                                                          ].map((String value) {
-                                                                                            return DropdownMenuItem<String>(
-                                                                                              value: value,
-                                                                                              child: Text(value),
-                                                                                            );
-                                                                                          }).toList(),
-                                                                                          onChanged: (String? newValue) {
-                                                                                            setState(() {
-                                                                                              initalMode = newValue ?? '';
-                                                                                            });
-                                                                                          },
-                                                                                        ),
-                                                                                      ),
-                                                                                    ],
-                                                                                  ),
-                                                                                  Row(
-                                                                                    children: [
-                                                                                      Expanded(
-                                                                                        child: DropdownButtonFormField<String>(
-                                                                                          decoration: const InputDecoration(
-                                                                                            labelText: 'Program',
-                                                                                          ),
-                                                                                          value: initalPlan,
-                                                                                          items: [
-                                                                                            '0 day',
-                                                                                            '3 day',
-                                                                                            'Gold UMS',
-                                                                                            'Plat UMS',
-                                                                                            'Other', // Add 'Other' option
-                                                                                          ].map((String value) {
-                                                                                            return DropdownMenuItem<String>(
-                                                                                              value: value,
-                                                                                              child: Text(value),
-                                                                                            );
-                                                                                          }).toList(),
-                                                                                          onChanged: (String? newValue) {
-                                                                                            debugPrint('New Value: $newValue');
-                                                                                            setState(() {
-                                                                                              initalPlan = newValue ?? '';
-                                                                                            });
-                                                                                          },
-                                                                                        ),
-                                                                                      ),
-                                                                                      if (initalPlan == 'Other')
-                                                                                        Expanded(
-                                                                                          child: Container(
-                                                                                            margin: const EdgeInsets.only(left: 10),
-                                                                                            child: TextFormField(
-                                                                                              controller: customPlan,
-                                                                                              decoration: const InputDecoration(
-                                                                                                labelText: 'Custom Plan',
-                                                                                              ),
-                                                                                              validator: (value) {
-                                                                                                if (value == null || value.isEmpty) {
-                                                                                                  return 'Please enter the plan';
-                                                                                                } else if (value.length < 3) {
-                                                                                                  return 'Please enter a valid plan';
-                                                                                                }
-                                                                                                return null;
-                                                                                              },
-                                                                                            ),
-                                                                                          ),
-                                                                                        ),
-                                                                                    ],
-                                                                                  ),
-                                                                                  // 2 buttons
-                                                                                ],
+                                                                                ),
                                                                               ),
-                                                                            ),
-                                                                            Row(
-                                                                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                                                              children: [
-                                                                                Expanded(
-                                                                                  child: TextButton(
-                                                                                    onPressed: () {
-                                                                                      Navigator.of(context).pop();
-                                                                                    },
-                                                                                    child: const Text('Cancel'),
+                                                                              const SizedBox(
+                                                                                width: 10,
+                                                                              ),
+                                                                              // select plan dropdown
+                                                                              Expanded(
+                                                                                child: DropdownButtonFormField<String>(
+                                                                                  decoration: const InputDecoration(
+                                                                                    contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                    isDense: true,
+                                                                                    labelText: 'Mode',
                                                                                   ),
+                                                                                  value: initalMode,
+                                                                                  items: [
+                                                                                    'Cash',
+                                                                                    'Online',
+                                                                                    'Cheque',
+                                                                                  ].map((String value) {
+                                                                                    return DropdownMenuItem<String>(
+                                                                                      value: value,
+                                                                                      child: Text(value),
+                                                                                    );
+                                                                                  }).toList(),
+                                                                                  onChanged: (String? newValue) {
+                                                                                    setState(() {
+                                                                                      initalMode = newValue ?? '';
+                                                                                    });
+                                                                                  },
                                                                                 ),
+                                                                              ),
+                                                                            ],
+                                                                          ),
+                                                                          Row(
+                                                                            children: [
+                                                                              Expanded(
+                                                                                child: DropdownButtonFormField<String>(
+                                                                                  decoration: const InputDecoration(
+                                                                                    labelText: 'Program',
+                                                                                  ),
+                                                                                  value: initalPlan,
+                                                                                  items: [
+                                                                                    '0 day',
+                                                                                    '3 day',
+                                                                                    'Gold UMS',
+                                                                                    'Plat UMS',
+                                                                                    'Other', // Add 'Other' option
+                                                                                  ].map((String value) {
+                                                                                    return DropdownMenuItem<String>(
+                                                                                      value: value,
+                                                                                      child: Text(value),
+                                                                                    );
+                                                                                  }).toList(),
+                                                                                  onChanged: (String? newValue) {
+                                                                                    debugPrint('New Value: $newValue');
+                                                                                    setState(() {
+                                                                                      initalPlan = newValue ?? '';
+                                                                                    });
+                                                                                  },
+                                                                                ),
+                                                                              ),
+                                                                              if (initalPlan == 'Other')
                                                                                 Expanded(
-                                                                                  child: TextButton(
-                                                                                    onPressed: () async {
-                                                                                      if (formKey.currentState!.validate() && !submitted) {
-                                                                                        changeSubmitted();
-                                                                                        // save the data
-                                                                                        // save to firebase
-                                                                                        // add to firebase
-                                                                                        try {
-                                                                                          if (initalPlan == 'Other') {
-                                                                                            initalPlan = customPlan.text.trim();
-                                                                                          }
-                                                                                          // balance
-                                                                                          int newBalance = int.parse(balance) - int.parse(amount.text.trim());
-                                                                                          final DatabaseReference dbRef = coachDb.child(cid);
-                                                                                          await dbRef.child('attendance').child(DateFormat('ddMMyy').format(selectedDate)).child('fees').push().set({
-                                                                                            'uid': id,
-                                                                                            'program': initalPlan,
-                                                                                            'amount': int.parse(amount.text.trim()),
-                                                                                            'mode': initalMode,
-                                                                                            'balance': newBalance,
-                                                                                          });
-                                                                                          // set user balance
-                                                                                          await dbRef.child('users').child(id).update({
-                                                                                            'balance': newBalance,
-                                                                                          });
-                                                                                          amount.clear();
-                                                                                          Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                          changeSubmitted();
-                                                                                        } catch (e) {
-                                                                                          Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                          Flushbar(
-                                                                                            margin: const EdgeInsets.all(7),
-                                                                                            borderRadius: BorderRadius.circular(15),
-                                                                                            flushbarStyle: FlushbarStyle.FLOATING,
-                                                                                            flushbarPosition: FlushbarPosition.TOP,
-                                                                                            message: "Please check the data and try again or contact support",
-                                                                                            icon: Icon(
-                                                                                              Icons.error_outline_rounded,
-                                                                                              size: 28.0,
-                                                                                              color: Colors.red[300],
-                                                                                            ),
-                                                                                            duration: const Duration(milliseconds: 3000),
-                                                                                            leftBarIndicatorColor: Colors.red[300],
-                                                                                          ).show(scaffoldKey.currentContext!);
-                                                                                          changeSubmitted();
+                                                                                  child: Container(
+                                                                                    margin: const EdgeInsets.only(left: 10),
+                                                                                    child: TextFormField(
+                                                                                      controller: customPlan,
+                                                                                      decoration: const InputDecoration(
+                                                                                        labelText: 'Custom Plan',
+                                                                                      ),
+                                                                                      validator: (value) {
+                                                                                        if (value == null || value.isEmpty) {
+                                                                                          return 'Please enter the plan';
+                                                                                        } else if (value.length < 3) {
+                                                                                          return 'Please enter a valid plan';
                                                                                         }
-                                                                                      }
-                                                                                    },
-                                                                                    child: const Text('Save'),
+                                                                                        return null;
+                                                                                      },
+                                                                                    ),
                                                                                   ),
                                                                                 ),
-                                                                              ],
-                                                                            ),
-                                                                          ],
-                                                                        ),
+                                                                            ],
+                                                                          ),
+                                                                          // 2 buttons
+                                                                        ],
                                                                       ),
                                                                     ),
-                                                                  );
-                                                                }),
+                                                                    Row(
+                                                                      mainAxisAlignment:
+                                                                          MainAxisAlignment
+                                                                              .spaceAround,
+                                                                      crossAxisAlignment:
+                                                                          CrossAxisAlignment
+                                                                              .center,
+                                                                      children: [
+                                                                        Expanded(
+                                                                          child:
+                                                                              TextButton(
+                                                                            onPressed:
+                                                                                () {
+                                                                              Navigator.of(context).pop();
+                                                                            },
+                                                                            child:
+                                                                                const Text('Cancel'),
+                                                                          ),
+                                                                        ),
+                                                                        Expanded(
+                                                                          child:
+                                                                              TextButton(
+                                                                            onPressed:
+                                                                                () async {
+                                                                              if (formKey.currentState!.validate() && !submitted) {
+                                                                                changeSubmitted();
+                                                                                // save the data
+                                                                                // save to firebase
+                                                                                // add to firebase
+                                                                                try {
+                                                                                  if (initalPlan == 'Other') {
+                                                                                    initalPlan = customPlan.text.trim();
+                                                                                  }
+                                                                                  // balance
+                                                                                  const time = ServerValue.timestamp;
+                                                                                  final int payAmount = int.parse(amount.text.trim());
+                                                                                  final DatabaseReference dbRef = coachDb.child(cid);
+                                                                                  String newPaymentId = FirebaseDatabase.instance.ref().push().key!;
+                                                                                  final Map<String, dynamic> updates = {
+                                                                                    // Set club fees
+                                                                                    'attendance/${DateFormat('ddMMyy').format(selectedDate)}/fees/$newPaymentId': {
+                                                                                      'uid': id,
+                                                                                      'program': initalPlan,
+                                                                                      'amount': payAmount,
+                                                                                      'mode': initalMode,
+                                                                                      'balance': realBalance - payAmount,
+                                                                                      'time': time,
+                                                                                    },
+                                                                                    // Set user payments
+                                                                                    'users/$id/payments/${DateFormat('ddMMyy').format(selectedDate)}': {
+                                                                                      newPaymentId: {
+                                                                                        'date': DateFormat('ddMMyy').format(selectedDate),
+                                                                                        'time': time,
+                                                                                        'amount': payAmount,
+                                                                                        'mode': initalMode,
+                                                                                        'program': initalPlan,
+                                                                                      },
+                                                                                      "totalAmount": ServerValue.increment(payAmount),
+                                                                                    },
+                                                                                    // Increment user's total paid amount
+                                                                                    'users/$id/paid': ServerValue.increment(payAmount),
+                                                                                  };
+                                                                                  await dbRef.update(updates);
+                                                                                  amount.clear();
+                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                  changeSubmitted();
+                                                                                } catch (e) {
+                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                  Flushbar(
+                                                                                    margin: const EdgeInsets.all(7),
+                                                                                    borderRadius: BorderRadius.circular(15),
+                                                                                    flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                    flushbarPosition: FlushbarPosition.TOP,
+                                                                                    message: "Please check the data and try again or contact support",
+                                                                                    icon: Icon(
+                                                                                      Icons.error_outline_rounded,
+                                                                                      size: 28.0,
+                                                                                      color: Colors.red[300],
+                                                                                    ),
+                                                                                    duration: const Duration(milliseconds: 3000),
+                                                                                    leftBarIndicatorColor: Colors.red[300],
+                                                                                  ).show(scaffoldKey.currentContext!);
+                                                                                  changeSubmitted();
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            child:
+                                                                                const Text('Save'),
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ],
+                                                                ),
                                                               ),
-                                                            );
-                                                          },
-                                                        );
-                                                      },
-                                                      child: const Text(
-                                                          'Club Fees 💵',
-                                                          style: TextStyle(
-                                                              color: Colors
-                                                                  .black87))),
-                                                ),
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  child: TextButton(
-                                                      onPressed:
-                                                          // snack bar
-                                                          () {
-                                                        Navigator.push(
-                                                          context,
-                                                          MaterialPageRoute(
-                                                            builder: (context) =>
-                                                                CustOrderForm(
-                                                              uid: id,
-                                                              productsHistory: user[
-                                                                  'productsHistory'],
-                                                              name: name,
-                                                              popIndex: 2,
-                                                              attendance: true,
                                                             ),
-                                                          ),
-                                                        );
-                                                      },
-                                                      child: const Text(
-                                                          'Retail 🛍️',
-                                                          style: TextStyle(
-                                                              color: Colors
-                                                                  .black87))),
-                                                ),
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  child: TextButton(
-                                                      onPressed:
-                                                          // snack bar
-                                                          () {
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content:
-                                                                Text('Retail'),
-                                                            duration: Duration(
-                                                                seconds: 2),
-                                                          ),
-                                                        );
-                                                      },
-                                                      child: const Text(
-                                                          'Home Program 🏠',
-                                                          style: TextStyle(
-                                                              color: Colors
-                                                                  .black87))),
-                                                ),
-                                              ]),
-                                        );
-                                      },
+                                                          );
+                                                        }),
+                                                      ),
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                              child: const Text('Club Fees 💵',
+                                                  style: TextStyle(
+                                                      color: Colors.black87))),
+                                        ),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: TextButton(
+                                              onPressed:
+                                                  // snack bar
+                                                  () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        CustOrderForm(
+                                                      uid: id,
+                                                      productsHistory: user[
+                                                          'productsHistory'],
+                                                      name: name,
+                                                      popIndex: 2,
+                                                      attendance: true,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              child: const Text('Retail 🛍️',
+                                                  style: TextStyle(
+                                                      color: Colors.black87))),
+                                        ),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: TextButton(
+                                              onPressed:
+                                                  // snack bar
+                                                  () {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Retail'),
+                                                    duration:
+                                                        Duration(seconds: 2),
+                                                  ),
+                                                );
+                                              },
+                                              child: const Text(
+                                                  'Home Program 🏠',
+                                                  style: TextStyle(
+                                                      color: Colors.black87))),
+                                        ),
+                                      ]),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                        DataCell(
+                          Text(getPlan(day)['plan']),
+                        ),
+                        DataCell(
+                          Text(days,
+                              style: const TextStyle(letterSpacing: 1.8)),
+                        ),
+                        DataCell(
+                          Text(balance,
+                              style: TextStyle(
+                                  color: int.tryParse(balance) == 0
+                                      ? Colors.black
+                                      : Colors.red)),
+                        ),
+                        if (isEdit)
+                          DataCell(
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                // ask for confirmation
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('Confirmation'),
+                                      content: Text(
+                                          'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?'),
+                                      actions: [
+                                        TextButton(
+                                          child: const Text('Cancel'),
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                        TextButton(
+                                          child: const Text('Delete'),
+                                          onPressed: () {
+                                            // delete from firebase
+                                            final DatabaseReference dbRef =
+                                                coachDb.child(cid);
+                                            dbRef
+                                                .child('attendance')
+                                                .child(DateFormat('ddMMyy')
+                                                    .format(selectedDate))
+                                                .child('students')
+                                                .set(presentStudentsUID
+                                                    .where((uid) =>
+                                                        uid !=
+                                                        presentStudentsUID[
+                                                            index])
+                                                    .toList());
+                                            dbRef
+                                                .child('users')
+                                                .child(
+                                                    presentStudentsUID[index])
+                                                .child('days')
+                                                .child(DateFormat('ddMMyy')
+                                                    .format(selectedDate))
+                                                .remove();
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                      ],
                                     );
                                   },
-                                ),
-                                const DataCell(
-                                  Text('UMS'),
-                                ),
-                                const DataCell(
-                                  Text('25/30',
-                                      style: TextStyle(letterSpacing: 1.8)),
-                                ),
-                                DataCell(
-                                  Text(balance,
-                                      style: TextStyle(
-                                          color: int.tryParse(balance) == 0
-                                              ? Colors.black
-                                              : Colors.red)),
-                                ),
-                                if (isEdit)
-                                  DataCell(
-                                    IconButton(
-                                      icon: const Icon(Icons.delete,
-                                          color: Colors.red),
-                                      onPressed: () {
-                                        // ask for confirmation
-                                        showDialog(
-                                          context: context,
-                                          builder: (BuildContext context) {
-                                            return AlertDialog(
-                                              title: const Text('Confirmation'),
-                                              content: Text(
-                                                  'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?'),
-                                              actions: [
-                                                TextButton(
-                                                  child: const Text('Cancel'),
-                                                  onPressed: () {
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                ),
-                                                TextButton(
-                                                  child: const Text('Delete'),
-                                                  onPressed: () {
-                                                    // delete from firebase
-                                                    final DatabaseReference
-                                                        dbRef =
-                                                        coachDb.child(cid);
-                                                    dbRef
-                                                        .child('attendance')
-                                                        .child(DateFormat(
-                                                                'ddMMyy')
-                                                            .format(
-                                                                selectedDate))
-                                                        .child('students')
-                                                        .set(presentStudentsUID
-                                                            .where((uid) =>
-                                                                uid !=
-                                                                presentStudentsUID[
-                                                                    index])
-                                                            .toList());
-                                                    dbRef
-                                                        .child('users')
-                                                        .child(
-                                                            presentStudentsUID[
-                                                                index])
-                                                        .child('days')
-                                                        .child(DateFormat(
-                                                                'ddMMyy')
-                                                            .format(
-                                                                selectedDate))
-                                                        .remove();
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        );
-                                      },
-                                    ),
-                                  ),
-                              ],
-                            );
-                          }),
-                        ),
-                      ),
-                    ],
-                  );
-                } else if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Error'),
-                  );
-                } else {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-              }),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
+  }
+
+  Map<String, dynamic> getPlan(int days,
+      {int? assignedPlanDays, String? planName}) {
+    String plan;
+    String day;
+    int balance = 200;
+
+    if (days == 0 || days == 1) {
+      plan = '0 day';
+      day = '$days / 1';
+    } else if (days >= 2 && days < 5) {
+      plan = '3 day'; // Change this value as needed
+      day = '${days - 1} / 3';
+      for (int i = 1; i < days; i++) {
+        balance += 240;
+      }
+    } else {
+      if (assignedPlanDays != null && planName != null) {
+        plan = planName;
+        day = '${days - 1} / $assignedPlanDays';
+      } else {
+        plan = 'Gold UMS'; // Change this value as needed
+        day = '${days - 4} / 30';
+      }
+      for (int i = 1; i < days; i++) {
+        balance += 240;
+      }
+    }
+
+    return {'plan': plan, 'day': day, 'balance': balance};
   }
 }
 
@@ -876,7 +1013,12 @@ class DailyDetails extends StatefulWidget {
 class _DailyDetailsState extends State<DailyDetails> {
 // create date variable and set it to widget.selectedDate
   late DateTime selectedDate;
+  bool isEdit = false;
+  final String cid = FirebaseAuth.instance.currentUser!.uid;
   List<Map<dynamic, dynamic>> todaysProductsHistory = [];
+  final DatabaseReference coachDb =
+      FirebaseDatabase.instance.ref().child('Coaches');
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   @override
   void initState() {
     super.initState();
@@ -903,6 +1045,7 @@ class _DailyDetailsState extends State<DailyDetails> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: scaffoldKey,
       appBar: MyAppBar(
         leftIcon: Container(
           margin: const EdgeInsets.only(left: 10),
@@ -966,6 +1109,19 @@ class _DailyDetailsState extends State<DailyDetails> {
                 duration: const Duration(milliseconds: 2000),
                 leftBarIndicatorColor: Colors.green[300],
               ).show(context);
+            },
+          ),
+
+          // edit button
+          IconButton(
+            icon: Icon(
+              isEdit ? Icons.edit_off_rounded : Icons.edit_rounded,
+              color: Colors.grey,
+            ),
+            onPressed: () {
+              setState(() {
+                isEdit = !isEdit;
+              });
             },
           ),
           SizedBox(
@@ -1119,22 +1275,27 @@ class _DailyDetailsState extends State<DailyDetails> {
                       width: 1,
                     ),
                     horizontalMargin: MediaQuery.of(context).size.width * 0.02,
-                    columns: const <DataColumn>[
-                      DataColumn(
+                    columns: <DataColumn>[
+                      const DataColumn(
                         label: Text('Name'),
                       ),
-                      DataColumn(
+                      const DataColumn(
                         label: Text('Program'),
                       ),
-                      DataColumn(
+                      const DataColumn(
                         label: Text('Mode'),
                       ),
-                      DataColumn(
+                      const DataColumn(
                         label: Text('Amount'),
                       ),
-                      DataColumn(
+                      const DataColumn(
                         label: Text('C. Balance'),
                       ),
+                      if (isEdit)
+                        const DataColumn2(
+                          label: Text('Delete'),
+                          size: ColumnSize.S,
+                        ),
                     ],
                     rows:
                         List<DataRow>.generate(widget.clubFees.length, (index) {
@@ -1155,7 +1316,117 @@ class _DailyDetailsState extends State<DailyDetails> {
                             style: TextStyle(
                                 color: widget.clubFees[index]['balance'] >= 0
                                     ? Colors.black
-                                    : Colors.red)))
+                                    : Colors.red))),
+                        if (isEdit)
+                          DataCell(
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                // ask for confirmation
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('Confirmation'),
+                                      content: Text(
+                                          'Are you sure you want to delete "${name.split(' ')[0]}\'s" payment?'),
+                                      actions: [
+                                        TextButton(
+                                          child: const Text('Cancel'),
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                        TextButton(
+                                          child: const Text('Delete'),
+                                          onPressed: () async {
+                                            // get payment id
+                                            try {
+                                              final DatabaseReference dbRef =
+                                                  coachDb.child(cid);
+                                              final String uid =
+                                                  widget.clubFees[index]['uid'];
+                                              final String paymentId = widget
+                                                  .clubFees[index]['paymentId'];
+                                              debugPrint('UID: $uid');
+
+                                              // delete from firebase
+                                              final Map<String, dynamic>
+                                                  updates = {
+                                                // delete from club fees
+                                                'attendance/${DateFormat('ddMMyy').format(selectedDate)}/fees/$paymentId':
+                                                    null,
+                                                // delete from user payments
+                                                'users/$uid/payments/$paymentId':
+                                                    null,
+                                                // decrement user's total paid amount
+                                                'users/$uid/paid':
+                                                    ServerValue.increment(
+                                                        -int.parse(amount)),
+                                              };
+                                              await dbRef.update(updates);
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message:
+                                                    "Payment deleted successfully",
+                                                icon: Icon(
+                                                  Icons.check_circle_outline,
+                                                  size: 28.0,
+                                                  color: Colors.green[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 2000),
+                                                leftBarIndicatorColor:
+                                                    Colors.green[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            } catch (e) {
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message:
+                                                    "Please check the data and try again or contact support",
+                                                icon: Icon(
+                                                  Icons.error_outline_rounded,
+                                                  size: 28.0,
+                                                  color: Colors.red[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 3000),
+                                                leftBarIndicatorColor:
+                                                    Colors.red[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
                       ]);
                     }),
                   ),
@@ -1289,8 +1560,6 @@ class _DailyDetailsState extends State<DailyDetails> {
       ),
     );
   }
-
-  void showCustomDialog(BuildContext context, String message) {}
 }
 
 class GradientBox extends StatelessWidget {

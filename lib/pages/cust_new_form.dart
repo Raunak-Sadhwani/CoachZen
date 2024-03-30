@@ -281,7 +281,7 @@ class _CustNewFormState extends State<CustNewForm> {
                   'email': _emailController.text.trim(),
                   'created': realtime,
                   'cid': cid,
-                  'balance': 200,
+                  // 'paid': 0,
                 };
 
                 String? newUserUid = FirebaseDatabase.instance.ref().push().key;
