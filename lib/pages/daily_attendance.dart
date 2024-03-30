@@ -47,6 +47,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   String initalMode = 'Cash';
   bool submitted = false;
   Color studentBox = const Color.fromARGB(255, 189, 189, 189);
+  late String formattedDate;
 
   void changeSubmitted() {
     setState(() {
@@ -57,7 +58,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   @override
   void initState() {
     super.initState();
-
     // Force landscape orientation
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
@@ -69,6 +69,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   void setupDataListener(DateTime selectedDate) {
     // Close the previous listener if it exists
     _streamSubscription?.cancel();
+    formattedDate = DateFormat('ddMMyy').format(selectedDate);
 
     mystream = coachDb.child(cid).onValue;
     // Set up the new listener
@@ -76,20 +77,16 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       if (mounted) {
         datas += 1;
         debugPrint('got data - $datas');
-        // get users
-        dynamic usersData = event.snapshot.value['users'];
-        Map<dynamic, dynamic> usersDataMap =
-            Map<dynamic, dynamic>.from(usersData as Map<dynamic, dynamic>);
-        setState(() {
-          users = [];
-          zdays = 0;
-        });
-        final List<Map<String, dynamic>> updatedUsers = [];
-        usersDataMap.forEach((key, userData) {
-          // int totalDays = -1;
-          // int day = -1;
-          // int amountPaidTillNow = 0;
-          final allDays = (userData['days'] as Map?)?.entries.where((entry) {
+        final eventData = event.snapshot.value;
+
+        // Process users data
+        final usersData = eventData['users'] ?? {};
+        final updatedUsers = usersData.entries.map((entry) {
+          final key = entry.key;
+          final userData = entry.value;
+          studentsNameUID[key] = userData['name'];
+
+          final allDays = ((userData['days'] as Map?)?.entries.where((entry) {
                 final dateString = entry.key.toString();
                 final dayx = int.parse(dateString.substring(0, 2));
                 final month = int.parse(dateString.substring(2, 4));
@@ -97,9 +94,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 final keyDate = DateTime(year, month, dayx);
                 return keyDate.isBefore(selectedDate) ||
                     keyDate.isAtSameMomentAs(selectedDate);
-              }).length ??
+              }).length) ??
               0;
-          final totalDays = allDays - 1;
+          final totalDays = allDays == 0 ? 0 : allDays - 1;
 
           final userPayments = Map.from(userData['payments'] ?? {});
           final amountPaidTillNow = userPayments.values.fold(0, (sum, payment) {
@@ -109,63 +106,62 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             }
             return sum;
           });
-          studentsNameUID[key] = userData['name'];
-          updatedUsers.add({
+
+          return {
             'id': key,
             'name': userData['name'],
             'phone': userData['phone'],
             'paid': userData['paid'],
-            'productsHistory': List<Map<dynamic, dynamic>>.from(userData['productsHistory'] ?? []) ,
+            'productsHistory': List<Map<dynamic, dynamic>>.from(
+                userData['productsHistory'] ?? []),
             'days': userData['days'],
             'payments': userData['payments'],
             'totalDays': totalDays,
             'amountPaidTillNow': amountPaidTillNow,
             // Add other user fields as needed
-          });
-        });
-        dynamic data = event.snapshot.value['attendance']
-            [DateFormat('ddMMyy').format(selectedDate)];
+          };
+        }).toList();
+
+        // Process attendance data
+        final attendanceData = eventData['attendance'] != null
+            ? eventData['attendance'][formattedDate]
+            : null;
+        final presentStudents = attendanceData != null
+            ? List<String>.from(attendanceData['students'] ?? [])
+            : <String>[];
+
+        // Update state
         setState(() {
           users = updatedUsers;
-          presentStudentsUID = [];
-        });
-        if (data != null) {
-          Map<dynamic, dynamic> attendanceData =
-              Map<dynamic, dynamic>.from(data as Map<dynamic, dynamic>);
-          List<dynamic> students = attendanceData['students'];
-          if (students.isNotEmpty) {
-            for (var student in students) {
-              presentStudentsUID.add(student);
-              if (users.firstWhere(
+          presentStudentsUID = presentStudents;
+          zdays = presentStudents
+              .where((student) =>
+                  users.firstWhere(
                       (user) => user['id'] == student)['totalDays'] ==
-                  0) {
-                zdays += 1;
-              }
-            }
-          }
-          // get club fees
-          setState(() {
-            clubFees = [];
-            revenue = 0;
-          });
-          dynamic clubFeesData = data['fees'];
-          if (clubFeesData != null) {
-            Map<dynamic, dynamic> clubFeesDataMap = Map<dynamic, dynamic>.from(
-                clubFeesData as Map<dynamic, dynamic>);
-            clubFeesDataMap.forEach((key, clubFeeData) {
-              revenue += clubFeeData['amount'] as int;
-              setState(() {
-                clubFees.add({
-                  'uid': clubFeeData['uid'],
-                  'program': clubFeeData['program'],
-                  'mode': clubFeeData['mode'],
-                  'amount': clubFeeData['amount'],
-                  'balance': clubFeeData['balance'],
-                  'paymentId': key,
-                });
+                  0)
+              .length;
+          clubFees = [];
+          revenue = 0;
+        });
+
+        // Process club fees data
+        final clubFeesData =
+            attendanceData != null ? attendanceData['fees'] : null;
+        if (clubFeesData != null) {
+          final clubFeesDataMap = Map<String, dynamic>.from(clubFeesData);
+          clubFeesDataMap.forEach((key, clubFeeData) {
+            setState(() {
+              clubFees.add({
+                'uid': clubFeeData['uid'],
+                'program': clubFeeData['program'],
+                'mode': clubFeeData['mode'],
+                'amount': clubFeeData['amount'],
+                'balance': clubFeeData['balance'],
+                'paymentId': key,
               });
+              revenue += clubFeeData['amount'] as int;
             });
-          }
+          });
         }
       }
     });
@@ -402,23 +398,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       // add to firebase
                       try {
                         final DatabaseReference dbRef = coachDb.child(cid);
-                        // await dbRef
-                        //     .child('attendance')
-                        //     .child(DateFormat('ddMMyy').format(selectedDate))
-                        //     .child('students')
-                        //     .set(presentStudentsUID);
-                        // // add one timestamp in days of student
-                        // await dbRef
-                        //     .child('users')
-                        //     .child(selectedUserId)
-                        //     .child('days')
-                        //     .set({
-                        //   DateFormat('ddMMyy').format(selectedDate): true,
-                        // });
                         Map<String, dynamic> updates = {
-                          'attendance/${DateFormat('ddMMyy').format(selectedDate)}/students':
+                          'attendance/$formattedDate/students':
                               presentStudentsUID,
-                          'users/$selectedUserId/days/${DateFormat('ddMMyy').format(selectedDate)}':
+                          'users/$selectedUserId/days/$formattedDate':
                               ServerValue.timestamp,
                         };
                         await dbRef.update(updates);
@@ -756,7 +739,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   String newPaymentId = FirebaseDatabase.instance.ref().push().key!;
                                                                                   final Map<String, dynamic> updates = {
                                                                                     // Set club fees
-                                                                                    'attendance/${DateFormat('ddMMyy').format(selectedDate)}/fees/$newPaymentId': {
+                                                                                    'attendance/$formattedDate/fees/$newPaymentId': {
                                                                                       'uid': id,
                                                                                       'program': initalPlan,
                                                                                       'amount': payAmount,
@@ -765,9 +748,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                       'time': time,
                                                                                     },
                                                                                     // Set user payments
-                                                                                    'users/$id/payments/${DateFormat('ddMMyy').format(selectedDate)}': {
+                                                                                    'users/$id/payments/$formattedDate': {
                                                                                       newPaymentId: {
-                                                                                        'date': DateFormat('ddMMyy').format(selectedDate),
+                                                                                        'date': formattedDate,
                                                                                         'time': time,
                                                                                         'amount': payAmount,
                                                                                         'mode': initalMode,
@@ -914,25 +897,42 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                             // delete from firebase
                                             final DatabaseReference dbRef =
                                                 coachDb.child(cid);
-                                            dbRef
-                                                .child('attendance')
-                                                .child(DateFormat('ddMMyy')
-                                                    .format(selectedDate))
-                                                .child('students')
-                                                .set(presentStudentsUID
-                                                    .where((uid) =>
-                                                        uid !=
-                                                        presentStudentsUID[
-                                                            index])
-                                                    .toList());
-                                            dbRef
-                                                .child('users')
-                                                .child(
-                                                    presentStudentsUID[index])
-                                                .child('days')
-                                                .child(DateFormat('ddMMyy')
-                                                    .format(selectedDate))
-                                                .remove();
+                                            Map<String, dynamic> updates = {
+                                              'attendance/$formattedDate/students':
+                                                  presentStudentsUID
+                                                      .where((uid) =>
+                                                          uid !=
+                                                          presentStudentsUID[
+                                                              index])
+                                                      .toList(),
+                                              'users/${presentStudentsUID[index]}/days/$formattedDate':
+                                                  null,
+                                            };
+                                            try {
+                                              dbRef.update(updates);
+                                            } catch (e) {
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message:
+                                                    "Error deleting ${name.split(' ')[0]} from the attendance list",
+                                                icon: Icon(
+                                                  Icons.error_outline_rounded,
+                                                  size: 28.0,
+                                                  color: Colors.red[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 3000),
+                                                leftBarIndicatorColor:
+                                                    Colors.red[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            }
                                             Navigator.of(context).pop();
                                           },
                                         ),
