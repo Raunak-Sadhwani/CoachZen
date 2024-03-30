@@ -2,10 +2,12 @@
 
 import 'package:another_flushbar/flushbar.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:coach_zen/pages/daily_attendance.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
@@ -17,6 +19,7 @@ class CustOrderForm extends StatefulWidget {
   final List<Map<dynamic, dynamic>> productsHistory;
   final int popIndex;
   final int? index;
+  final bool? attendance;
   const CustOrderForm({
     Key? key,
     required this.name,
@@ -24,6 +27,7 @@ class CustOrderForm extends StatefulWidget {
     required this.productsHistory,
     required this.popIndex,
     this.index,
+    this.attendance,
   }) : super(key: key);
 
   @override
@@ -87,6 +91,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
   @override
   void initState() {
     super.initState();
+    if (widget.attendance != null) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
     if (widget.index == null) {
       for (var _ in tempList) {
         final productNameController = TextEditingController();
@@ -191,7 +201,16 @@ class _CustOrderFormState extends State<CustOrderForm> {
         leftIcon: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           color: Colors.black26,
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (widget.attendance != null) {
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const DailyAttendance()));
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
         rightIcons: [
           IconButton(

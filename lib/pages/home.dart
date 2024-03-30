@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:coach_zen/pages/daily_attendance.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -648,12 +649,28 @@ class HomeButton extends StatelessWidget {
   }
 }
 
-class NewCustWrapper extends StatelessWidget {
+class NewCustWrapper extends StatefulWidget {
   final bool? attendance;
   const NewCustWrapper({
     Key? key,
     this.attendance,
   }) : super(key: key);
+
+  @override
+  State<NewCustWrapper> createState() => _NewCustWrapperState();
+}
+
+class _NewCustWrapperState extends State<NewCustWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.attendance != null) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -667,15 +684,14 @@ class NewCustWrapper extends StatelessWidget {
           child: IconButton(
             icon: const Icon(Icons.arrow_back_ios),
             color: Colors.black26,
-            onPressed: () {
-              Navigator.pop(context);
-              if (attendance != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DailyAttendance(),
-                  ),
-                );
+            onPressed: () async {
+              if (widget.attendance != null) {
+                Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const DailyAttendance()));
+              } else {
+                Navigator.pop(context);
               }
             },
           ),
