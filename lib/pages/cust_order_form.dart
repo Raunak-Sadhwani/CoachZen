@@ -135,6 +135,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
       productQuantityControllers[i].dispose();
     }
     scrollController.dispose();
+    if (widget.attendance != null) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
     super.dispose();
   }
 
@@ -202,14 +208,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
           icon: const Icon(Icons.arrow_back_rounded),
           color: Colors.black26,
           onPressed: () {
-            if (widget.attendance != null) {
-              Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const DailyAttendance()));
-            } else {
-              Navigator.pop(context);
-            }
+            Navigator.pop(context);
           },
         ),
         rightIcons: [

@@ -673,6 +673,17 @@ class _NewCustWrapperState extends State<NewCustWrapper> {
   }
 
   @override
+  void dispose() {
+    if (widget.attendance != null) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     double height = MediaQuery.of(context).size.height;
     double width = MediaQuery.of(context).size.width;
@@ -685,14 +696,7 @@ class _NewCustWrapperState extends State<NewCustWrapper> {
             icon: const Icon(Icons.arrow_back_ios),
             color: Colors.black26,
             onPressed: () async {
-              if (widget.attendance != null) {
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const DailyAttendance()));
-              } else {
-                Navigator.pop(context);
-              }
+              Navigator.pop(context);
             },
           ),
         ),

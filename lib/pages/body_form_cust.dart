@@ -18,14 +18,14 @@ final String uid = FirebaseAuth.instance.currentUser!.uid;
 class BodyFormCustomerWrap extends StatefulWidget {
   final String uid;
   final VoidCallback callback;
+  final bool? attendance;
   const BodyFormCustomerWrap(
-      {Key? key, required this.uid, required this.callback})
+      {Key? key, required this.uid, required this.callback, this.attendance})
       : super(key: key);
 
   @override
   State<BodyFormCustomerWrap> createState() => _BodyFormCustomerWrapState();
 }
-
 
 // String formatDate(Timestamp timestamp) {
 //   DateTime dateTime = timestamp.toDate();
@@ -42,6 +42,23 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
     super.initState();
     checkInternetConnection();
     userDataFuture = fetchUserData();
+    if (widget.attendance != null) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.attendance != null) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+    super.dispose();
   }
 
   Future<Map<dynamic, dynamic>> fetchUserData() async {
@@ -186,23 +203,23 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                       .toList();
                   products.sort((a, b) => b['date'].compareTo(a['date']));
                 }
-                if (user['plans'] != null && user['plans'].isNotEmpty) {
-                  plans = (user['plans'] as List)
-                      .cast<Map<dynamic, dynamic>>()
-                      .toList();
-                  plans.sort((a, b) => b['started'].compareTo(a['started']));
-                  // if userdata does not have plan, add it
-                  if (userData['plan'] == null) {
-                    String plan = plans[0]['name'];
-                    // make plan before 'created' key in userData
-                    userData = Map.fromEntries([
-                      ...userData.entries
-                          .where((entry) => entry.key != 'created'),
-                      MapEntry('plan', plan),
-                      MapEntry('created', userData['created']),
-                    ]);
-                  }
-                }
+                // if (user['plans'] != null && user['plans'].isNotEmpty) {
+                //   plans = (user['plans'] as List)
+                //       .cast<Map<dynamic, dynamic>>()
+                //       .toList();
+                //   plans.sort((a, b) => b['started'].compareTo(a['started']));
+                //   // if userdata does not have plan, add it
+                //   if (userData['plan'] == null) {
+                //     String plan = plans[0]['name'];
+                //     // make plan before 'created' key in userData
+                //     userData = Map.fromEntries([
+                //       ...userData.entries
+                //           .where((entry) => entry.key != 'created'),
+                //       MapEntry('plan', plan),
+                //       MapEntry('created', userData['created']),
+                //     ]);
+                //   }
+                // }
                 measurements.sort((a, b) => a['date'].compareTo(b['date']));
                 return BodyFormCustomer(
                     callback: widget.callback,

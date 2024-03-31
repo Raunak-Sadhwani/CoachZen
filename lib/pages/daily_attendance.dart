@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:another_flushbar/flushbar.dart';
+import 'package:coach_zen/pages/body_form_cust.dart';
 import 'package:coach_zen/pages/cust_order_form.dart';
 import 'package:coach_zen/pages/home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -35,6 +36,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   List<dynamic> users = [];
   DateTime selectedDate = DateTime.now();
   List<Map<dynamic, dynamic>> clubFees = [];
+  List<Map<dynamic, dynamic>> homeProgram = [];
   Map<String, String> studentsNameUID = {};
   Map<dynamic, dynamic> presentStudentsUID = {};
   bool isEdit = false;
@@ -49,6 +51,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   bool submitted = false;
   Color studentBox = const Color.fromARGB(255, 189, 189, 189);
   List sortedPresentStudents = [];
+  Set<String> encounteredIds = {}; // To avoid duplicates
   late String formattedDate;
 
   void changeSubmitted() {
@@ -79,7 +82,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       if (mounted) {
         datas += 1;
         debugPrint('got data - $datas');
-
         final eventData = event.snapshot.value;
         // Process users data
         final usersData = eventData['users'] ?? {};
@@ -87,18 +89,23 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           final key = entry.key;
           final userData = entry.value;
           studentsNameUID[key] = userData['name'];
+          int totalDays = -1;
 
-          final allDays = ((userData['days'] as Map?)?.entries.where((entry) {
-                final dateString = entry.key.toString();
-                final dayx = int.parse(dateString.substring(0, 2));
-                final month = int.parse(dateString.substring(2, 4));
-                final year = int.parse(dateString.substring(4, 6)) + 2000;
-                final keyDate = DateTime(year, month, dayx);
-                return keyDate.isBefore(selectedDate) ||
-                    keyDate.isAtSameMomentAs(selectedDate);
-              }).length) ??
-              0;
-          final totalDays = allDays == 0 ? 0 : allDays - 1;
+          // Iterate through entries in 'days' map
+          (userData['days'] as Map?)?.forEach((key, value) {
+            // Convert key to date
+            final dateString = key.toString();
+            final dayx = int.parse(dateString.substring(0, 2));
+            final month = int.parse(dateString.substring(2, 4));
+            final year = int.parse(dateString.substring(4, 6)) + 2000;
+            final keyDate = DateTime(year, month, dayx);
+
+            // Check if key date is before or at the same moment as selected date
+            if (keyDate.isBefore(selectedDate) ||
+                keyDate.isAtSameMomentAs(selectedDate)) {
+              totalDays += (value['shakes'] as int);
+            }
+          });
 
           // final userPayments = Map.from(userData['payments'] ?? {});
           // get all payments till selected date
@@ -117,7 +124,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   .fold(0, (prev, amount) => prev + amount)) ??
               0;
           debugPrint('Amount Paid: $amountPaidTillNow');
-
           return {
             'id': key,
             'name': userData['name'],
@@ -127,8 +133,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 userData['productsHistory'] ?? []),
             'days': userData['days'],
             'payments': userData['payments'],
+            'homeProgram': userData['homeProgram'],
             'totalDays': totalDays,
             'amountPaidTillNow': amountPaidTillNow,
+            'onHomeProgram': userData['homeProgram'] != null &&
+                userData['homeProgram'][formattedDate] != null,
+
             // Add other user fields as needed
           };
         }).toList();
@@ -141,13 +151,39 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
             : {};
 
-        // sort the present students
+        dynamic tempSortedPresentStudents = [];
+
+        // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
+        presentStudents.forEach((studentId, studentData) {
+          // Check if shakes > 1
+          if ((studentData['shakes'] as int) > 1) {
+            // Add student twice if shakes > 1
+            tempSortedPresentStudents.add(studentId);
+            tempSortedPresentStudents.add(studentId);
+          } else {
+            // Add student once if shakes <= 1
+            tempSortedPresentStudents.add(studentId);
+          }
+        });
+        final sortedPresentStudentsx = tempSortedPresentStudents;
+
+        // process home program data
+        final homeProgramData = eventData['attendance'] != null
+            ? eventData['attendance'][formattedDate]
+            : null;
+
+        List<Map<dynamic, dynamic>> homeProgramx = [];
+        if (homeProgramData != null && homeProgramData['homeProgram'] != null) {
+          homeProgramx = List<Map<dynamic, dynamic>>.from(
+              homeProgramData['homeProgram'].values);
+        }
 
         // Update state
         setState(() {
-          sortedPresentStudents = presentStudents.keys.toList();
           users = updatedUsers;
+          homeProgram = homeProgramx;
           presentStudentsUID = presentStudents;
+          sortedPresentStudents = sortedPresentStudentsx;
           zdays = presentStudents.keys
               .where((student) =>
                   users.firstWhere(
@@ -157,9 +193,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           clubFees = [];
           revenue = 0;
         });
-        sortedPresentStudents.sort((a, b) {
-          return presentStudents[a].compareTo(presentStudents[b]);
-        });
+        // sortedPresentStudents.sort((a, b) {
+        //   return presentStudents[a].compareTo(presentStudents[b]);
+        // });
         // Process club fees data
         final clubFeesData =
             attendanceData != null ? attendanceData['fees'] : null;
@@ -210,11 +246,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   color: Colors.grey,
                 ),
                 onPressed: () {
-                  // Navigator.pop(context);
-                  Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomePage()),
-                      (Route<dynamic> route) => false);
+                  Navigator.pop(context);
+                  // Navigator.pushAndRemoveUntil(
+                  //     context,
+                  //     MaterialPageRoute(builder: (context) => const HomePage()),
+                  //     (Route<dynamic> route) => false);
                 },
               ),
             ),
@@ -230,11 +266,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               onPressed: () {
                 //  open date picker
                 showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime(2023),
-                  lastDate: today,
-                ).then((date) {
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2023),
+                        // one month ahead
+                        lastDate: today.add(const Duration(days: 30)))
+                    .then((date) {
                   if (date != null) {
                     setState(() {
                       selectedDate = date;
@@ -286,6 +323,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         zdays: zdays.toString(),
                         shakes: presentStudentsUID.length.toString(),
                         revenue: revenue.toString(),
+                        homeProgram: homeProgram,
                         users: users,
                       ),
                     ),
@@ -404,8 +442,43 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     },
                     onSuggestionSelected: (suggestion) async {
                       String selectedUserId = suggestion['id'];
+                      // bool doubleShake = false;
                       if (presentStudentsUID.keys.contains(selectedUserId)) {
-                        return;
+                        // check if user is in home program today
+                        final user = users
+                            .firstWhere((user) => user['id'] == selectedUserId);
+                        if (user['onHomeProgram'] &&
+                            user['days'][formattedDate]['shakes'] == 1) {
+                          // confirm if double shake
+                          bool? result = await showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: const Text('Confirmation'),
+                                  content: Text(
+                                      'Are you sure you want to add "${suggestion['name'].split(' ')[0]}" "again" to the attendance list?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).pop(false);
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        Navigator.of(context).pop(true);
+                                      },
+                                      child: const Text('Add'),
+                                    ),
+                                  ],
+                                );
+                              });
+                          if (result == false) {
+                            return;
+                          }
+                        } else {
+                          return;
+                        }
                       }
                       // add to firebase
                       try {
@@ -413,8 +486,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         const time = ServerValue.timestamp;
                         Map<String, dynamic> updates = {
                           'attendance/$formattedDate/students/$selectedUserId':
-                              time,
-                          'users/$selectedUserId/days/$formattedDate': time,
+                              {
+                            'time': time,
+                            'shakes': ServerValue.increment(1),
+                          },
+                          'users/$selectedUserId/days/$formattedDate': {
+                            'time': time,
+                            'shakes': ServerValue.increment(1),
+                          }
                         };
                         await dbRef.update(updates);
                       } catch (e) {
@@ -488,8 +567,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         size: ColumnSize.S,
                       ),
                   ],
+                  // check why sortedPresentStudents is regenerating
                   rows: List<DataRow>.generate(sortedPresentStudents.length,
                       (index) {
+                    debugPrint('xxIndex: ${sortedPresentStudents.length}');
                     // get user
                     final user = users.firstWhere(
                         (user) => user['id'] == sortedPresentStudents[index]);
@@ -503,11 +584,20 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     int realBalance = totalBalance - amountPaidTillNow;
                     String balance = realBalance.toString();
                     String planName = getPlan(day)['plan'];
+                    bool onHomeProgram = user['onHomeProgram'];
+                    String sno = (index + 1).toString();
+                    if (encounteredIds.contains(id)) {
+                      // If encountered before, append "(H)" to sno
+                      sno += ' (H)';
+                    } else {
+                      // If encountering for the first time, add ID to encounteredIds
+                      encounteredIds.add(id);
+                    }
 
                     return DataRow(
                       cells: <DataCell>[
                         DataCell(
-                          Text((index + 1).toString()),
+                          Text(sno),
                         ),
                         DataCell(
                           // get name from users list
@@ -891,20 +981,215 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                         SizedBox(
                                           width: double.infinity,
                                           child: TextButton(
-                                              onPressed:
-                                                  // snack bar
-                                                  () {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('Retail'),
-                                                    duration:
-                                                        Duration(seconds: 2),
-                                                  ),
+                                              onPressed: () {
+                                                // alert dialog
+                                                dynamic formkey =
+                                                    GlobalKey<FormState>();
+                                                TextEditingController
+                                                    daysController =
+                                                    TextEditingController();
+                                                showDialog(
+                                                  context: context,
+                                                  builder:
+                                                      (BuildContext context) {
+                                                    return Form(
+                                                      key: formkey,
+                                                      child: AlertDialog(
+                                                        title: const Text(
+                                                            'Home Program 🏠'),
+                                                        content: Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              Expanded(
+                                                                child:
+                                                                    TextFormField(
+                                                                  controller:
+                                                                      daysController,
+                                                                  decoration:
+                                                                      const InputDecoration(
+                                                                    labelText:
+                                                                        'Days',
+                                                                  ),
+                                                                  keyboardType:
+                                                                      TextInputType
+                                                                          .number,
+                                                                  validator:
+                                                                      (value) {
+                                                                    if (value ==
+                                                                            null ||
+                                                                        value
+                                                                            .isEmpty) {
+                                                                      return 'Please enter the days';
+                                                                    } else if (int.tryParse(
+                                                                            value) ==
+                                                                        null) {
+                                                                      return 'Please enter a valid number';
+                                                                    } else if (int.tryParse(
+                                                                            value)! <
+                                                                        1) {
+                                                                      return 'Please enter a valid number';
+                                                                    } else if (int.tryParse(
+                                                                            value)! >
+                                                                        31) {
+                                                                      return 'Please enter a valid number';
+                                                                    }
+                                                                    return null;
+                                                                  },
+                                                                ),
+                                                              ),
+                                                            ]),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                      context)
+                                                                  .pop();
+                                                            },
+                                                            child: const Text(
+                                                                'Cancel'),
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () {
+                                                              if (formkey
+                                                                  .currentState!
+                                                                  .validate()) {
+                                                                // confirm
+                                                                showDialog(
+                                                                    context:
+                                                                        context,
+                                                                    builder:
+                                                                        (BuildContext
+                                                                            context) {
+                                                                      return AlertDialog(
+                                                                        title: const Text(
+                                                                            'Confirmation'),
+                                                                        content:
+                                                                            Text('Are you sure you want to add "${daysController.text} days" to "${name.split(' ')[0]}" ?'),
+                                                                        actions: [
+                                                                          TextButton(
+                                                                            child:
+                                                                                const Text('Cancel'),
+                                                                            onPressed:
+                                                                                () {
+                                                                              Navigator.of(context).pop();
+                                                                            },
+                                                                          ),
+                                                                          TextButton(
+                                                                            child:
+                                                                                const Text('Add'),
+                                                                            onPressed:
+                                                                                () async {
+                                                                              if (submitted) {
+                                                                                return;
+                                                                              }
+                                                                              setState(() {
+                                                                                submitted = true;
+                                                                              });
+                                                                              try {
+                                                                                final DatabaseReference dbRef = coachDb.child(cid);
+                                                                                const time = ServerValue.timestamp;
+                                                                                Map<String, dynamic> updates = {};
+                                                                                for (int i = 1; i <= int.parse(daysController.text); i++) {
+                                                                                  final String newDate = DateFormat('ddMMyy').format(selectedDate.add(Duration(days: i)));
+                                                                                  updates['attendance/$newDate/students/$id'] = {
+                                                                                    'time': time,
+                                                                                    'shakes': ServerValue.increment(1),
+                                                                                  };
+                                                                                  updates['users/$id/days/$newDate'] = {
+                                                                                    'time': time,
+                                                                                    'shakes': ServerValue.increment(1),
+                                                                                  };
+                                                                                  updates['users/$id/homeProgram/$newDate'] = time;
+                                                                                }
+                                                                                String newId = FirebaseDatabase.instance.ref().push().key!;
+                                                                                updates['attendance/$formattedDate/homeProgram/$newId'] = {
+                                                                                  'uid': id,
+                                                                                  'days': int.parse(daysController.text),
+                                                                                  'time': time,
+                                                                                  'homeProgramID': newId,
+                                                                                };
+
+                                                                                await dbRef.update(updates);
+                                                                                await Flushbar(
+                                                                                  margin: const EdgeInsets.all(7),
+                                                                                  borderRadius: BorderRadius.circular(15),
+                                                                                  flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                  flushbarPosition: FlushbarPosition.TOP,
+                                                                                  message: "${name.split(' ')[0]} added for ${daysController.text} days",
+                                                                                  icon: Icon(
+                                                                                    Icons.check_circle_outline,
+                                                                                    size: 28.0,
+                                                                                    color: Colors.green[300],
+                                                                                  ),
+                                                                                  duration: const Duration(milliseconds: 2000),
+                                                                                  leftBarIndicatorColor: Colors.green[300],
+                                                                                ).show(scaffoldKey.currentContext!);
+                                                                                setState(() {
+                                                                                  submitted = false;
+                                                                                });
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                              } catch (e) {
+                                                                                Flushbar(
+                                                                                  margin: const EdgeInsets.all(7),
+                                                                                  borderRadius: BorderRadius.circular(15),
+                                                                                  flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                  flushbarPosition: FlushbarPosition.TOP,
+                                                                                  message: "Error adding ${name.split(' ')[0]} to the home list",
+                                                                                  icon: Icon(
+                                                                                    Icons.error_outline_rounded,
+                                                                                    size: 28.0,
+                                                                                    color: Colors.red[300],
+                                                                                  ),
+                                                                                  duration: const Duration(milliseconds: 3000),
+                                                                                  leftBarIndicatorColor: Colors.red[300],
+                                                                                ).show(scaffoldKey.currentContext!);
+                                                                                setState(() {
+                                                                                  submitted = false;
+                                                                                });
+                                                                              }
+                                                                            },
+                                                                          ),
+                                                                        ],
+                                                                      );
+                                                                    });
+                                                              }
+                                                            },
+                                                            child: const Text(
+                                                                'Save'),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
                                                 );
                                               },
                                               child: const Text(
                                                   'Home Program 🏠',
+                                                  style: TextStyle(
+                                                      color: Colors.black87))),
+                                        ),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: TextButton(
+                                              onPressed: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        BodyFormCustomerWrap(
+                                                      uid: id,
+                                                      callback: () {},
+                                                      attendance: true,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              child: const Text(
+                                                  'Visit Profile 📝',
                                                   style: TextStyle(
                                                       color: Colors.black87))),
                                         ),
@@ -958,6 +1243,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                               'attendance/$formattedDate/students/$id':
                                                   null,
                                               'users/${presentStudentsUID[index]}/days/$formattedDate':
+                                                  null,
+                                              'users/$uid/homeProgram/$formattedDate':
                                                   null,
                                             };
                                             try {
@@ -1048,6 +1335,7 @@ class DailyDetails extends StatefulWidget {
   final String shakes;
   final String revenue;
   final List<dynamic> users;
+  final List<Map<dynamic, dynamic>> homeProgram;
   const DailyDetails({
     super.key,
     required this.selectedDate,
@@ -1057,6 +1345,7 @@ class DailyDetails extends StatefulWidget {
     required this.shakes,
     required this.revenue,
     required this.users,
+    required this.homeProgram,
   });
 
   @override
@@ -1077,22 +1366,21 @@ class _DailyDetailsState extends State<DailyDetails> {
     super.initState();
     selectedDate = widget.selectedDate;
     // get the products history for the selected date
-    for (var user in widget.users) {
-      if (user['productsHistory'] != null) {
-        List<Map<dynamic, dynamic>> productsHistory =
-            List<Map<dynamic, dynamic>>.from(user['productsHistory']);
-        for (var product in productsHistory) {
-          product['name'] = user['name'];
-          // convert ms to datetime
-          DateTime productDate =
-              DateTime.fromMillisecondsSinceEpoch(product['date']);
-          if (format.format(productDate) == format.format(selectedDate)) {
-            todaysProductsHistory.add(product);
-          }
-        }
-      }
-    }
-    debugPrint('Products History: $todaysProductsHistory');
+    // for (var user in widget.users) {
+    //   if (user['productsHistory'] != null) {
+    //     List<Map<dynamic, dynamic>> productsHistory =
+    //         List<Map<dynamic, dynamic>>.from(user['productsHistory']);
+    //     for (var product in productsHistory) {
+    //       product['name'] = user['name'];
+    //       // convert ms to datetime
+    //       DateTime productDate =
+    //           DateTime.fromMillisecondsSinceEpoch(product['date']);
+    //       if (format.format(productDate) == format.format(selectedDate)) {
+    //         todaysProductsHistory.add(product);
+    //       }
+    //     }
+    //   }
+    // }
   }
 
   @override
@@ -1123,19 +1411,19 @@ class _DailyDetailsState extends State<DailyDetails> {
           ),
           onPressed: () {
             //  open date picker
-            showDatePicker(
-              context: context,
-              initialDate: widget.selectedDate,
-              firstDate: DateTime(2023),
-              lastDate: today,
-            ).then((date) {
-              if (date != null) {
-                setState(() {
-                  //  update the date
-                  selectedDate = date;
-                });
-              }
-            });
+            // showDatePicker(
+            //   context: context,
+            //   initialDate: widget.selectedDate,
+            //   firstDate: DateTime(2023),
+            //   lastDate: today,
+            // ).then((date) {
+            //   if (date != null) {
+            //     setState(() {
+            //       //  update the date
+            //       selectedDate = date;
+            //     });
+            //   }
+            // });
           },
         ),
         rightIcons: [
@@ -1607,6 +1895,202 @@ class _DailyDetailsState extends State<DailyDetails> {
                               style: TextStyle(color: Colors.red))),
                         ]);
                       })),
+                ),
+                SizedBox(
+                  height: MediaQuery.of(context).size.width * 0.04,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        height: 1,
+                        indent: 10,
+                        endIndent: 5,
+                        color: Colors.grey[600]!,
+                      ),
+                    ),
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.02,
+                    ),
+                    Text(
+                      "HOME PROGRAM",
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.02,
+                    ),
+                    Expanded(
+                      child: Divider(
+                        height: 1,
+                        indent: 5,
+                        endIndent: 10,
+                        color: Colors.grey[600]!,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: MediaQuery.of(context).size.width * 0.04,
+                ),
+                Center(
+                  child: DataTable(
+                    headingRowColor:
+                        MaterialStateProperty.all(Colors.grey[200]),
+                    border: TableBorder.all(
+                      color: Colors.black12,
+                      width: 1,
+                    ),
+                    horizontalMargin: MediaQuery.of(context).size.width * 0.02,
+                    columns: <DataColumn>[
+                      const DataColumn(
+                        label: Text('Name'),
+                      ),
+                      const DataColumn(
+                        label: Text('Days'),
+                      ),
+                      const DataColumn(
+                        label: Text('Until'),
+                      ),
+                      if (isEdit)
+                        const DataColumn2(
+                          label: Text('Delete'),
+                          size: ColumnSize.S,
+                        ),
+                    ],
+                    rows: List<DataRow>.generate(widget.homeProgram.length,
+                        (index) {
+                      String name = widget
+                          .studentsNameUID[widget.homeProgram[index]['uid']];
+                      String days =
+                          widget.homeProgram[index]['days'].toString();
+                      String until = DateFormat('dd/MM/yy').format(
+                          selectedDate.add(Duration(days: int.parse(days))));
+                      return DataRow(cells: <DataCell>[
+                        DataCell(Text(name)),
+                        DataCell(Text(days)),
+                        DataCell(Text(until)),
+                        if (isEdit)
+                          DataCell(
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                // ask for confirmation
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('Confirmation'),
+                                      content: Text(
+                                          'Are you sure you want to delete "${name.split(' ')[0]}\'s" home program?'),
+                                      actions: [
+                                        TextButton(
+                                          child: const Text('Cancel'),
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                        TextButton(
+                                          child: const Text('Delete'),
+                                          onPressed: () async {
+                                            // get payment id
+                                            try {
+                                              final DatabaseReference dbRef =
+                                                  coachDb.child(cid);
+                                              final String uid = widget
+                                                  .homeProgram[index]['uid'];
+                                              final String homeProgramId =
+                                                  widget.homeProgram[index]
+                                                      ['homeProgramID'];
+
+                                              // delete from firebase
+                                              final Map<String, dynamic>
+                                                  updates = {};
+                                              for (int i = 1;
+                                                  i <= int.parse(days);
+                                                  i++) {
+                                                final String newDate =
+                                                    DateFormat('ddMMyy').format(
+                                                        selectedDate.add(
+                                                            Duration(days: i)));
+                                                updates['attendance/$newDate/students/$uid'] =
+                                                    null;
+                                                updates['users/$uid/days/$newDate'] =
+                                                    null;
+                                                updates['users/$uid/homeProgram/$newDate'] =
+                                                    null;
+                                              }
+                                              updates['attendance/${DateFormat('ddMMyy').format(selectedDate)}/homeProgram/$homeProgramId'] =
+                                                  null;
+
+                                              await dbRef.update(updates);
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message:
+                                                    "Home Program deleted successfully",
+                                                icon: Icon(
+                                                  Icons.check_circle_outline,
+                                                  size: 28.0,
+                                                  color: Colors.green[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 2000),
+                                                leftBarIndicatorColor:
+                                                    Colors.green[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            } catch (e) {
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message:
+                                                    "Please check the data and try again or contact support",
+                                                icon: Icon(
+                                                  Icons.error_outline_rounded,
+                                                  size: 28.0,
+                                                  color: Colors.red[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 3000),
+                                                leftBarIndicatorColor:
+                                                    Colors.red[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                      ]);
+                    }),
+                  ),
                 ),
               ]),
         ),
