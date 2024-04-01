@@ -53,9 +53,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   List<Map<dynamic, dynamic>> sortedPresentStudents = [];
   late String formattedDate;
 
-  void changeSubmitted() {
+  void changeSubmitted(bool val) {
     setState(() {
-      submitted = !submitted;
+      submitted = val;
     });
   }
 
@@ -78,159 +78,178 @@ class _DailyAttendanceState extends State<DailyAttendance> {
     mystream = coachDb.child(cid).onValue;
     // Set up the new listener
     _streamSubscription = mystream.listen((event) {
-      if (mounted) {
-        datas += 1;
-        debugPrint('got data - $datas');
-        final eventData = event.snapshot.value;
-        // Process users data
-        final usersData = eventData['users'] ?? {};
-        final updatedUsers = usersData.entries.map((entry) {
-          final key = entry.key;
-          final userData = entry.value;
-          studentsNameUID[key] = userData['name'];
-          int totalDays = -1;
+      try {
+        if (mounted) {
+          datas += 1;
+          debugPrint('got data - $datas');
+          final eventData = event.snapshot.value;
+          // Process users data
+          final usersData = eventData['users'] ?? {};
+          final updatedUsers = usersData.entries.map((entry) {
+            final key = entry.key;
+            final userData = entry.value;
+            studentsNameUID[key] = userData['name'];
+            int totalDays = -1;
 
-          // Iterate through entries in 'days' map
-          (userData['days'] as Map?)?.forEach((key, value) {
-            // Convert key to date
-            final dateString = key.toString();
-            final dayx = int.parse(dateString.substring(0, 2));
-            final month = int.parse(dateString.substring(2, 4));
-            final year = int.parse(dateString.substring(4, 6)) + 2000;
-            final keyDate = DateTime(year, month, dayx);
+            // Iterate through entries in 'days' map
+            (userData['days'] as Map?)?.forEach((key, value) {
+              // Convert key to date
+              final dateString = key.toString();
+              final dayx = int.parse(dateString.substring(0, 2));
+              final month = int.parse(dateString.substring(2, 4));
+              final year = int.parse(dateString.substring(4, 6)) + 2000;
+              final keyDate = DateTime(year, month, dayx);
 
-            // Check if key date is before or at the same moment as selected date
-            if (keyDate.isBefore(selectedDate) ||
-                keyDate.isAtSameMomentAs(selectedDate)) {
-              totalDays += (value['shakes'] as int);
+              // Check if key date is before or at the same moment as selected date
+              if (keyDate.isBefore(selectedDate) ||
+                  keyDate.isAtSameMomentAs(selectedDate)) {
+                totalDays += (value['shakes'] as int);
+              }
+            });
+
+            // final userPayments = Map.from(userData['payments'] ?? {});
+            // get all payments till selected date
+            final amountPaidTillNow = ((userData['payments'] as Map?)
+                    ?.entries
+                    .where((entry) {
+                      final dateString = entry.key.toString();
+                      final dayx = int.parse(dateString.substring(0, 2));
+                      final month = int.parse(dateString.substring(2, 4));
+                      final year = int.parse(dateString.substring(4, 6)) + 2000;
+                      final keyDate = DateTime(year, month, dayx);
+                      return keyDate.isBefore(selectedDate) ||
+                          keyDate.isAtSameMomentAs(selectedDate);
+                    })
+                    .map((entry) => entry.value['totalAmount'] as int)
+                    .fold(0, (prev, amount) => prev + amount)) ??
+                0;
+            debugPrint('Amount Paid: $amountPaidTillNow');
+            return {
+              'id': key,
+              'name': userData['name'],
+              'phone': userData['phone'],
+              'paid': userData['paid'],
+              'productsHistory': List<Map<dynamic, dynamic>>.from(
+                  userData['productsHistory'] ?? []),
+              'days': userData['days'],
+              'payments': userData['payments'],
+              'homeProgram': userData['homeProgram'],
+              'totalDays': totalDays,
+              'amountPaidTillNow': amountPaidTillNow,
+              'plansPaid': userData['plansPaid'],
+              'onHomeProgram': userData['homeProgram'] != null &&
+                  userData['homeProgram'][formattedDate] != null,
+
+              // Add other user fields as needed
+            };
+          }).toList();
+
+          // Process attendance data
+          final attendanceData = eventData['attendance'] != null
+              ? eventData['attendance'][formattedDate]
+              : null;
+          final presentStudents = attendanceData != null
+              ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
+              : {};
+
+          List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
+
+          // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
+          presentStudents.forEach((studentId, studentData) {
+            // Check if shakes > 1
+            if ((studentData['shakes'] as int) > 1) {
+              // Add student twice if shakes > 1
+              tempSortedPresentStudents.add({
+                'id': studentId,
+                'time': studentData['time'],
+                'home': true,
+              });
+              tempSortedPresentStudents.add({
+                'id': studentId,
+                'time': studentData['time'],
+                'second': true,
+              });
+            } else {
+              // Add student once if shakes <= 1
+              tempSortedPresentStudents.add({
+                'id': studentId,
+                'time': studentData['time'],
+              });
             }
           });
+          final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
+              tempSortedPresentStudents;
 
-          // final userPayments = Map.from(userData['payments'] ?? {});
-          // get all payments till selected date
-          final amountPaidTillNow = ((userData['payments'] as Map?)
-                  ?.entries
-                  .where((entry) {
-                    final dateString = entry.key.toString();
-                    final dayx = int.parse(dateString.substring(0, 2));
-                    final month = int.parse(dateString.substring(2, 4));
-                    final year = int.parse(dateString.substring(4, 6)) + 2000;
-                    final keyDate = DateTime(year, month, dayx);
-                    return keyDate.isBefore(selectedDate) ||
-                        keyDate.isAtSameMomentAs(selectedDate);
-                  })
-                  .map((entry) => entry.value['totalAmount'] as int)
-                  .fold(0, (prev, amount) => prev + amount)) ??
-              0;
-          debugPrint('Amount Paid: $amountPaidTillNow');
-          return {
-            'id': key,
-            'name': userData['name'],
-            'phone': userData['phone'],
-            'paid': userData['paid'],
-            'productsHistory': List<Map<dynamic, dynamic>>.from(
-                userData['productsHistory'] ?? []),
-            'days': userData['days'],
-            'payments': userData['payments'],
-            'homeProgram': userData['homeProgram'],
-            'totalDays': totalDays,
-            'amountPaidTillNow': amountPaidTillNow,
-            'onHomeProgram': userData['homeProgram'] != null &&
-                userData['homeProgram'][formattedDate] != null,
+          // process home program data
+          final homeProgramData = eventData['attendance'] != null
+              ? eventData['attendance'][formattedDate]
+              : null;
 
-            // Add other user fields as needed
-          };
-        }).toList();
+          List<Map<dynamic, dynamic>> homeProgramx = [];
+          if (homeProgramData != null &&
+              homeProgramData['homeProgram'] != null) {
+            homeProgramx = List<Map<dynamic, dynamic>>.from(
+                homeProgramData['homeProgram'].values);
+          }
 
-        // Process attendance data
-        final attendanceData = eventData['attendance'] != null
-            ? eventData['attendance'][formattedDate]
-            : null;
-        final presentStudents = attendanceData != null
-            ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
-            : {};
+          // Update state
+          setState(() {
+            users = updatedUsers;
+            homeProgram = homeProgramx;
+            presentStudentsUID = presentStudents;
+            sortedPresentStudents = sortedPresentStudentsx;
+            zdays = presentStudents.keys
+                .where((student) =>
+                    users.firstWhere(
+                        (user) => user['id'] == student)['totalDays'] ==
+                    0)
+                .length;
+            clubFees = [];
+            revenue = 0;
+          });
 
-        List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
+          // sort the present students
+          sortedPresentStudents.sort((a, b) {
+            final int timeA = a['time'];
+            final int timeB = b['time'];
+            return timeB.compareTo(timeA);
+          });
 
-        // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
-        presentStudents.forEach((studentId, studentData) {
-          // Check if shakes > 1
-          if ((studentData['shakes'] as int) > 1) {
-            // Add student twice if shakes > 1
-            tempSortedPresentStudents.add({
-              'id': studentId,
-              'time': studentData['time'],
-              'home': true,
-            });
-            tempSortedPresentStudents.add({
-              'id': studentId,
-              'time': studentData['time'],
-              'second': true,
-            });
-          } else {
-            // Add student once if shakes <= 1
-            tempSortedPresentStudents.add({
-              'id': studentId,
-              'time': studentData['time'],
+          // Process club fees data
+          final clubFeesData =
+              attendanceData != null ? attendanceData['fees'] : null;
+          if (clubFeesData != null) {
+            final clubFeesDataMap = Map<String, dynamic>.from(clubFeesData);
+            clubFeesDataMap.forEach((key, clubFeeData) {
+              setState(() {
+                clubFees.add({
+                  'uid': clubFeeData['uid'],
+                  'program': clubFeeData['program'],
+                  'mode': clubFeeData['mode'],
+                  'amount': clubFeeData['amount'],
+                  'balance': clubFeeData['balance'],
+                  'paymentId': key,
+                });
+                revenue += clubFeeData['amount'] as int;
+              });
             });
           }
-        });
-        final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
-            tempSortedPresentStudents;
-
-        // process home program data
-        final homeProgramData = eventData['attendance'] != null
-            ? eventData['attendance'][formattedDate]
-            : null;
-
-        List<Map<dynamic, dynamic>> homeProgramx = [];
-        if (homeProgramData != null && homeProgramData['homeProgram'] != null) {
-          homeProgramx = List<Map<dynamic, dynamic>>.from(
-              homeProgramData['homeProgram'].values);
         }
-
-        // Update state
-        setState(() {
-          users = updatedUsers;
-          homeProgram = homeProgramx;
-          presentStudentsUID = presentStudents;
-          sortedPresentStudents = sortedPresentStudentsx;
-          zdays = presentStudents.keys
-              .where((student) =>
-                  users.firstWhere(
-                      (user) => user['id'] == student)['totalDays'] ==
-                  0)
-              .length;
-          clubFees = [];
-          revenue = 0;
-        });
-
-        // sort the present students
-        sortedPresentStudents.sort((a, b) {
-          final int timeA = a['time'];
-          final int timeB = b['time'];
-          return timeB.compareTo(timeA);
-        });
-
-        // Process club fees data
-        final clubFeesData =
-            attendanceData != null ? attendanceData['fees'] : null;
-        if (clubFeesData != null) {
-          final clubFeesDataMap = Map<String, dynamic>.from(clubFeesData);
-          clubFeesDataMap.forEach((key, clubFeeData) {
-            setState(() {
-              clubFees.add({
-                'uid': clubFeeData['uid'],
-                'program': clubFeeData['program'],
-                'mode': clubFeeData['mode'],
-                'amount': clubFeeData['amount'],
-                'balance': clubFeeData['balance'],
-                'paymentId': key,
-              });
-              revenue += clubFeeData['amount'] as int;
-            });
-          });
-        }
+      } catch (e) {
+        Flushbar(
+          margin: const EdgeInsets.all(7),
+          borderRadius: BorderRadius.circular(15),
+          flushbarStyle: FlushbarStyle.FLOATING,
+          flushbarPosition: FlushbarPosition.TOP,
+          message: "Unable to get data. Please check your internet connection",
+          icon: Icon(
+            Icons.error_outline_rounded,
+            size: 28.0,
+            color: Colors.red[300],
+          ),
+          duration: const Duration(milliseconds: 3000),
+          leftBarIndicatorColor: Colors.red[300],
+        ).show(scaffoldKey.currentContext!);
       }
     });
   }
@@ -496,6 +515,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           return;
                         }
                       }
+                      if (submitted) {
+                        return;
+                      }
+                      changeSubmitted(true);
                       // add to firebase
                       try {
                         final DatabaseReference dbRef = coachDb.child(cid);
@@ -512,6 +535,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           }
                         };
                         await dbRef.update(updates);
+                        changeSubmitted(false);
                       } catch (e) {
                         Flushbar(
                           margin: const EdgeInsets.all(7),
@@ -528,6 +552,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           duration: const Duration(milliseconds: 3000),
                           leftBarIndicatorColor: Colors.red[300],
                         ).show(scaffoldKey.currentContext!);
+                        changeSubmitted(false);
                       }
                     },
                   ),
@@ -635,19 +660,88 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                           width: double.infinity,
                                           child: TextButton(
                                               onPressed: () {
+                                                List<String> plans = [];
+                                                String zeroDay = '0 day';
+                                                String threeDay = '3 day';
+
+                                                bool zeroDayValid =
+                                                    user['plansPaid'] != null &&
+                                                        user['plansPaid']
+                                                                ['0 day'] !=
+                                                            null;
+                                                bool zeroDayOver =
+                                                    zeroDayValid &&
+                                                        user['plansPaid']
+                                                                ['0 day'] >=
+                                                            200;
+
+                                                if (!zeroDayOver) {
+                                                  zeroDay +=
+                                                      ' (Remaining - ₹${zeroDayValid ? 200 - user['plansPaid']['0 day'] : 200})';
+                                                  plans.add(zeroDay);
+                                                }
+
+                                                bool threeDayValid =
+                                                    user['plansPaid'] != null &&
+                                                        user['plansPaid']
+                                                                ['3 day'] !=
+                                                            null;
+                                                bool threeDayOver =
+                                                    threeDayValid &&
+                                                        user['plansPaid']
+                                                                ['3 day'] >=
+                                                            720;
+                                                if (!threeDayOver) {
+                                                  threeDay +=
+                                                      ' (Remaining - ₹${threeDayValid ? 720 - user['plansPaid']['3 day'] : 720})';
+                                                }
+
+                                                if (day <= 1) {
+                                                  if (zeroDayOver &&
+                                                      !threeDayOver) {
+                                                    plans.add(threeDay);
+                                                  } else if (zeroDayOver &&
+                                                      threeDayOver) {
+                                                    plans.addAll([
+                                                      'Gold UMS',
+                                                      'Plat UMS',
+                                                      'Paid',
+                                                      'Other'
+                                                    ]);
+                                                  }
+                                                } else if (day <= 4) {
+                                                  if (!threeDayOver) {
+                                                    plans.add(threeDay);
+                                                    plans.addAll(
+                                                        ['Paid', 'Other']);
+                                                  }
+                                                } else {
+                                                  if (!threeDayOver) {
+                                                    plans.add(threeDay);
+                                                  }
+                                                  plans.addAll([
+                                                    'Gold UMS',
+                                                    'Plat UMS',
+                                                    'Paid',
+                                                    'Other'
+                                                  ]);
+                                                }
+
+                                                setState(() {
+                                                  initalPlan = plans[0];
+                                                });
+
+                                                // debugPrint(
+                                                //     "plans:  opx: $plans");
+                                                // remove duplicates in plans
+                                                // plans = plans.toSet().toList();
+
                                                 // open a new dialog to enter the cash amount
                                                 Navigator.of(context).pop();
                                                 showDialog(
                                                   barrierDismissible: true,
                                                   context: context,
                                                   builder: (BuildContext cxt) {
-                                                    List<String> plans = [
-                                                      '0 day',
-                                                      '3 day',
-                                                      'Gold UMS',
-                                                      'Plat UMS',
-                                                      'Other',
-                                                    ];
                                                     List<
                                                             DropdownMenuItem<
                                                                 String>>?
@@ -725,9 +819,17 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                       return 'Please enter the amount';
                                                                                     } else if (int.tryParse(value) == null) {
                                                                                       return 'Please enter a valid amount';
-                                                                                    } else if (int.tryParse(value)! < -50000) {
-                                                                                      return 'Please enter a valid amount';
+                                                                                    } else if (int.tryParse(value)! < 50) {
+                                                                                      return 'Minimum amount is 50';
                                                                                     } else if (int.tryParse(value)! > 50000) {
+                                                                                      return 'Please enter a valid amount';
+                                                                                    } else if (initalPlan == '0 day' && int.tryParse(value)! > 200) {
+                                                                                      return 'Maximum amount for 0 day is 200';
+                                                                                    } else if (initalPlan == '3 day' && int.tryParse(value)! > 720) {
+                                                                                      return 'Maximum amount for 3 day is 720';
+                                                                                    } else if (initalPlan == 'Gold UMS' && int.tryParse(value)! > 7200) {
+                                                                                      return 'Please enter a valid amount';
+                                                                                    } else if (initalPlan == 'Plat UMS' && int.tryParse(value)! > 9600) {
                                                                                       return 'Please enter a valid amount';
                                                                                     }
                                                                                     return null;
@@ -865,13 +967,16 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                             onPressed:
                                                                                 () async {
                                                                               if (formKey.currentState!.validate() && !submitted) {
-                                                                                changeSubmitted();
+                                                                                changeSubmitted(true);
                                                                                 // save the data
                                                                                 // save to firebase
                                                                                 // add to firebase
                                                                                 try {
                                                                                   if (initalPlan == 'Other') {
                                                                                     initalPlan = customPlan.text.trim();
+                                                                                  } else {
+                                                                                    // all text before (
+                                                                                    initalPlan = initalPlan.split(' (')[0];
                                                                                   }
                                                                                   // balance
                                                                                   const time = ServerValue.timestamp;
@@ -889,18 +994,19 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                       'time': time,
                                                                                     },
                                                                                     // Set user payments
-                                                                                    'users/$id/payments/$formattedDate': {
-                                                                                      newPaymentId: {
-                                                                                        'date': formattedDate,
-                                                                                        'time': time,
-                                                                                        'amount': payAmount,
-                                                                                        'mode': initalMode,
-                                                                                        'program': initalPlan,
-                                                                                      },
-                                                                                      "totalAmount": ServerValue.increment(payAmount),
+                                                                                    'users/$id/payments/$formattedDate/$newPaymentId': {
+                                                                                      'date': formattedDate,
+                                                                                      'time': time,
+                                                                                      'amount': payAmount,
+                                                                                      'mode': initalMode,
+                                                                                      'balance': realBalance - payAmount,
+                                                                                      'program': initalPlan,
                                                                                     },
-                                                                                    // Increment user's total paid amount
+                                                                                    'users/$id/payments/$formattedDate/totalAmount': ServerValue.increment(payAmount),
+
                                                                                     'users/$id/paid': ServerValue.increment(payAmount),
+                                                                                    // Increment user's total paid amount
+                                                                                    'users/$id/plansPaid/$initalPlan': ServerValue.increment(payAmount),
                                                                                   };
                                                                                   bool wrongPlan = initalPlan.toString().toLowerCase() == '0 day' || initalPlan.toString().toLowerCase() == '3 day';
                                                                                   if (!wrongPlan) {
@@ -929,7 +1035,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   customPlanDays.clear();
                                                                                   initalPlan = '0 day';
                                                                                   Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                  changeSubmitted();
+                                                                                  changeSubmitted(false);
                                                                                 } catch (e) {
                                                                                   Navigator.of(scaffoldKey.currentContext!).pop();
                                                                                   Flushbar(
@@ -946,7 +1052,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                     duration: const Duration(milliseconds: 3000),
                                                                                     leftBarIndicatorColor: Colors.red[300],
                                                                                   ).show(scaffoldKey.currentContext!);
-                                                                                  changeSubmitted();
+                                                                                  changeSubmitted(false);
                                                                                 }
                                                                               }
                                                                             },
@@ -1102,9 +1208,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                               if (submitted) {
                                                                                 return;
                                                                               }
-                                                                              setState(() {
-                                                                                submitted = true;
-                                                                              });
+
+                                                                              changeSubmitted(true);
+
                                                                               try {
                                                                                 final DatabaseReference dbRef = coachDb.child(cid);
                                                                                 const time = ServerValue.timestamp;
@@ -1201,9 +1307,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                       leftBarIndicatorColor: Colors.red[300],
                                                                                     ).show(scaffoldKey.currentContext!);
                                                                                   }
-                                                                                  setState(() {
-                                                                                    submitted = false;
-                                                                                  });
+                                                                                  changeSubmitted(false);
                                                                                   return;
                                                                                 }
                                                                                 String newId = FirebaseDatabase.instance.ref().push().key!;
@@ -1232,9 +1336,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   duration: const Duration(milliseconds: 2000),
                                                                                   leftBarIndicatorColor: Colors.green[300],
                                                                                 ).show(scaffoldKey.currentContext!);
-                                                                                setState(() {
-                                                                                  submitted = false;
-                                                                                });
+                                                                                changeSubmitted(false);
                                                                               } catch (e) {
                                                                                 Flushbar(
                                                                                   margin: const EdgeInsets.all(7),
@@ -1250,9 +1352,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   duration: const Duration(milliseconds: 3000),
                                                                                   leftBarIndicatorColor: Colors.red[300],
                                                                                 ).show(scaffoldKey.currentContext!);
-                                                                                setState(() {
-                                                                                  submitted = false;
-                                                                                });
+                                                                                changeSubmitted(false);
                                                                               }
                                                                             },
                                                                           ),
@@ -1322,13 +1422,21 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () {
                                 // ask for confirmation
+                                String confirmMsg =
+                                    'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?';
+                                if (isHome) {
+                                  confirmMsg +=
+                                      'It will delete Home program of today, But Remember the issued home program all days are not deleted from given issue date';
+                                } else if (isSecond) {
+                                  confirmMsg +=
+                                      'It will delete the second shake of "${name.split(' ')[0]}" from the attendance list';
+                                }
                                 showDialog(
                                   context: context,
                                   builder: (BuildContext context) {
                                     return AlertDialog(
                                       title: const Text('Confirmation'),
-                                      content: Text(
-                                          'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?'),
+                                      content: Text(confirmMsg),
                                       actions: [
                                         TextButton(
                                           child: const Text('Cancel'),
@@ -1339,62 +1447,48 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                         TextButton(
                                           child: const Text('Delete'),
                                           onPressed: () async {
-                                            int time =
-                                                sortedPresentStudents[index]
-                                                    ['time'];
+                                            if (submitted) {
+                                              return;
+                                            }
+                                            changeSubmitted(true);
 
                                             // delete from firebase
                                             final DatabaseReference dbRef =
                                                 coachDb.child(cid);
                                             Map<String, dynamic> updates = {};
-
-                                            // check if 'home' is true
-                                            if (isHome) {
-                                              updates = {
-                                                'attendance/$formattedDate/students/$id':
-                                                    {
-                                                  'time': time,
-                                                  'shakes':
-                                                      ServerValue.increment(-1),
-                                                },
-                                                'users/$id/days/$formattedDate':
-                                                    {
-                                                  'time': time,
-                                                  'shakes':
-                                                      ServerValue.increment(-1),
-                                                },
-                                                'users/$id/homeProgram/$formattedDate':
-                                                    null,
-                                              };
-                                            } else if (isSecond) {
-                                              updates = {
-                                                'attendance/$formattedDate/students/$id':
-                                                    {
-                                                  'time': time,
-                                                  'shakes':
-                                                      ServerValue.increment(-1),
-                                                },
-                                                'users/$id/days/$formattedDate':
-                                                    {
-                                                  'time': time,
-                                                  'shakes':
-                                                      ServerValue.increment(-1),
-                                                }
-                                              };
-                                            } else {
-                                              updates = {
-                                                'attendance/$formattedDate/students/$id':
-                                                    null,
-                                                'users/$id/days/$formattedDate':
-                                                    null,
-                                                'users/$id/homeProgram/$formattedDate':
-                                                    null,
-                                              };
-                                            }
                                             try {
+                                              // check if 'home' is true
+                                              if (isHome) {
+                                                updates = {
+                                                  'attendance/$formattedDate/students/$id/shakes':
+                                                      ServerValue.increment(-1),
+                                                  'users/$id/days/$formattedDate/shakes':
+                                                      ServerValue.increment(-1),
+                                                  'users/$id/homeProgram/$formattedDate':
+                                                      null,
+                                                };
+                                              } else if (isSecond) {
+                                                updates = {
+                                                  'attendance/$formattedDate/students/$id/shakes':
+                                                      ServerValue.increment(-1),
+                                                  'users/$id/days/$formattedDate':
+                                                      ServerValue.increment(-1),
+                                                };
+                                              } else {
+                                                updates = {
+                                                  'attendance/$formattedDate/students/$id':
+                                                      null,
+                                                  'users/$id/days/$formattedDate':
+                                                      null,
+                                                  'users/$id/homeProgram/$formattedDate':
+                                                      null,
+                                                };
+                                              }
                                               final bool popMsg = isHome;
                                               await dbRef.update(updates);
-                                              Navigator.of(context).pop();
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
                                               if (popMsg) {
                                                 Flushbar(
                                                   margin:
@@ -1406,7 +1500,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   flushbarPosition:
                                                       FlushbarPosition.TOP,
                                                   message:
-                                                      "${name.split(' ')[0]} has been removed from today's list. But Remember the home program is not deleted from given date",
+                                                      "${name.split(' ')[0]} has been removed from today's list. But Remember home program all days are not deleted from given date. You can delete all list by going to the home program section on that day",
                                                   icon: Icon(
                                                     // alert icon
                                                     Icons.error_outline_rounded,
@@ -1414,12 +1508,13 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     color: Colors.orange[300],
                                                   ),
                                                   duration: const Duration(
-                                                      milliseconds: 10000),
+                                                      milliseconds: 15000),
                                                   leftBarIndicatorColor:
                                                       Colors.orange[300],
                                                 ).show(scaffoldKey
                                                     .currentContext!);
                                               }
+                                              changeSubmitted(false);
                                             } catch (e) {
                                               Flushbar(
                                                 margin: const EdgeInsets.all(7),
@@ -1442,6 +1537,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     Colors.red[300],
                                               ).show(
                                                   scaffoldKey.currentContext!);
+                                              changeSubmitted(false);
                                             }
                                           },
                                         ),
@@ -1525,7 +1621,9 @@ class DailyDetails extends StatefulWidget {
 class _DailyDetailsState extends State<DailyDetails> {
 // create date variable and set it to widget.selectedDate
   late DateTime selectedDate;
+  late String formattedDate = DateFormat('ddMMyy').format(selectedDate);
   bool isEdit = false;
+  bool submitted = false;
   final String cid = FirebaseAuth.instance.currentUser!.uid;
   List<Map<dynamic, dynamic>> todaysProductsHistory = [];
   final DatabaseReference coachDb =
@@ -1535,22 +1633,12 @@ class _DailyDetailsState extends State<DailyDetails> {
   void initState() {
     super.initState();
     selectedDate = widget.selectedDate;
-    // get the products history for the selected date
-    // for (var user in widget.users) {
-    //   if (user['productsHistory'] != null) {
-    //     List<Map<dynamic, dynamic>> productsHistory =
-    //         List<Map<dynamic, dynamic>>.from(user['productsHistory']);
-    //     for (var product in productsHistory) {
-    //       product['name'] = user['name'];
-    //       // convert ms to datetime
-    //       DateTime productDate =
-    //           DateTime.fromMillisecondsSinceEpoch(product['date']);
-    //       if (format.format(productDate) == format.format(selectedDate)) {
-    //         todaysProductsHistory.add(product);
-    //       }
-    //     }
-    //   }
-    // }
+  }
+
+  void changeSubmitted(bool value) {
+    setState(() {
+      submitted = value;
+    });
   }
 
   @override
@@ -1851,6 +1939,10 @@ class _DailyDetailsState extends State<DailyDetails> {
                                         TextButton(
                                           child: const Text('Delete'),
                                           onPressed: () async {
+                                            if (submitted) {
+                                              return;
+                                            }
+                                            changeSubmitted(true);
                                             // get payment id
                                             try {
                                               final DatabaseReference dbRef =
@@ -1859,19 +1951,27 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                   widget.clubFees[index]['uid'];
                                               final String paymentId = widget
                                                   .clubFees[index]['paymentId'];
-                                              debugPrint('UID: $uid');
+                                              final String plan = widget
+                                                  .clubFees[index]['program'];
 
                                               // delete from firebase
                                               final Map<String, dynamic>
                                                   updates = {
                                                 // delete from club fees
-                                                'attendance/${DateFormat('ddMMyy').format(selectedDate)}/fees/$paymentId':
+                                                'attendance/$formattedDate/fees/$paymentId':
                                                     null,
                                                 // delete from user payments
-                                                'users/$uid/payments/$paymentId':
+                                                'users/$uid/payments/$formattedDate/$paymentId':
                                                     null,
+                                                'users/$uid/payments/$formattedDate/totalAmount':
+                                                    ServerValue.increment(
+                                                        -int.parse(amount)),
+
                                                 // decrement user's total paid amount
                                                 'users/$uid/paid':
+                                                    ServerValue.increment(
+                                                        -int.parse(amount)),
+                                                'users/$uid/plansPaid/$plan':
                                                     ServerValue.increment(
                                                         -int.parse(amount)),
                                               };
@@ -1903,6 +2003,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     Colors.green[300],
                                               ).show(
                                                   scaffoldKey.currentContext!);
+                                              changeSubmitted(false);
                                             } catch (e) {
                                               Navigator.of(scaffoldKey
                                                       .currentContext!)
@@ -1928,6 +2029,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     Colors.red[300],
                                               ).show(
                                                   scaffoldKey.currentContext!);
+                                              changeSubmitted(false);
                                             }
                                           },
                                         ),
@@ -2165,6 +2267,10 @@ class _DailyDetailsState extends State<DailyDetails> {
                                         TextButton(
                                           child: const Text('Delete'),
                                           onPressed: () async {
+                                            if (submitted) {
+                                              return;
+                                            }
+                                            changeSubmitted(true);
                                             // get payment id
                                             try {
                                               final DatabaseReference dbRef =
@@ -2208,7 +2314,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                   missedDays++;
                                                 }
                                               }
-                                              updates['attendance/${DateFormat('ddMMyy').format(selectedDate)}/homeProgram/$homeProgramId'] =
+                                              updates['attendance/$formattedDate/homeProgram/$homeProgramId'] =
                                                   null;
 
                                               await dbRef.update(updates);
@@ -2255,6 +2361,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                         : Colors.green[300],
                                               ).show(
                                                   scaffoldKey.currentContext!);
+                                              changeSubmitted(false);
                                             } catch (e) {
                                               Navigator.of(scaffoldKey
                                                       .currentContext!)
@@ -2280,6 +2387,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     Colors.red[300],
                                               ).show(
                                                   scaffoldKey.currentContext!);
+                                              changeSubmitted(false);
                                             }
                                           },
                                         ),

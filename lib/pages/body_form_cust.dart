@@ -203,23 +203,28 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                       .toList();
                   products.sort((a, b) => b['date'].compareTo(a['date']));
                 }
-                // if (user['plans'] != null && user['plans'].isNotEmpty) {
-                //   plans = (user['plans'] as List)
-                //       .cast<Map<dynamic, dynamic>>()
-                //       .toList();
-                //   plans.sort((a, b) => b['started'].compareTo(a['started']));
-                //   // if userdata does not have plan, add it
-                //   if (userData['plan'] == null) {
-                //     String plan = plans[0]['name'];
-                //     // make plan before 'created' key in userData
-                //     userData = Map.fromEntries([
-                //       ...userData.entries
-                //           .where((entry) => entry.key != 'created'),
-                //       MapEntry('plan', plan),
-                //       MapEntry('created', userData['created']),
-                //     ]);
-                //   }
-                // }
+                if (user['payments'] != null) {
+                  //         "payments": {
+                  //   "310324": {
+                  //     "-NuOzCKycm2j1r0aLk16": {
+                  //       "amount": 100,
+                  //       "balance": 100,
+                  //       "date": "310324",
+                  //       "mode": "Cash",
+                  //       "program": "0 day",
+                  //       "time": 1711980467795
+                  //     },
+                  //     "totalAmount": 100
+                  //   }
+                  // },
+
+                  plans = (user['payments'] as Map<dynamic, dynamic>)
+                      .values
+                      .toList()
+                      .cast<Map<dynamic, dynamic>>()
+                      .toList();
+                }
+
                 measurements.sort((a, b) => a['date'].compareTo(b['date']));
                 return BodyFormCustomer(
                     callback: widget.callback,
@@ -429,8 +434,21 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             label: 'Plans',
                             page: CustPlanHist(
                               name: widget.userData['name'],
-                              uid: widget.uid,
-                              plans: const [],
+                              // uid: widget.uid,
+                              plans: [
+                                {
+                                  'name': '0 Day',
+                                  'plan': '01 Jan 2021',
+                                  'date': DateTime.now(),
+                                  'amount': 1000
+                                },
+                                {
+                                  'name': '3 Day',
+                                  'plan': '01 Jan 2021',
+                                  'date': DateTime.now(),
+                                  'amount': 1000
+                                },
+                              ],
                             )),
                       ],
                     )
