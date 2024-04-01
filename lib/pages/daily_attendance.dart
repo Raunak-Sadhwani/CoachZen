@@ -50,8 +50,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   String initalMode = 'Cash';
   bool submitted = false;
   Color studentBox = const Color.fromARGB(255, 189, 189, 189);
-  List sortedPresentStudents = [];
-  Set<String> encounteredIds = {}; // To avoid duplicates
+  List<Map<dynamic, dynamic>> sortedPresentStudents = [];
   late String formattedDate;
 
   void changeSubmitted() {
@@ -151,21 +150,33 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
             : {};
 
-        dynamic tempSortedPresentStudents = [];
+        List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
 
         // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
         presentStudents.forEach((studentId, studentData) {
           // Check if shakes > 1
           if ((studentData['shakes'] as int) > 1) {
             // Add student twice if shakes > 1
-            tempSortedPresentStudents.add(studentId);
-            tempSortedPresentStudents.add(studentId);
+            tempSortedPresentStudents.add({
+              'id': studentId,
+              'time': studentData['time'],
+              'home': true,
+            });
+            tempSortedPresentStudents.add({
+              'id': studentId,
+              'time': studentData['time'],
+              'second': true,
+            });
           } else {
             // Add student once if shakes <= 1
-            tempSortedPresentStudents.add(studentId);
+            tempSortedPresentStudents.add({
+              'id': studentId,
+              'time': studentData['time'],
+            });
           }
         });
-        final sortedPresentStudentsx = tempSortedPresentStudents;
+        final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
+            tempSortedPresentStudents;
 
         // process home program data
         final homeProgramData = eventData['attendance'] != null
@@ -193,9 +204,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           clubFees = [];
           revenue = 0;
         });
-        // sortedPresentStudents.sort((a, b) {
-        //   return presentStudents[a].compareTo(presentStudents[b]);
-        // });
+
+        // sort the present students
+        sortedPresentStudents.sort((a, b) {
+          final int timeA = a['time'];
+          final int timeB = b['time'];
+          return timeB.compareTo(timeA);
+        });
+
         // Process club fees data
         final clubFeesData =
             attendanceData != null ? attendanceData['fees'] : null;
@@ -456,7 +472,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                 return AlertDialog(
                                   title: const Text('Confirmation'),
                                   content: Text(
-                                      'Are you sure you want to add "${suggestion['name'].split(' ')[0]}" "again" to the attendance list?'),
+                                      'Are you sure you want to add "${suggestion['name'].split(' ')[0]}" "again" to the attendance list? It will add second shake to that day.'),
                                   actions: [
                                     TextButton(
                                       onPressed: () {
@@ -570,30 +586,32 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   // check why sortedPresentStudents is regenerating
                   rows: List<DataRow>.generate(sortedPresentStudents.length,
                       (index) {
-                    debugPrint('xxIndex: ${sortedPresentStudents.length}');
+                    // debugPrint('xxIndex: ${sortedPresentStudents.length}');
                     // get user
-                    final user = users.firstWhere(
-                        (user) => user['id'] == sortedPresentStudents[index]);
+                    final user = users.firstWhere((user) =>
+                        user['id'] == sortedPresentStudents[index]['id']);
                     String id = user['id'];
                     String name = user['name'];
                     int amountPaidTillNow = user['amountPaidTillNow'];
                     int day = user['totalDays'];
+                    bool onHomeProgram = user['onHomeProgram'];
+                    String sno = (index + 1).toString();
+                    // check if 'home' is true
+                    bool isHome = sortedPresentStudents[index]['home'] != null;
+                    bool isSecond =
+                        sortedPresentStudents[index]['second'] != null;
+                    if ((isHome || onHomeProgram) && !isSecond) {
+                      sno += ' (H)';
+                      if (isHome) {
+                        day -= 1;
+                      }
+                    }
+
                     String days = getPlan(day)['day'];
                     int totalBalance = getPlan(day)['balance'];
-                    debugPrint('Total Balance: $totalBalance');
                     int realBalance = totalBalance - amountPaidTillNow;
                     String balance = realBalance.toString();
                     String planName = getPlan(day)['plan'];
-                    bool onHomeProgram = user['onHomeProgram'];
-                    String sno = (index + 1).toString();
-                    if (encounteredIds.contains(id)) {
-                      // If encountered before, append "(H)" to sno
-                      sno += ' (H)';
-                    } else {
-                      // If encountering for the first time, add ID to encounteredIds
-                      encounteredIds.add(id);
-                    }
-
                     return DataRow(
                       cells: <DataCell>[
                         DataCell(
@@ -1091,8 +1109,52 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 final DatabaseReference dbRef = coachDb.child(cid);
                                                                                 const time = ServerValue.timestamp;
                                                                                 Map<String, dynamic> updates = {};
+                                                                                bool homeProg = user['homeProgram'] != null;
+                                                                                bool error = false;
+                                                                                bool overwriteErr = false;
+                                                                                String errorDate = '';
                                                                                 for (int i = 1; i <= int.parse(daysController.text); i++) {
                                                                                   final String newDate = DateFormat('ddMMyy').format(selectedDate.add(Duration(days: i)));
+                                                                                  // check if already present
+                                                                                  if (homeProg && user['homeProgram'][newDate] != null) {
+                                                                                    // error
+                                                                                    error = true;
+                                                                                    errorDate = newDate;
+                                                                                    updates.clear();
+                                                                                    break;
+                                                                                  }
+                                                                                  if (user['days'][newDate] != null) {
+                                                                                    errorDate = newDate;
+                                                                                    errorDate = '${errorDate.substring(0, 2)}/${errorDate.substring(2, 4)}/20${errorDate.substring(4, 6)}';
+                                                                                    bool? result = await showDialog(
+                                                                                      context: context,
+                                                                                      builder: (BuildContext context) {
+                                                                                        return AlertDialog(
+                                                                                          title: const Text('Confirmation'),
+                                                                                          content: Text('"${name.split(' ')[0]}" already exists on $errorDate. Do you want to overwrite it? It will add second shake to that day.'),
+                                                                                          actions: [
+                                                                                            TextButton(
+                                                                                              onPressed: () {
+                                                                                                Navigator.of(context).pop(false);
+                                                                                              },
+                                                                                              child: const Text('Cancel'),
+                                                                                            ),
+                                                                                            TextButton(
+                                                                                              onPressed: () {
+                                                                                                Navigator.of(context).pop(true);
+                                                                                              },
+                                                                                              child: const Text('Overwrite'),
+                                                                                            ),
+                                                                                          ],
+                                                                                        );
+                                                                                      },
+                                                                                    );
+                                                                                    if (result == false) {
+                                                                                      overwriteErr = true;
+                                                                                      updates.clear();
+                                                                                      break;
+                                                                                    }
+                                                                                  }
                                                                                   updates['attendance/$newDate/students/$id'] = {
                                                                                     'time': time,
                                                                                     'shakes': ServerValue.increment(1),
@@ -1103,6 +1165,47 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   };
                                                                                   updates['users/$id/homeProgram/$newDate'] = time;
                                                                                 }
+                                                                                if (overwriteErr || error) {
+                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                  if (error) {
+                                                                                    errorDate = '${errorDate.substring(0, 2)}/${errorDate.substring(2, 4)}/20${errorDate.substring(4, 6)}';
+                                                                                    Flushbar(
+                                                                                      margin: const EdgeInsets.all(7),
+                                                                                      borderRadius: BorderRadius.circular(15),
+                                                                                      flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                      flushbarPosition: FlushbarPosition.TOP,
+                                                                                      message: 'Error: "${name.split(' ')[0]}" already exists on $errorDate. Please add from $errorDate or ensure total days add up to $errorDate.',
+                                                                                      icon: Icon(
+                                                                                        Icons.error_outline_rounded,
+                                                                                        size: 28.0,
+                                                                                        color: Colors.red[300],
+                                                                                      ),
+                                                                                      duration: const Duration(milliseconds: 10000),
+                                                                                      leftBarIndicatorColor: Colors.red[300],
+                                                                                    ).show(scaffoldKey.currentContext!);
+                                                                                  } else {
+                                                                                    Flushbar(
+                                                                                      margin: const EdgeInsets.all(7),
+                                                                                      borderRadius: BorderRadius.circular(15),
+                                                                                      flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                      flushbarPosition: FlushbarPosition.TOP,
+                                                                                      message: 'Home program cancelled',
+                                                                                      icon: Icon(
+                                                                                        Icons.error_outline_rounded,
+                                                                                        size: 28.0,
+                                                                                        color: Colors.red[300],
+                                                                                      ),
+                                                                                      duration: const Duration(milliseconds: 3000),
+                                                                                      leftBarIndicatorColor: Colors.red[300],
+                                                                                    ).show(scaffoldKey.currentContext!);
+                                                                                  }
+                                                                                  setState(() {
+                                                                                    submitted = false;
+                                                                                  });
+                                                                                  return;
+                                                                                }
                                                                                 String newId = FirebaseDatabase.instance.ref().push().key!;
                                                                                 updates['attendance/$formattedDate/homeProgram/$newId'] = {
                                                                                   'uid': id,
@@ -1112,6 +1215,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 };
 
                                                                                 await dbRef.update(updates);
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
                                                                                 await Flushbar(
                                                                                   margin: const EdgeInsets.all(7),
                                                                                   borderRadius: BorderRadius.circular(15),
@@ -1129,9 +1235,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 setState(() {
                                                                                   submitted = false;
                                                                                 });
-                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
                                                                               } catch (e) {
                                                                                 Flushbar(
                                                                                   margin: const EdgeInsets.all(7),
@@ -1235,20 +1338,88 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                         ),
                                         TextButton(
                                           child: const Text('Delete'),
-                                          onPressed: () {
+                                          onPressed: () async {
+                                            int time =
+                                                sortedPresentStudents[index]
+                                                    ['time'];
+
                                             // delete from firebase
                                             final DatabaseReference dbRef =
                                                 coachDb.child(cid);
-                                            Map<String, dynamic> updates = {
-                                              'attendance/$formattedDate/students/$id':
-                                                  null,
-                                              'users/${presentStudentsUID[index]}/days/$formattedDate':
-                                                  null,
-                                              'users/$uid/homeProgram/$formattedDate':
-                                                  null,
-                                            };
+                                            Map<String, dynamic> updates = {};
+
+                                            // check if 'home' is true
+                                            if (isHome) {
+                                              updates = {
+                                                'attendance/$formattedDate/students/$id':
+                                                    {
+                                                  'time': time,
+                                                  'shakes':
+                                                      ServerValue.increment(-1),
+                                                },
+                                                'users/$id/days/$formattedDate':
+                                                    {
+                                                  'time': time,
+                                                  'shakes':
+                                                      ServerValue.increment(-1),
+                                                },
+                                                'users/$id/homeProgram/$formattedDate':
+                                                    null,
+                                              };
+                                            } else if (isSecond) {
+                                              updates = {
+                                                'attendance/$formattedDate/students/$id':
+                                                    {
+                                                  'time': time,
+                                                  'shakes':
+                                                      ServerValue.increment(-1),
+                                                },
+                                                'users/$id/days/$formattedDate':
+                                                    {
+                                                  'time': time,
+                                                  'shakes':
+                                                      ServerValue.increment(-1),
+                                                }
+                                              };
+                                            } else {
+                                              updates = {
+                                                'attendance/$formattedDate/students/$id':
+                                                    null,
+                                                'users/$id/days/$formattedDate':
+                                                    null,
+                                                'users/$id/homeProgram/$formattedDate':
+                                                    null,
+                                              };
+                                            }
                                             try {
-                                              dbRef.update(updates);
+                                              final bool popMsg = isHome;
+                                              await dbRef.update(updates);
+                                              Navigator.of(context).pop();
+                                              if (popMsg) {
+                                                Flushbar(
+                                                  margin:
+                                                      const EdgeInsets.all(7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                  flushbarStyle:
+                                                      FlushbarStyle.FLOATING,
+                                                  flushbarPosition:
+                                                      FlushbarPosition.TOP,
+                                                  message:
+                                                      "${name.split(' ')[0]} has been removed from today's list. But Remember the home program is not deleted from given date",
+                                                  icon: Icon(
+                                                    // alert icon
+                                                    Icons.error_outline_rounded,
+                                                    size: 28.0,
+                                                    color: Colors.orange[300],
+                                                  ),
+                                                  duration: const Duration(
+                                                      milliseconds: 10000),
+                                                  leftBarIndicatorColor:
+                                                      Colors.orange[300],
+                                                ).show(scaffoldKey
+                                                    .currentContext!);
+                                              }
                                             } catch (e) {
                                               Flushbar(
                                                 margin: const EdgeInsets.all(7),
@@ -1272,7 +1443,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                               ).show(
                                                   scaffoldKey.currentContext!);
                                             }
-                                            Navigator.of(context).pop();
                                           },
                                         ),
                                       ],
@@ -2008,6 +2178,12 @@ class _DailyDetailsState extends State<DailyDetails> {
                                               // delete from firebase
                                               final Map<String, dynamic>
                                                   updates = {};
+                                              final user = widget.users
+                                                  .firstWhere((element) =>
+                                                      element['id'] == uid);
+                                              bool missingDays = false;
+                                              int missedDays = 0;
+
                                               for (int i = 1;
                                                   i <= int.parse(days);
                                                   i++) {
@@ -2015,17 +2191,34 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     DateFormat('ddMMyy').format(
                                                         selectedDate.add(
                                                             Duration(days: i)));
-                                                updates['attendance/$newDate/students/$uid'] =
-                                                    null;
-                                                updates['users/$uid/days/$newDate'] =
-                                                    null;
-                                                updates['users/$uid/homeProgram/$newDate'] =
-                                                    null;
+
+                                                // check if shakes is 2
+                                                if (user['homeProgram'] !=
+                                                        null &&
+                                                    user['homeProgram']
+                                                            [newDate] !=
+                                                        null) {
+                                                  updates['users/$uid/days/$newDate'] =
+                                                      null;
+                                                  updates['users/$uid/homeProgram/$newDate'] =
+                                                      null;
+                                                  updates['attendance/$newDate/students/$uid'] =
+                                                      null;
+                                                } else {
+                                                  missedDays++;
+                                                }
                                               }
                                               updates['attendance/${DateFormat('ddMMyy').format(selectedDate)}/homeProgram/$homeProgramId'] =
                                                   null;
 
                                               await dbRef.update(updates);
+                                              missingDays = missedDays > 0;
+                                              String msg =
+                                                  "Home Program deleted successfully";
+                                              if (missingDays) {
+                                                msg +=
+                                                    ". But ${missedDays.toString()} days were already deleted from the home program";
+                                              }
                                               Navigator.of(scaffoldKey
                                                       .currentContext!)
                                                   .pop();
@@ -2040,17 +2233,26 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     FlushbarStyle.FLOATING,
                                                 flushbarPosition:
                                                     FlushbarPosition.TOP,
-                                                message:
-                                                    "Home Program deleted successfully",
+                                                message: msg,
                                                 icon: Icon(
-                                                  Icons.check_circle_outline,
+                                                  missingDays
+                                                      ? Icons
+                                                          .error_outline_rounded
+                                                      : Icons
+                                                          .check_circle_outline,
                                                   size: 28.0,
-                                                  color: Colors.green[300],
+                                                  color: missingDays
+                                                      ? Colors.orange[300]
+                                                      : Colors.green[300],
                                                 ),
-                                                duration: const Duration(
-                                                    milliseconds: 2000),
+                                                duration: Duration(
+                                                    milliseconds: missingDays
+                                                        ? 5000
+                                                        : 2000),
                                                 leftBarIndicatorColor:
-                                                    Colors.green[300],
+                                                    missingDays
+                                                        ? Colors.orange[300]
+                                                        : Colors.green[300],
                                               ).show(
                                                   scaffoldKey.currentContext!);
                                             } catch (e) {
@@ -2066,7 +2268,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                 flushbarPosition:
                                                     FlushbarPosition.TOP,
                                                 message:
-                                                    "Please check the data and try again or contact support",
+                                                    "$e Please check the data and try again or contact support",
                                                 icon: Icon(
                                                   Icons.error_outline_rounded,
                                                   size: 28.0,
