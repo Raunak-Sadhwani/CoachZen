@@ -158,7 +158,12 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                   "measurements",
                   "productsHistory",
                   "plans",
-                  "medicalHistory"
+                  "medicalHistory",
+                  "payments",
+                  "homeProgram",
+                  "plansPaid",
+                  "paid",
+                  "days"
                 ];
                 user.forEach((key, value) {
                   if (value.runtimeType != List &&
@@ -183,7 +188,9 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                 ]);
                 List<Map<dynamic, dynamic>> measurements = [];
                 List<Map<dynamic, dynamic>> products = [];
-                List<Map<dynamic, dynamic>> plans = [];
+                Map<dynamic, dynamic> plans = {};
+                Map<dynamic, dynamic> days = {};
+                Map<dynamic, dynamic> homeProgram = {};
                 List medicalHistory = user['medicalHistory'] ?? [];
                 String? image = user['image'];
 
@@ -218,11 +225,15 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                   //   }
                   // },
 
-                  plans = (user['payments'] as Map<dynamic, dynamic>)
-                      .values
-                      .toList()
-                      .cast<Map<dynamic, dynamic>>()
-                      .toList();
+                  plans =  user['payments'];
+                }
+
+                if (user['days'] != null) {
+                  days = user['days'];
+                }
+
+                if (user['homeProgram'] != null) {
+                  homeProgram = user['homeProgram'];
                 }
 
                 measurements.sort((a, b) => a['date'].compareTo(b['date']));
@@ -232,6 +243,8 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                     measurements: measurements,
                     products: products,
                     plans: plans,
+                    days: days,
+                    homeProgram: homeProgram,
                     medicalHistory: medicalHistory,
                     uid: widget.uid,
                     image: image);
@@ -248,7 +261,9 @@ class BodyFormCustomer extends StatefulWidget {
   final Map<dynamic, dynamic> userData;
   final List<Map<dynamic, dynamic>> measurements;
   final List<Map<dynamic, dynamic>> products;
-  final List<Map<dynamic, dynamic>> plans;
+  final Map<dynamic, dynamic> plans;
+  final Map<dynamic, dynamic> days;
+  final Map<dynamic, dynamic> homeProgram;
   final List medicalHistory;
   final String? image;
   final String uid;
@@ -257,11 +272,13 @@ class BodyFormCustomer extends StatefulWidget {
     required this.userData,
     required this.measurements,
     required this.plans,
+    required this.days,
     required this.products,
     required this.uid,
     required this.image,
     required this.medicalHistory,
     required this.callback,
+    required this.homeProgram,
   }) : super(key: key);
 
   @override
@@ -434,21 +451,10 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             label: 'Plans',
                             page: CustPlanHist(
                               name: widget.userData['name'],
+                              days: widget.days,
                               // uid: widget.uid,
-                              plans: [
-                                {
-                                  'name': '0 Day',
-                                  'plan': '01 Jan 2021',
-                                  'date': DateTime.now(),
-                                  'amount': 1000
-                                },
-                                {
-                                  'name': '3 Day',
-                                  'plan': '01 Jan 2021',
-                                  'date': DateTime.now(),
-                                  'amount': 1000
-                                },
-                              ],
+                              homeProgram: widget.homeProgram,
+                              plans: widget.plans,
                             )),
                       ],
                     )

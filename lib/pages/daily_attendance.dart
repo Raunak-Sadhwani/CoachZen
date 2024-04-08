@@ -16,6 +16,7 @@ import 'package:data_table_2/data_table_2.dart';
 
 final DateFormat format = DateFormat('dd MMM yyyy');
 final DateTime today = DateTime.now();
+const int shakePrice = 240;
 
 class DailyAttendance extends StatefulWidget {
   const DailyAttendance({super.key});
@@ -67,13 +68,20 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
-    setupDataListener(selectedDate);
+    initializeData();
   }
 
-  void setupDataListener(DateTime selectedDate) {
+  Future<void> initializeData() async {
+    // Set up data listener and wait for initial data to be fetched
+    await setupDataListener(selectedDate);
+
+    // print('7 initialized');
+  }
+
+  Future<void> setupDataListener(DateTime selectedDate) async {
     // Close the previous listener if it exists
     _streamSubscription?.cancel();
-    formattedDate = DateFormat('ddMMyy').format(selectedDate);
+    formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
 
     mystream = coachDb.child(cid).onValue;
     // Set up the new listener
@@ -94,11 +102,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             // Iterate through entries in 'days' map
             (userData['days'] as Map?)?.forEach((key, value) {
               // Convert key to date
-              final dateString = key.toString();
-              final dayx = int.parse(dateString.substring(0, 2));
-              final month = int.parse(dateString.substring(2, 4));
-              final year = int.parse(dateString.substring(4, 6)) + 2000;
-              final keyDate = DateTime(year, month, dayx);
+              final keyDate = DateTime.parse(key);
 
               // Check if key date is before or at the same moment as selected date
               if (keyDate.isBefore(selectedDate) ||
@@ -109,21 +113,29 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
             // final userPayments = Map.from(userData['payments'] ?? {});
             // get all payments till selected date
-            final amountPaidTillNow = ((userData['payments'] as Map?)
-                    ?.entries
-                    .where((entry) {
-                      final dateString = entry.key.toString();
-                      final dayx = int.parse(dateString.substring(0, 2));
-                      final month = int.parse(dateString.substring(2, 4));
-                      final year = int.parse(dateString.substring(4, 6)) + 2000;
-                      final keyDate = DateTime(year, month, dayx);
-                      return keyDate.isBefore(selectedDate) ||
-                          keyDate.isAtSameMomentAs(selectedDate);
-                    })
-                    .map((entry) => entry.value['totalAmount'] as int)
-                    .fold(0, (prev, amount) => prev + amount)) ??
-                0;
-            debugPrint('Amount Paid: $amountPaidTillNow');
+            int amountPaidTillNow = 0;
+            int day0PaidTillNow = 0;
+            int day3PaidTillNow = 0;
+            final Map<dynamic, dynamic> payments = userData['payments'] ?? {};
+            if (payments.isNotEmpty) {
+              payments.forEach((key, value) {
+                final paymentDate = DateTime.parse(key);
+                if (paymentDate.isBefore(selectedDate) ||
+                    paymentDate.isAtSameMomentAs(selectedDate)) {
+                  amountPaidTillNow += value['totalAmount'] as int;
+                  for (String planKey in value.keys) {
+                    if (planKey != 'totalAmount') {
+                      final planData = value[planKey];
+                      if (planData['program'] == '0 day') {
+                        day0PaidTillNow += planData['amount'] as int;
+                      } else if (planData['program'] == '3 day') {
+                        day3PaidTillNow += planData['amount'] as int;
+                      }
+                    }
+                  }
+                }
+              });
+            }
             return {
               'id': key,
               'name': userData['name'],
@@ -134,9 +146,15 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               'days': userData['days'],
               'payments': userData['payments'],
               'homeProgram': userData['homeProgram'],
+              'advancedPayments': userData['advancedPayments'],
               'totalDays': totalDays,
-              'amountPaidTillNow': amountPaidTillNow,
+              'amountPaidTillNow': {
+                'total': amountPaidTillNow,
+                '0 day': day0PaidTillNow,
+                '3 day': day3PaidTillNow,
+              },
               'plansPaid': userData['plansPaid'],
+              'plans': userData['plans'],
               'onHomeProgram': userData['homeProgram'] != null &&
                   userData['homeProgram'][formattedDate] != null,
 
@@ -229,6 +247,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   'amount': clubFeeData['amount'],
                   'balance': clubFeeData['balance'],
                   'paymentId': key,
+                  'planId': clubFeeData['planId'],
+                  'advancedPayment': clubFeeData['advancedPayment'],
                 });
                 revenue += clubFeeData['amount'] as int;
               });
@@ -252,6 +272,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
         ).show(scaffoldKey.currentContext!);
       }
     });
+    print('Data listener initialized');
   }
 
   @override
@@ -305,7 +326,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         initialDate: selectedDate,
                         firstDate: DateTime(2023),
                         // one month ahead
-                        lastDate: today.add(const Duration(days: 30)))
+                        lastDate: today.add(const Duration(days: 50)))
                     .then((date) {
                   if (date != null) {
                     setState(() {
@@ -477,11 +498,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     },
                     onSuggestionSelected: (suggestion) async {
                       String selectedUserId = suggestion['id'];
+
                       // bool doubleShake = false;
                       if (presentStudentsUID.keys.contains(selectedUserId)) {
-                        // check if user is in home program today
                         final user = users
                             .firstWhere((user) => user['id'] == selectedUserId);
+                        // check if user is in home program today
                         if (user['onHomeProgram'] &&
                             user['days'][formattedDate]['shakes'] == 1) {
                           // confirm if double shake
@@ -617,7 +639,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         user['id'] == sortedPresentStudents[index]['id']);
                     String id = user['id'];
                     String name = user['name'];
-                    int amountPaidTillNow = user['amountPaidTillNow'];
+                    int amountPaidTillNow = user['amountPaidTillNow']['total'];
                     int day = user['totalDays'];
                     bool onHomeProgram = user['onHomeProgram'];
                     String sno = (index + 1).toString();
@@ -631,12 +653,175 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         day -= 1;
                       }
                     }
-
-                    String days = getPlan(day)['day'];
-                    int totalBalance = getPlan(day)['balance'];
+                    final gotPlan = getPlan(day);
+                    int totalBalance = gotPlan['balance'];
                     int realBalance = totalBalance - amountPaidTillNow;
                     String balance = realBalance.toString();
-                    String planName = getPlan(day)['plan'];
+                    String days = gotPlan['day'];
+                    String planName = gotPlan['plan'];
+                    Map<String, int> allBalances = {};
+                    Map<String, int> actualBalances = {};
+                    bool existingPlan = false;
+                    String? planDate;
+                    int planDays = 0;
+                    int tempAllPlanDays = 4;
+                    final bool advancedPaymentx =
+                        user['advancedPayments'] != null &&
+                            user['advancedPayments']['pid'] != null;
+
+                    if (day > 4) {
+                      final day0 = user['amountPaidTillNow']['0 day'] ?? 0;
+                      final day3 = user['amountPaidTillNow']['3 day'] ?? 0;
+                      if (day0 < 200) {
+                        int tempBal = 200 - (day0 as int);
+                        allBalances['0 day'] = tempBal;
+                      }
+                      if (day3 < 720) {
+                        int tempBal = 720 - (day3 as int);
+                        allBalances['3 day'] = tempBal;
+                      }
+                      final plansPaid = user['plansPaid'];
+                      if (plansPaid != null) {
+                        final actDay0 = plansPaid['0 day'] ?? 0;
+                        final actDay3 = plansPaid['3 day'] ?? 0;
+                        if (actDay0 < 200) {
+                          int tempBal = 200 - (actDay0 as int);
+                          actualBalances['0 day'] = tempBal;
+                        }
+                        if (actDay3 < 720) {
+                          int tempBal = 720 - (actDay3 as int);
+                          actualBalances['3 day'] = tempBal;
+                        }
+                      } else {
+                        actualBalances['0 day'] = 200;
+                        actualBalances['3 day'] = 720;
+                      }
+                      if (user['plans'] != null) {
+                        List sortAllKeys = user['plans'].keys.toList();
+                        sortAllKeys.sort((a, b) => a.compareTo(b));
+
+                        // final allDaysMap = user['days'];
+                        // check if today's date comes in between any plan
+                        for (String key in sortAllKeys) {
+                          final plan = user['plans'][key];
+                          // final planDate = DateTime.parse(key);
+                          planDays = plan['days'] as int;
+                          tempAllPlanDays += planDays;
+                          // debugPrint('Existing Plan: $existingPlan');
+                          if (user['totalDays'] <= tempAllPlanDays) {
+                            final program = plan['program'];
+                            existingPlan = true;
+                            planDate = key;
+                            final int cDay = day - (tempAllPlanDays - planDays);
+
+                            if (cDay == 1 && (planDate != formattedDate)) {
+                              String paymentId = plan['payments'].keys.first;
+                              String paymentDate = plan['payments'][paymentId];
+                              final Map<String, dynamic> updates = {
+                                'users/$id/plans/$planDate': null,
+                                'users/$id/plans/$formattedDate': plan,
+                                'users/$id/plansPaid/$program/$planDate': null,
+                                'users/$id/plansPaid/$program/$formattedDate':
+                                    user['plansPaid'][program][planDate],
+                                'attendance/$paymentDate/fees/$paymentId/planId':
+                                    formattedDate,
+                                'users/$id/payments/$paymentDate/$paymentId/planId':
+                                    formattedDate,
+                              };
+                              coachDb.child(cid).update(updates);
+                            }
+
+                            final gotNewPlan = getPlan(cDay,
+                                assignedPlanDays: planDays, planName: program);
+                            days = gotNewPlan['day'];
+                            planName = gotNewPlan['plan'];
+                            const int fiveDayCost = 920;
+                            realBalance =
+                                (((user['plans'][key]['days'] as int) *
+                                            shakePrice) +
+                                        fiveDayCost) -
+                                    amountPaidTillNow;
+                            balance = realBalance.toString();
+                            break;
+                          }
+                        }
+
+                        if (plansPaid != null) {
+                          final Map<dynamic, dynamic> plans = user['plans'];
+
+                          for (String key in plans.keys) {
+                            int bal = plans[key]['balance'] as int;
+                            String planName = plans[key]['program'];
+                            if (bal != 0) {
+                              actualBalances[planName] = bal;
+                            }
+                            int planPaid = 0;
+                            Map<dynamic, dynamic> planPaymentDates =
+                                plans[key]['payments'] ?? {};
+                            // remove any date after today
+                            planPaymentDates.removeWhere((key, value) {
+                              final planPaymentDate = DateTime.parse(value);
+                              return planPaymentDate.isAfter(selectedDate);
+                            });
+                            if (planPaymentDates.isNotEmpty) {
+                              for (String key in planPaymentDates.keys) {
+                                final paymentId = key;
+                                final datex = planPaymentDates[key];
+                                planPaid += user['payments'][datex][paymentId]
+                                    ['amount'] as int;
+                              }
+                            }
+
+                            int planCost =
+                                ((user['plans'][key]['days'] as int) *
+                                    shakePrice);
+                            final int finBal = planCost - planPaid;
+                            if (finBal != 0) {
+                              allBalances[plans[key]['program']] = finBal;
+                            }
+                          }
+                        }
+
+                        if (!existingPlan) {
+                          final int currentDay = day - tempAllPlanDays;
+                          if (currentDay == 1 && advancedPaymentx) {
+                            // query to firebase to set plan
+                            final DatabaseReference dbRef = coachDb.child(cid);
+                            final Map<dynamic, dynamic> pid =
+                                user['advancedPayments']['pid'];
+                            final int pidAmount = pid['amount'] as int;
+                            // remove amount from advanced payments
+                            pid.remove('amount');
+                            final String program = pid['program'];
+                            final String paymentId = pid['payments'].keys.first;
+                            final String paymentDate =
+                                pid['payments'][paymentId];
+
+                            final Map<String, dynamic> updates = {
+                              'users/$id/plans/$formattedDate': pid,
+                              'users/$id/plansPaid/$program/$formattedDate':
+                                  pidAmount,
+                              'users/$id/advancedPayments': null,
+                              'attendance/$paymentDate/fees/$paymentId/planId':
+                                  formattedDate,
+                              'users/$id/payments/$paymentDate/$paymentId/planId':
+                                  formattedDate,
+                            };
+                            dbRef.update(updates);
+                          }
+                          days = '$currentDay / $currentDay';
+                          actualBalances['Paid'] = currentDay * shakePrice;
+                          allBalances['Extra ${currentDay}days'] =
+                              currentDay * shakePrice;
+                        }
+                      } else {
+                        final int currentDay = day - tempAllPlanDays;
+                        days = '$currentDay / $currentDay';
+                        actualBalances['Paid'] = currentDay * shakePrice;
+                        allBalances['Extra ${currentDay}days'] =
+                            currentDay * shakePrice;
+                      }
+                    }
                     return DataRow(
                       cells: <DataCell>[
                         DataCell(
@@ -661,47 +846,90 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                           child: TextButton(
                                               onPressed: () {
                                                 List<String> plans = [];
-                                                String zeroDay = '0 day';
-                                                String threeDay = '3 day';
+                                                if (actualBalances.isNotEmpty) {
+                                                  for (String key
+                                                      in actualBalances.keys) {
+                                                    if (actualBalances[key]! >
+                                                        0) {
+                                                      plans.add(
+                                                          "$key (Remaining - ₹${actualBalances[key]})");
+                                                    }
+                                                  }
+                                                  if (!existingPlan) {
+                                                    plans.addAll([
+                                                      'Gold UMS',
+                                                      'Plat UMS',
+                                                      'Other'
+                                                    ]);
+                                                  }
+                                                } else {
+                                                  String zeroDay = '0 day';
+                                                  String threeDay = '3 day';
 
-                                                bool zeroDayValid =
-                                                    user['plansPaid'] != null &&
-                                                        user['plansPaid']
-                                                                ['0 day'] !=
-                                                            null;
-                                                bool zeroDayOver =
-                                                    zeroDayValid &&
-                                                        user['plansPaid']
-                                                                ['0 day'] >=
-                                                            200;
+                                                  bool zeroDayValid =
+                                                      user['plansPaid'] !=
+                                                              null &&
+                                                          user['plansPaid']
+                                                                  ['0 day'] !=
+                                                              null;
+                                                  bool zeroDayOver =
+                                                      zeroDayValid &&
+                                                          user['plansPaid']
+                                                                  ['0 day'] >=
+                                                              200;
 
-                                                if (!zeroDayOver) {
-                                                  zeroDay +=
-                                                      ' (Remaining - ₹${zeroDayValid ? 200 - user['plansPaid']['0 day'] : 200})';
-                                                  plans.add(zeroDay);
-                                                }
+                                                  if (!zeroDayOver) {
+                                                    zeroDay +=
+                                                        ' (Remaining - ₹${zeroDayValid ? 200 - user['plansPaid']['0 day'] : 200})';
+                                                    plans.add(zeroDay);
+                                                  }
 
-                                                bool threeDayValid =
-                                                    user['plansPaid'] != null &&
-                                                        user['plansPaid']
-                                                                ['3 day'] !=
-                                                            null;
-                                                bool threeDayOver =
-                                                    threeDayValid &&
-                                                        user['plansPaid']
-                                                                ['3 day'] >=
-                                                            720;
-                                                if (!threeDayOver) {
-                                                  threeDay +=
-                                                      ' (Remaining - ₹${threeDayValid ? 720 - user['plansPaid']['3 day'] : 720})';
-                                                }
+                                                  bool threeDayValid =
+                                                      user['plansPaid'] !=
+                                                              null &&
+                                                          user['plansPaid']
+                                                                  ['3 day'] !=
+                                                              null;
+                                                  bool threeDayOver =
+                                                      threeDayValid &&
+                                                          user['plansPaid']
+                                                                  ['3 day'] >=
+                                                              720;
+                                                  if (!threeDayOver) {
+                                                    threeDay +=
+                                                        ' (Remaining - ₹${threeDayValid ? 720 - user['plansPaid']['3 day'] : 720})';
+                                                  }
 
-                                                if (day <= 1) {
-                                                  if (zeroDayOver &&
-                                                      !threeDayOver) {
-                                                    plans.add(threeDay);
-                                                  } else if (zeroDayOver &&
-                                                      threeDayOver) {
+                                                  if (day <= 1) {
+                                                    if (zeroDayOver &&
+                                                        !threeDayOver) {
+                                                      plans.add(threeDay);
+                                                    } else if (zeroDayOver &&
+                                                        threeDayOver) {
+                                                      plans.addAll([
+                                                        'Gold UMS',
+                                                        'Plat UMS',
+                                                        'Paid',
+                                                        'Other'
+                                                      ]);
+                                                    }
+                                                  } else if (day <= 4) {
+                                                    if (!threeDayOver) {
+                                                      plans.add(threeDay);
+                                                      plans.addAll(
+                                                          ['Paid', 'Other']);
+                                                    } else {
+                                                      plans.addAll([
+                                                        'Gold UMS',
+                                                        'Plat UMS',
+                                                        'Paid',
+                                                        'Other'
+                                                      ]);
+                                                    }
+                                                  } else {
+                                                    if (!threeDayOver) {
+                                                      plans.add(threeDay);
+                                                    }
                                                     plans.addAll([
                                                       'Gold UMS',
                                                       'Plat UMS',
@@ -709,35 +937,28 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                       'Other'
                                                     ]);
                                                   }
-                                                } else if (day <= 4) {
-                                                  if (!threeDayOver) {
-                                                    plans.add(threeDay);
-                                                    plans.addAll(
-                                                        ['Paid', 'Other']);
-                                                  }
-                                                } else {
-                                                  if (!threeDayOver) {
-                                                    plans.add(threeDay);
-                                                  }
-                                                  plans.addAll([
-                                                    'Gold UMS',
-                                                    'Plat UMS',
-                                                    'Paid',
-                                                    'Other'
-                                                  ]);
                                                 }
 
                                                 setState(() {
                                                   initalPlan = plans[0];
                                                 });
 
-                                                // debugPrint(
-                                                //     "plans:  opx: $plans");
-                                                // remove duplicates in plans
-                                                // plans = plans.toSet().toList();
-
                                                 // open a new dialog to enter the cash amount
                                                 Navigator.of(context).pop();
+
+                                                List checkWrongValues = [
+                                                  '0 day',
+                                                  '0 d',
+                                                  '0 dy',
+                                                  '0 da',
+                                                  '0 days',
+                                                  '3 day',
+                                                  '3 d',
+                                                  '3 dy',
+                                                  '3 da',
+                                                  '3 days',
+                                                  'Paid'
+                                                ];
                                                 showDialog(
                                                   barrierDismissible: true,
                                                   context: context,
@@ -753,323 +974,470 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                         child: Text(value),
                                                       );
                                                     }).toList();
-                                                    return SingleChildScrollView(
-                                                      child: Positioned(
-                                                        top: 0,
-                                                        child: StatefulBuilder(
-                                                            builder: (context,
-                                                                setState) {
-                                                          return Padding(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(16),
-                                                            child: Material(
-                                                              // color: Colors.green,
-                                                              shape: RoundedRectangleBorder(
-                                                                  borderRadius:
-                                                                      BorderRadius
-                                                                          .circular(
-                                                                              15)),
-                                                              child: Padding(
-                                                                padding:
-                                                                    const EdgeInsets
-                                                                        .all(
-                                                                        16),
-                                                                child: Column(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  children: [
-                                                                    Row(
-                                                                      children: [
-                                                                        Expanded(
-                                                                            child:
-                                                                                Container(
-                                                                          margin: const EdgeInsets
-                                                                              .only(
-                                                                              bottom: 10),
+                                                    return StatefulBuilder(
+                                                        builder: (context,
+                                                            setState) {
+                                                      return SingleChildScrollView(
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .all(16),
+                                                          child: Material(
+                                                            // color: Colors.green,
+                                                            shape: RoundedRectangleBorder(
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            15)),
+                                                            child: Padding(
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .all(16),
+                                                              child: Column(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Row(
+                                                                    children: [
+                                                                      Expanded(
                                                                           child:
-                                                                              const Text(
-                                                                            'Club Fees 💵',
-                                                                            style: TextStyle(
-                                                                                fontSize: 16,
-                                                                                fontWeight: FontWeight.w600,
-                                                                                color: Colors.greenAccent),
-                                                                          ),
-                                                                        )),
-                                                                      ],
-                                                                    ),
-                                                                    Form(
-                                                                      key:
-                                                                          formKey,
-                                                                      autovalidateMode:
-                                                                          AutovalidateMode
-                                                                              .onUserInteraction,
-                                                                      child:
-                                                                          Column(
-                                                                        children: [
-                                                                          Row(
-                                                                            children: [
-                                                                              Expanded(
-                                                                                child: TextFormField(
-                                                                                  keyboardType: TextInputType.number,
-                                                                                  controller: amount,
-                                                                                  validator: (value) {
-                                                                                    if (value == null || value.isEmpty) {
-                                                                                      return 'Please enter the amount';
-                                                                                    } else if (int.tryParse(value) == null) {
-                                                                                      return 'Please enter a valid amount';
-                                                                                    } else if (int.tryParse(value)! < 50) {
-                                                                                      return 'Minimum amount is 50';
-                                                                                    } else if (int.tryParse(value)! > 50000) {
-                                                                                      return 'Please enter a valid amount';
-                                                                                    } else if (initalPlan == '0 day' && int.tryParse(value)! > 200) {
-                                                                                      return 'Maximum amount for 0 day is 200';
-                                                                                    } else if (initalPlan == '3 day' && int.tryParse(value)! > 720) {
-                                                                                      return 'Maximum amount for 3 day is 720';
-                                                                                    } else if (initalPlan == 'Gold UMS' && int.tryParse(value)! > 7200) {
-                                                                                      return 'Please enter a valid amount';
-                                                                                    } else if (initalPlan == 'Plat UMS' && int.tryParse(value)! > 9600) {
-                                                                                      return 'Please enter a valid amount';
+                                                                              Container(
+                                                                        margin: const EdgeInsets
+                                                                            .only(
+                                                                            bottom:
+                                                                                10),
+                                                                        child:
+                                                                            const Text(
+                                                                          'Club Fees 💵',
+                                                                          style: TextStyle(
+                                                                              fontSize: 16,
+                                                                              fontWeight: FontWeight.w600,
+                                                                              color: Colors.greenAccent),
+                                                                        ),
+                                                                      )),
+                                                                    ],
+                                                                  ),
+                                                                  Form(
+                                                                    key:
+                                                                        formKey,
+                                                                    autovalidateMode:
+                                                                        AutovalidateMode
+                                                                            .onUserInteraction,
+                                                                    child:
+                                                                        Column(
+                                                                      children: [
+                                                                        Row(
+                                                                          children: [
+                                                                            Expanded(
+                                                                              child: TextFormField(
+                                                                                keyboardType: TextInputType.number,
+                                                                                controller: amount,
+                                                                                validator: (value) {
+                                                                                  String iniplan = initalPlan;
+                                                                                  if (initalPlan.contains(' (')) {
+                                                                                    iniplan = initalPlan.split(' (')[0].trim();
+                                                                                  }
+                                                                                  if (value == null || value.isEmpty) {
+                                                                                    return 'Please enter the amount';
+                                                                                  } else if (int.tryParse(value) == null) {
+                                                                                    return 'Please enter a valid amount';
+                                                                                  } else if (actualBalances.isNotEmpty && actualBalances[iniplan] != null) {
+                                                                                    if (int.tryParse(value)! < 1) {
+                                                                                      return 'Minimum amount is 1';
                                                                                     }
-                                                                                    return null;
-                                                                                  },
-                                                                                  decoration: const InputDecoration(
-                                                                                    contentPadding: EdgeInsets.zero, // Remove any content padding
-                                                                                    isDense: true,
-                                                                                    labelText: 'Amount (₹)',
-                                                                                  ),
+
+                                                                                    if (actualBalances[iniplan] != null) {
+                                                                                      if (int.tryParse(value)! > actualBalances[iniplan]!) {
+                                                                                        return 'Amount exceeds the remaining balance';
+                                                                                      }
+                                                                                    }
+                                                                                  } else if (int.tryParse(value)! < 50) {
+                                                                                    return 'Minimum amount is 50';
+                                                                                  } else if (iniplan == '0 day' && int.tryParse(value)! > 200) {
+                                                                                    return 'Maximum amount for 0 day is 200';
+                                                                                  } else if (iniplan == '3 day' && int.tryParse(value)! > 720) {
+                                                                                    return 'Maximum amount for 3 day is 720';
+                                                                                  } else if (iniplan == 'Gold UMS' && int.tryParse(value)! > 7200) {
+                                                                                    return 'Please enter a valid amount';
+                                                                                  } else if (iniplan == 'Plat UMS' && int.tryParse(value)! > 9600) {
+                                                                                    return 'Please enter a valid amount';
+                                                                                  } else if (initalPlan == 'Other' && int.tryParse(customPlanDays.text.trim()) != null) {
+                                                                                    if (int.tryParse(value)! > int.tryParse(customPlanDays.text.trim())! * shakePrice) {
+                                                                                      return 'Plan cost exceeds the entered amount';
+                                                                                    }
+                                                                                  } else if (int.tryParse(value)! > 30000) {
+                                                                                    return 'Please enter a valid amount';
+                                                                                  }
+                                                                                  return null;
+                                                                                },
+                                                                                decoration: const InputDecoration(
+                                                                                  contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                  isDense: true,
+                                                                                  labelText: 'Amount (₹)',
                                                                                 ),
                                                                               ),
-                                                                              const SizedBox(
-                                                                                width: 10,
-                                                                              ),
-                                                                              // select plan dropdown
-                                                                              Expanded(
-                                                                                child: DropdownButtonFormField<String>(
-                                                                                  decoration: const InputDecoration(
-                                                                                    contentPadding: EdgeInsets.zero, // Remove any content padding
-                                                                                    isDense: true,
-                                                                                    labelText: 'Mode',
-                                                                                  ),
-                                                                                  value: initalMode,
-                                                                                  items: [
-                                                                                    'Cash',
-                                                                                    'Online',
-                                                                                    'Cheque',
-                                                                                  ].map((String value) {
-                                                                                    return DropdownMenuItem<String>(
-                                                                                      value: value,
-                                                                                      child: Text(value),
-                                                                                    );
-                                                                                  }).toList(),
-                                                                                  onChanged: (String? newValue) {
-                                                                                    setState(() {
-                                                                                      initalMode = newValue ?? '';
-                                                                                    });
-                                                                                  },
+                                                                            ),
+                                                                            const SizedBox(
+                                                                              width: 10,
+                                                                            ),
+                                                                            // select plan dropdown
+                                                                            Expanded(
+                                                                              child: DropdownButtonFormField<String>(
+                                                                                decoration: const InputDecoration(
+                                                                                  contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                  isDense: true,
+                                                                                  labelText: 'Mode',
                                                                                 ),
+                                                                                value: initalMode,
+                                                                                items: [
+                                                                                  'Cash',
+                                                                                  'Online',
+                                                                                  'Cheque',
+                                                                                ].map((String value) {
+                                                                                  return DropdownMenuItem<String>(
+                                                                                    value: value,
+                                                                                    child: Text(value),
+                                                                                  );
+                                                                                }).toList(),
+                                                                                onChanged: (String? newValue) {
+                                                                                  setState(() {
+                                                                                    initalMode = newValue ?? '';
+                                                                                  });
+                                                                                },
                                                                               ),
-                                                                            ],
-                                                                          ),
-                                                                          Row(
-                                                                            children: [
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                        Row(
+                                                                          children: [
+                                                                            Expanded(
+                                                                              flex: 2,
+                                                                              child: DropdownButtonFormField<String>(
+                                                                                decoration: const InputDecoration(
+                                                                                  labelText: 'Program',
+                                                                                ),
+                                                                                value: initalPlan,
+                                                                                items: planItemsx,
+                                                                                onChanged: (String? newValue) {
+                                                                                  debugPrint('New Value: $newValue');
+                                                                                  setState(() {
+                                                                                    initalPlan = newValue ?? '';
+                                                                                  });
+                                                                                },
+                                                                              ),
+                                                                            ),
+                                                                            if (initalPlan ==
+                                                                                'Other')
                                                                               Expanded(
                                                                                 flex: 2,
-                                                                                child: DropdownButtonFormField<String>(
-                                                                                  decoration: const InputDecoration(
-                                                                                    labelText: 'Program',
+                                                                                child: Container(
+                                                                                  margin: const EdgeInsets.only(left: 10),
+                                                                                  child: TextFormField(
+                                                                                    controller: customPlan,
+                                                                                    decoration: const InputDecoration(
+                                                                                      labelText: 'Custom Plan',
+                                                                                    ),
+                                                                                    validator: (value) {
+                                                                                      if (value == null || value.isEmpty) {
+                                                                                        return 'Please enter the plan';
+                                                                                      } else if (value.length < 3) {
+                                                                                        return 'Please enter a valid plan';
+                                                                                      } else if (checkWrongValues.contains(value)) {
+                                                                                        return 'Please enter a valid plan';
+                                                                                      }
+                                                                                      return null;
+                                                                                    },
                                                                                   ),
-                                                                                  value: initalPlan,
-                                                                                  items: planItemsx,
-                                                                                  onChanged: (String? newValue) {
-                                                                                    debugPrint('New Value: $newValue');
-                                                                                    setState(() {
-                                                                                      initalPlan = newValue ?? '';
-                                                                                    });
-                                                                                  },
                                                                                 ),
                                                                               ),
-                                                                              if (initalPlan == 'Other')
-                                                                                Expanded(
-                                                                                  flex: 2,
-                                                                                  child: Container(
-                                                                                    margin: const EdgeInsets.only(left: 10),
-                                                                                    child: TextFormField(
-                                                                                      controller: customPlan,
-                                                                                      decoration: const InputDecoration(
-                                                                                        labelText: 'Custom Plan',
-                                                                                      ),
-                                                                                      validator: (value) {
-                                                                                        if (value == null || value.isEmpty) {
-                                                                                          return 'Please enter the plan';
-                                                                                        } else if (value.length < 3) {
-                                                                                          return 'Please enter a valid plan';
-                                                                                        }
-                                                                                        return null;
-                                                                                      },
+                                                                            if (initalPlan ==
+                                                                                'Other')
+                                                                              Expanded(
+                                                                                flex: 1,
+                                                                                child: Container(
+                                                                                  margin: const EdgeInsets.only(left: 10),
+                                                                                  child: TextFormField(
+                                                                                    controller: customPlanDays,
+                                                                                    decoration: const InputDecoration(
+                                                                                      labelText: 'Plan Days',
                                                                                     ),
+                                                                                    validator: (value) {
+                                                                                      if (value == null || value.isEmpty) {
+                                                                                        return 'Please enter the plan';
+                                                                                      } else if (int.tryParse(value) == null) {
+                                                                                        return 'Please enter a valid plan';
+                                                                                      } else if (int.tryParse(value)! < 1) {
+                                                                                        return 'Please enter a valid plan';
+                                                                                      } else if (int.tryParse(value)! > 51) {
+                                                                                        return 'Please enter a valid plan';
+                                                                                      }
+                                                                                      return null;
+                                                                                    },
                                                                                   ),
                                                                                 ),
-                                                                              if (initalPlan == 'Other')
-                                                                                Expanded(
-                                                                                  flex: 1,
-                                                                                  child: Container(
-                                                                                    margin: const EdgeInsets.only(left: 10),
-                                                                                    child: TextFormField(
-                                                                                      controller: customPlanDays,
-                                                                                      decoration: const InputDecoration(
-                                                                                        labelText: 'Plan Days',
-                                                                                      ),
-                                                                                      validator: (value) {
-                                                                                        if (value == null || value.isEmpty) {
-                                                                                          return 'Please enter the plan';
-                                                                                        } else if (int.tryParse(value) == null) {
-                                                                                          return 'Please enter a valid plan';
-                                                                                        } else if (int.tryParse(value)! < 1) {
-                                                                                          return 'Please enter a valid plan';
-                                                                                        } else if (int.tryParse(value)! > 51) {
-                                                                                          return 'Please enter a valid plan';
-                                                                                        }
-                                                                                        return null;
-                                                                                      },
-                                                                                    ),
-                                                                                  ),
-                                                                                ),
-                                                                            ],
-                                                                          ),
-                                                                          // 2 buttons
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                    Row(
-                                                                      mainAxisAlignment:
-                                                                          MainAxisAlignment
-                                                                              .spaceAround,
-                                                                      crossAxisAlignment:
-                                                                          CrossAxisAlignment
-                                                                              .center,
-                                                                      children: [
-                                                                        Expanded(
-                                                                          child:
-                                                                              TextButton(
-                                                                            onPressed:
-                                                                                () {
-                                                                              Navigator.of(context).pop();
-                                                                            },
-                                                                            child:
-                                                                                const Text('Cancel'),
-                                                                          ),
+                                                                              ),
+                                                                          ],
                                                                         ),
-                                                                        Expanded(
-                                                                          child:
-                                                                              TextButton(
-                                                                            onPressed:
-                                                                                () async {
-                                                                              if (formKey.currentState!.validate() && !submitted) {
-                                                                                changeSubmitted(true);
-                                                                                // save the data
-                                                                                // save to firebase
-                                                                                // add to firebase
-                                                                                try {
-                                                                                  if (initalPlan == 'Other') {
-                                                                                    initalPlan = customPlan.text.trim();
-                                                                                  } else {
-                                                                                    // all text before (
-                                                                                    initalPlan = initalPlan.split(' (')[0];
-                                                                                  }
-                                                                                  // balance
-                                                                                  const time = ServerValue.timestamp;
-                                                                                  final int payAmount = int.parse(amount.text.trim());
-                                                                                  final DatabaseReference dbRef = coachDb.child(cid);
-                                                                                  String newPaymentId = FirebaseDatabase.instance.ref().push().key!;
-                                                                                  Map<String, dynamic> updates = {
-                                                                                    // Set club fees
-                                                                                    'attendance/$formattedDate/fees/$newPaymentId': {
-                                                                                      'uid': id,
-                                                                                      'program': initalPlan,
-                                                                                      'amount': payAmount,
-                                                                                      'mode': initalMode,
-                                                                                      'balance': realBalance - payAmount,
-                                                                                      'time': time,
-                                                                                    },
-                                                                                    // Set user payments
-                                                                                    'users/$id/payments/$formattedDate/$newPaymentId': {
-                                                                                      'date': formattedDate,
-                                                                                      'time': time,
-                                                                                      'amount': payAmount,
-                                                                                      'mode': initalMode,
-                                                                                      'balance': realBalance - payAmount,
-                                                                                      'program': initalPlan,
-                                                                                    },
-                                                                                    'users/$id/payments/$formattedDate/totalAmount': ServerValue.increment(payAmount),
-
-                                                                                    'users/$id/paid': ServerValue.increment(payAmount),
-                                                                                    // Increment user's total paid amount
-                                                                                    'users/$id/plansPaid/$initalPlan': ServerValue.increment(payAmount),
-                                                                                  };
-                                                                                  bool wrongPlan = initalPlan.toString().toLowerCase() == '0 day' || initalPlan.toString().toLowerCase() == '3 day';
-                                                                                  if (!wrongPlan) {
-                                                                                    int days = 30;
-                                                                                    if (initalPlan.toLowerCase() == 'gold ums') {
-                                                                                      days = 30;
-                                                                                    } else if (initalPlan.toLowerCase() == 'plat ums') {
-                                                                                      days = 40;
-                                                                                    } else {
-                                                                                      days = int.parse(customPlanDays.text.trim());
-                                                                                    }
-                                                                                    String newPlanId = FirebaseDatabase.instance.ref().push().key!;
-                                                                                    updates['users/$id/plans/$newPlanId'] = {
-                                                                                      'date': formattedDate,
-                                                                                      'time': time,
-                                                                                      'days': days,
-                                                                                      'program': initalPlan,
-                                                                                      'paymentId': newPaymentId,
-                                                                                      'amount': payAmount,
-                                                                                      'balance': (days * shakePrice) - payAmount,
-                                                                                    };
-                                                                                  }
-                                                                                  await dbRef.update(updates);
-                                                                                  amount.clear();
-                                                                                  customPlan.clear();
-                                                                                  customPlanDays.clear();
-                                                                                  initalPlan = '0 day';
-                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                  changeSubmitted(false);
-                                                                                } catch (e) {
-                                                                                  Navigator.of(scaffoldKey.currentContext!).pop();
-                                                                                  Flushbar(
-                                                                                    margin: const EdgeInsets.all(7),
-                                                                                    borderRadius: BorderRadius.circular(15),
-                                                                                    flushbarStyle: FlushbarStyle.FLOATING,
-                                                                                    flushbarPosition: FlushbarPosition.TOP,
-                                                                                    message: "$e Please check the data and try again or contact support",
-                                                                                    icon: Icon(
-                                                                                      Icons.error_outline_rounded,
-                                                                                      size: 28.0,
-                                                                                      color: Colors.red[300],
-                                                                                    ),
-                                                                                    duration: const Duration(milliseconds: 3000),
-                                                                                    leftBarIndicatorColor: Colors.red[300],
-                                                                                  ).show(scaffoldKey.currentContext!);
-                                                                                  changeSubmitted(false);
-                                                                                }
-                                                                              }
-                                                                            },
-                                                                            child:
-                                                                                const Text('Save'),
-                                                                          ),
-                                                                        ),
+                                                                        // 2 buttons
                                                                       ],
                                                                     ),
-                                                                  ],
-                                                                ),
+                                                                  ),
+                                                                  Row(
+                                                                    mainAxisAlignment:
+                                                                        MainAxisAlignment
+                                                                            .spaceAround,
+                                                                    crossAxisAlignment:
+                                                                        CrossAxisAlignment
+                                                                            .center,
+                                                                    children: [
+                                                                      Expanded(
+                                                                        child:
+                                                                            TextButton(
+                                                                          onPressed:
+                                                                              () {
+                                                                            Navigator.of(context).pop();
+                                                                          },
+                                                                          child:
+                                                                              const Text('Cancel'),
+                                                                        ),
+                                                                      ),
+                                                                      Expanded(
+                                                                        child:
+                                                                            TextButton(
+                                                                          onPressed:
+                                                                              () async {
+                                                                            if (formKey.currentState!.validate() &&
+                                                                                !submitted) {
+                                                                              changeSubmitted(true);
+                                                                              // save the data
+                                                                              // save to firebase
+                                                                              // add to firebase
+                                                                              try {
+                                                                                if (initalPlan == 'Other') {
+                                                                                  initalPlan = customPlan.text.trim();
+                                                                                } else {
+                                                                                  // all text before (
+                                                                                  initalPlan = initalPlan.split(' (')[0];
+                                                                                }
+                                                                                // balance
+                                                                                const time = ServerValue.timestamp;
+                                                                                final int payAmount = int.parse(amount.text.trim());
+                                                                                final DatabaseReference dbRef = coachDb.child(cid);
+                                                                                final String newPaymentId = FirebaseDatabase.instance.ref().push().key!;
+
+                                                                                int days = 30;
+                                                                                bool advancedPayment = false;
+                                                                                int totalBal = realBalance - payAmount;
+                                                                                String iniPlan = initalPlan.toString().toLowerCase();
+                                                                                bool wrongPlan = iniPlan == '0 day' || iniPlan == '3 day' || iniPlan == 'Paid';
+                                                                                if (existingPlan) {
+                                                                                  if (!wrongPlan && (totalBal < 0)) {
+                                                                                    bool? result = await showDialog(
+                                                                                        context: context,
+                                                                                        builder: (BuildContext context) {
+                                                                                          return AlertDialog(
+                                                                                            title: const Text('Confirmation'),
+                                                                                            content: Text('Are you sure you want to add an advanced payment for "${name.split(' ')[0]}"? $initalPlan - ₹$payAmount'),
+                                                                                            actions: [
+                                                                                              TextButton(
+                                                                                                onPressed: () {
+                                                                                                  Navigator.of(context).pop(false);
+                                                                                                },
+                                                                                                child: const Text('Cancel'),
+                                                                                              ),
+                                                                                              TextButton(
+                                                                                                onPressed: () {
+                                                                                                  Navigator.of(context).pop(true);
+                                                                                                },
+                                                                                                child: const Text('Add'),
+                                                                                              ),
+                                                                                            ],
+                                                                                          );
+                                                                                        });
+                                                                                    if (result != null && result) {
+                                                                                      totalBal = realBalance;
+                                                                                      if (initalPlan.toLowerCase() == 'gold ums') {
+                                                                                        days = 30;
+                                                                                      } else if (initalPlan.toLowerCase() == 'plat ums') {
+                                                                                        days = 40;
+                                                                                      } else {
+                                                                                        days = int.parse(customPlanDays.text.trim());
+                                                                                      }
+                                                                                      advancedPayment = true;
+                                                                                      final Map<dynamic, dynamic> userDays = user['days'];
+                                                                                      final sortAllKeys = userDays.keys.toList();
+                                                                                      sortAllKeys.sort((a, b) => a.compareTo(b));
+                                                                                      final int checkDay = tempAllPlanDays + 1;
+                                                                                      // check if sortAllKeys has the day
+                                                                                      if (sortAllKeys.length > checkDay) {
+                                                                                        planDate = sortAllKeys[checkDay];
+                                                                                        existingPlan = false;
+                                                                                      } else {
+                                                                                        planDate = null;
+                                                                                      }
+                                                                                    } else {
+                                                                                      changeSubmitted(false);
+                                                                                      throw 'Advanced payment cancelled';
+                                                                                    }
+                                                                                  }
+                                                                                } else if (!wrongPlan) {
+                                                                                  // get 5th day of user and set the existing planDate
+                                                                                  final Map<dynamic, dynamic> userDays = user['days'];
+                                                                                  final sortAllKeys = userDays.keys.toList();
+                                                                                  sortAllKeys.sort((a, b) => a.compareTo(b));
+                                                                                  if (user['plans'] == null) {
+                                                                                    planDate = sortAllKeys[5];
+                                                                                  } else {
+                                                                                    planDate = sortAllKeys[tempAllPlanDays + 1];
+                                                                                  }
+
+                                                                                  if (initalPlan.toLowerCase() == 'gold ums') {
+                                                                                    days = 30;
+                                                                                  } else if (initalPlan.toLowerCase() == 'plat ums') {
+                                                                                    days = 40;
+                                                                                  } else {
+                                                                                    days = int.parse(customPlanDays.text.trim());
+                                                                                  }
+                                                                                  totalBal = (days * shakePrice) - payAmount;
+                                                                                  try {
+                                                                                    final plansPaid = user['plansPaid'];
+                                                                                    if (plansPaid != null) {
+                                                                                      final day0 = plansPaid['0 day'] ?? 0;
+                                                                                      final day3 = plansPaid['3 day'] ?? 0;
+                                                                                      if (day0 < 200) {
+                                                                                        int tempBal = 200 - (day0 as int);
+                                                                                        totalBal += tempBal;
+                                                                                      }
+                                                                                      if (day3 < 720) {
+                                                                                        int tempBal = 720 - (day3 as int);
+                                                                                        totalBal += tempBal;
+                                                                                      }
+                                                                                    } else {
+                                                                                      totalBal += 920;
+                                                                                    }
+                                                                                  } catch (e) {
+                                                                                    debugPrint('Error: $e');
+                                                                                  }
+                                                                                }
+                                                                                Map<String, dynamic> updates = {
+                                                                                  // Set club fees
+                                                                                  'attendance/$formattedDate/fees/$newPaymentId': {
+                                                                                    'uid': id,
+                                                                                    'program': initalPlan,
+                                                                                    'amount': payAmount,
+                                                                                    'mode': initalMode,
+                                                                                    'balance': totalBal,
+                                                                                    'time': time,
+                                                                                    'planId': existingPlan || !wrongPlan ? planDate : null,
+                                                                                    'advancedPayment': advancedPayment ? true : null,
+                                                                                  },
+                                                                                  // Set user payments
+                                                                                  'users/$id/payments/$formattedDate/$newPaymentId': {
+                                                                                    'date': formattedDate,
+                                                                                    'time': time,
+                                                                                    'amount': payAmount,
+                                                                                    'mode': initalMode,
+                                                                                    'balance': totalBal,
+                                                                                    'program': initalPlan,
+                                                                                    'planId': existingPlan || !wrongPlan ? planDate : null,
+                                                                                    'advancedPayment': advancedPayment ? true : null,
+                                                                                  },
+                                                                                  // test remaining
+                                                                                  'users/$id/payments/$formattedDate/totalAmount': ServerValue.increment(payAmount),
+                                                                                  'users/$id/paid': ServerValue.increment(payAmount),
+                                                                                  // Increment user's total paid amount
+                                                                                  'users/$id/plansPaid/$initalPlan': ServerValue.increment(payAmount),
+                                                                                };
+
+                                                                                if (existingPlan && !wrongPlan) {
+                                                                                  if (!allBalances.containsKey(initalPlan) && !advancedPayment) {
+                                                                                    changeSubmitted(false);
+                                                                                    throw 'Plan not found';
+                                                                                  }
+                                                                                  updates.remove('users/$id/plansPaid/$initalPlan');
+                                                                                  if (!advancedPayment) {
+                                                                                    updates['users/$id/plans/$planDate/payments/$newPaymentId'] = formattedDate;
+                                                                                    updates['users/$id/plans/$planDate/balance'] = ServerValue.increment(-payAmount);
+                                                                                    updates['users/$id/plansPaid/$initalPlan/$planDate'] = ServerValue.increment(payAmount);
+                                                                                    if (planDate == null) {
+                                                                                      changeSubmitted(false);
+                                                                                      throw 'Plan Date is null';
+                                                                                    }
+                                                                                  } else {
+                                                                                    updates['users/$id/advancedPayments/pid'] = {
+                                                                                      'time': time,
+                                                                                      'program': initalPlan,
+                                                                                      'payments': {
+                                                                                        newPaymentId: formattedDate,
+                                                                                      },
+                                                                                      'days': days,
+                                                                                      'balance': (days * shakePrice) - payAmount,
+                                                                                      'amount': payAmount,
+                                                                                    };
+                                                                                    if (planDate != null) {
+                                                                                      changeSubmitted(false);
+                                                                                      throw 'Plan Date not null';
+                                                                                    }
+                                                                                  }
+                                                                                  // check if other plan
+                                                                                } else if (!wrongPlan) {
+                                                                                  updates['users/$id/plans/$planDate'] = {
+                                                                                    'time': time,
+                                                                                    'program': initalPlan,
+                                                                                    'payments': {
+                                                                                      newPaymentId: formattedDate,
+                                                                                    },
+                                                                                    'days': days,
+                                                                                    'balance': (days * shakePrice) - payAmount,
+                                                                                  };
+                                                                                  updates.remove('users/$id/plansPaid/$initalPlan');
+                                                                                  updates['users/$id/plansPaid/$initalPlan/$planDate'] = ServerValue.increment(payAmount);
+                                                                                  if (planDate == null) {
+                                                                                    changeSubmitted(false);
+                                                                                    throw 'Plan Date is null';
+                                                                                  }
+                                                                                }
+                                                                                await dbRef.update(updates);
+                                                                                amount.clear();
+                                                                                customPlan.clear();
+                                                                                customPlanDays.clear();
+                                                                                initalPlan = '0 day';
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                changeSubmitted(false);
+                                                                              } catch (e) {
+                                                                                Navigator.of(scaffoldKey.currentContext!).pop();
+                                                                                Flushbar(
+                                                                                  margin: const EdgeInsets.all(7),
+                                                                                  borderRadius: BorderRadius.circular(15),
+                                                                                  flushbarStyle: FlushbarStyle.FLOATING,
+                                                                                  flushbarPosition: FlushbarPosition.TOP,
+                                                                                  message: "$e Please check the data and try again or contact support",
+                                                                                  icon: Icon(
+                                                                                    Icons.error_outline_rounded,
+                                                                                    size: 28.0,
+                                                                                    color: Colors.red[300],
+                                                                                  ),
+                                                                                  duration: const Duration(milliseconds: 5000),
+                                                                                  leftBarIndicatorColor: Colors.red[300],
+                                                                                ).show(scaffoldKey.currentContext!);
+                                                                                changeSubmitted(false);
+                                                                              }
+                                                                            }
+                                                                          },
+                                                                          child:
+                                                                              const Text('Save'),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ],
                                                               ),
                                                             ),
-                                                          );
-                                                        }),
-                                                      ),
-                                                    );
+                                                          ),
+                                                        ),
+                                                      );
+                                                    });
                                                   },
                                                 );
                                               },
@@ -1179,6 +1547,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                               if (formkey
                                                                   .currentState!
                                                                   .validate()) {
+                                                                final int
+                                                                    tdays =
+                                                                    int.tryParse(
+                                                                            daysController.text) ??
+                                                                        0;
+
                                                                 // confirm
                                                                 showDialog(
                                                                     context:
@@ -1190,7 +1564,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                         title: const Text(
                                                                             'Confirmation'),
                                                                         content:
-                                                                            Text('Are you sure you want to add "${daysController.text} days" to "${name.split(' ')[0]}" ?'),
+                                                                            Text('Are you sure you want to add "$tdays days" to "${name.split(' ')[0]}" ?'),
                                                                         actions: [
                                                                           TextButton(
                                                                             child:
@@ -1219,8 +1593,34 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 bool error = false;
                                                                                 bool overwriteErr = false;
                                                                                 String errorDate = '';
-                                                                                for (int i = 1; i <= int.parse(daysController.text); i++) {
-                                                                                  final String newDate = DateFormat('ddMMyy').format(selectedDate.add(Duration(days: i)));
+                                                                                if (advancedPaymentx && existingPlan) {
+                                                                                  // check if existing plan finishes and next day 1 comes
+                                                                                  final int curDay = day - (tempAllPlanDays - planDays);
+                                                                                  if ((curDay + tdays) > planDays) {
+                                                                                    int remainingDays = planDays - curDay;
+                                                                                    // query to firebase to set plan
+                                                                                    final Map<dynamic, dynamic> pid = user['advancedPayments']['pid'];
+                                                                                    final int pidAmount = pid['amount'] as int;
+                                                                                    // remove amount from advanced payments
+                                                                                    pid.remove('amount');
+                                                                                    final String program = pid['program'];
+                                                                                    final String paymentId = pid['payments'].keys.first;
+                                                                                    final String paymentDate = pid['payments'][paymentId];
+                                                                                    final String firstDayDate = DateFormat('yyyy-MM-dd').format(selectedDate.add(Duration(days: remainingDays + 1)));
+
+                                                                                    final Map<String, dynamic> updates = {
+                                                                                      'users/$id/plans/$firstDayDate': pid,
+                                                                                      'users/$id/plansPaid/$program/$firstDayDate': pidAmount,
+                                                                                      'users/$id/advancedPayments': null,
+                                                                                      'attendance/$paymentDate/fees/$paymentId/planId': firstDayDate,
+                                                                                      'users/$id/payments/$paymentDate/$paymentId/planId': firstDayDate,
+                                                                                    };
+                                                                                    dbRef.update(updates);
+                                                                                  }
+                                                                                }
+
+                                                                                for (int i = 1; i <= tdays; i++) {
+                                                                                  final String newDate = DateFormat('yyyy-MM-dd').format(selectedDate.add(Duration(days: i)));
                                                                                   // check if already present
                                                                                   if (homeProg && user['homeProgram'][newDate] != null) {
                                                                                     // error
@@ -1231,7 +1631,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   }
                                                                                   if (user['days'][newDate] != null) {
                                                                                     errorDate = newDate;
-                                                                                    errorDate = '${errorDate.substring(0, 2)}/${errorDate.substring(2, 4)}/20${errorDate.substring(4, 6)}';
+                                                                                    errorDate = '${errorDate.substring(8, 10)}/${errorDate.substring(5, 7)}/${errorDate.substring(0, 4)}';
                                                                                     bool? result = await showDialog(
                                                                                       context: context,
                                                                                       builder: (BuildContext context) {
@@ -1276,7 +1676,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   Navigator.of(scaffoldKey.currentContext!).pop();
                                                                                   Navigator.of(scaffoldKey.currentContext!).pop();
                                                                                   if (error) {
-                                                                                    errorDate = '${errorDate.substring(0, 2)}/${errorDate.substring(2, 4)}/20${errorDate.substring(4, 6)}';
+                                                                                    errorDate = '${errorDate.substring(8, 10)}/${errorDate.substring(5, 7)}/${errorDate.substring(0, 4)}';
                                                                                     Flushbar(
                                                                                       margin: const EdgeInsets.all(7),
                                                                                       borderRadius: BorderRadius.circular(15),
@@ -1310,10 +1710,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   changeSubmitted(false);
                                                                                   return;
                                                                                 }
-                                                                                String newId = FirebaseDatabase.instance.ref().push().key!;
+                                                                                final String newId = FirebaseDatabase.instance.ref().push().key!;
                                                                                 updates['attendance/$formattedDate/homeProgram/$newId'] = {
                                                                                   'uid': id,
-                                                                                  'days': int.parse(daysController.text),
+                                                                                  'days': tdays,
                                                                                   'time': time,
                                                                                   'homeProgramID': newId,
                                                                                 };
@@ -1327,7 +1727,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   borderRadius: BorderRadius.circular(15),
                                                                                   flushbarStyle: FlushbarStyle.FLOATING,
                                                                                   flushbarPosition: FlushbarPosition.TOP,
-                                                                                  message: "${name.split(' ')[0]} added for ${daysController.text} days",
+                                                                                  message: "${name.split(' ')[0]} added for $tdays days",
                                                                                   icon: Icon(
                                                                                     Icons.check_circle_outline,
                                                                                     size: 28.0,
@@ -1410,12 +1810,40 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                               style: const TextStyle(letterSpacing: 1.8)),
                         ),
                         DataCell(
-                          Text(balance,
-                              style: TextStyle(
-                                  color: int.tryParse(balance) == 0
-                                      ? Colors.black
-                                      : Colors.red)),
-                        ),
+                            Text(int.parse(balance) < 0 ? '0' : balance,
+                                style: TextStyle(
+                                    color: int.tryParse(balance) == 0
+                                        ? Colors.black
+                                        : Colors.red)),
+                            onTap: allBalances.isEmpty
+                                ? null
+                                : () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title:
+                                              const Text('Remaining Balances'),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: allBalances.keys
+                                                .map((String key) {
+                                              return Text(
+                                                  '$key: ₹${allBalances[key]}');
+                                            }).toList(),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.of(context).pop();
+                                              },
+                                              child: const Text('Close'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  }),
                         if (isEdit)
                           DataCell(
                             IconButton(
@@ -1471,7 +1899,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                 updates = {
                                                   'attendance/$formattedDate/students/$id/shakes':
                                                       ServerValue.increment(-1),
-                                                  'users/$id/days/$formattedDate':
+                                                  'users/$id/days/$formattedDate/shakes':
                                                       ServerValue.increment(-1),
                                                 };
                                               } else {
@@ -1484,6 +1912,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                       null,
                                                 };
                                               }
+                                              debugPrint('Updates: $updates');
                                               final bool popMsg = isHome;
                                               await dbRef.update(updates);
                                               Navigator.of(scaffoldKey
@@ -1560,33 +1989,27 @@ class _DailyAttendanceState extends State<DailyAttendance> {
     );
   }
 
-  int shakePrice = 240;
   Map<String, dynamic> getPlan(int days,
       {int? assignedPlanDays, String? planName}) {
     String plan;
     String day;
     int balance = 200;
 
-    if (days == 0 || days == 1) {
+    if (assignedPlanDays != null && planName != null) {
+      plan = planName;
+      day = '$days / $assignedPlanDays';
+    } else if (days == 0 || days == 1) {
       plan = '0 day';
       day = '$days / 1';
     } else if (days >= 2 && days < 5) {
       plan = '3 day'; // Change this value as needed
       day = '${days - 1} / 3';
-      for (int i = 1; i < days; i++) {
-        balance += shakePrice;
-      }
     } else {
-      if (assignedPlanDays != null && planName != null) {
-        plan = planName;
-        day = '${days - 1} / $assignedPlanDays';
-      } else {
-        plan = 'Paid'; // Change this value as needed
-        day = '${days - 4} / ${days - 4}';
-      }
-      for (int i = 1; i < days; i++) {
-        balance += shakePrice;
-      }
+      plan = 'Paid'; // Change this value as needed
+      day = '${days - 4} / ${days - 4}';
+    }
+    for (int i = 1; i < days; i++) {
+      balance += shakePrice;
     }
 
     return {'plan': plan, 'day': day, 'balance': balance};
@@ -1621,7 +2044,7 @@ class DailyDetails extends StatefulWidget {
 class _DailyDetailsState extends State<DailyDetails> {
 // create date variable and set it to widget.selectedDate
   late DateTime selectedDate;
-  late String formattedDate = DateFormat('ddMMyy').format(selectedDate);
+  late String formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
   bool isEdit = false;
   bool submitted = false;
   final String cid = FirebaseAuth.instance.currentUser!.uid;
@@ -1898,8 +2321,8 @@ class _DailyDetailsState extends State<DailyDetails> {
                     ],
                     rows:
                         List<DataRow>.generate(widget.clubFees.length, (index) {
-                      String name =
-                          widget.studentsNameUID[widget.clubFees[index]['uid']];
+                      String uid = widget.clubFees[index]['uid'];
+                      String name = widget.studentsNameUID[uid];
                       String program = widget.clubFees[index]['program'];
                       String mode = widget.clubFees[index]['mode'];
                       String amount =
@@ -1947,34 +2370,81 @@ class _DailyDetailsState extends State<DailyDetails> {
                                             try {
                                               final DatabaseReference dbRef =
                                                   coachDb.child(cid);
-                                              final String uid =
-                                                  widget.clubFees[index]['uid'];
+
                                               final String paymentId = widget
                                                   .clubFees[index]['paymentId'];
                                               final String plan = widget
                                                   .clubFees[index]['program'];
+                                              final planId = widget
+                                                  .clubFees[index]['planId'];
+                                              final advancedPayment =
+                                                  widget.clubFees[index]
+                                                      ['advancedPayment'];
+
+                                              final user = widget.users
+                                                  .firstWhere((element) =>
+                                                      element['id'] == uid);
 
                                               // delete from firebase
-                                              final Map<String, dynamic>
-                                                  updates = {
+                                              Map<String, dynamic> updates = {
                                                 // delete from club fees
                                                 'attendance/$formattedDate/fees/$paymentId':
                                                     null,
-                                                // delete from user payments
-                                                'users/$uid/payments/$formattedDate/$paymentId':
-                                                    null,
-                                                'users/$uid/payments/$formattedDate/totalAmount':
-                                                    ServerValue.increment(
-                                                        -int.parse(amount)),
-
-                                                // decrement user's total paid amount
                                                 'users/$uid/paid':
                                                     ServerValue.increment(
                                                         -int.parse(amount)),
-                                                'users/$uid/plansPaid/$plan':
-                                                    ServerValue.increment(
-                                                        -int.parse(amount)),
                                               };
+
+                                              if (user['payments']
+                                                          [formattedDate]
+                                                      .keys
+                                                      .length <=
+                                                  2) {
+                                                updates['users/$uid/payments/$formattedDate'] =
+                                                    null;
+                                              } else {
+                                                updates['users/$uid/payments/$formattedDate/$paymentId'] =
+                                                    null;
+                                                updates['users/$uid/payments/$formattedDate/totalAmount'] =
+                                                    ServerValue.increment(
+                                                        -int.parse(amount));
+                                              }
+                                              // delete from plans
+                                              if ((user['plans'] != null) &&
+                                                  planId != null &&
+                                                  planId.isNotEmpty) {
+                                                // get planId
+
+                                                if (user['plans'][planId]
+                                                            ['payments']
+                                                        .keys
+                                                        .length ==
+                                                    1) {
+                                                  updates['users/$uid/plans/$planId'] =
+                                                      null;
+                                                  updates['users/$uid/plansPaid/$plan/$planId'] =
+                                                      null;
+                                                } else {
+                                                  updates['users/$uid/plans/$planId/payments/$paymentId'] =
+                                                      null;
+                                                  updates['users/$uid/plans/$planId/balance'] =
+                                                      ServerValue.increment(
+                                                          int.parse(amount));
+                                                  updates['users/$uid/plansPaid/$plan/$planId'] =
+                                                      ServerValue.increment(
+                                                          -int.parse(amount));
+                                                }
+                                              } else {
+                                                if (advancedPayment != null) {
+                                                  updates['users/$uid/advancedPayments'] =
+                                                      null;
+                                                } else {
+                                                  updates['users/$uid/plansPaid/$plan'] =
+                                                      ServerValue.increment(
+                                                          -int.parse(amount));
+                                                }
+                                              }
+
                                               await dbRef.update(updates);
                                               Navigator.of(scaffoldKey
                                                       .currentContext!)
@@ -2017,7 +2487,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                 flushbarPosition:
                                                     FlushbarPosition.TOP,
                                                 message:
-                                                    "Please check the data and try again or contact support",
+                                                    "$e Please check the data and try again or contact support",
                                                 icon: Icon(
                                                   Icons.error_outline_rounded,
                                                   size: 28.0,
@@ -2294,9 +2764,10 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                   i <= int.parse(days);
                                                   i++) {
                                                 final String newDate =
-                                                    DateFormat('ddMMyy').format(
-                                                        selectedDate.add(
-                                                            Duration(days: i)));
+                                                    DateFormat('yyyy-MM-dd')
+                                                        .format(selectedDate
+                                                            .add(Duration(
+                                                                days: i)));
 
                                                 // check if shakes is 2
                                                 if (user['homeProgram'] !=

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:auto_size_text/auto_size_text.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:coach_zen/pages/daily_attendance.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +16,7 @@ import 'package:coach_zen/pages/cust_new_form.dart';
 import 'package:coach_zen/pages/profile.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../components/services/notifi_service.dart';
+// import '../components/services/notifi_service.dart';
 import '../components/ui/appbar.dart';
 import 'login.dart';
 
@@ -72,7 +72,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> requestNotificationPermission() async {
     if (!await Permission.notification.isGranted) {
       await Permission.notification.request();
-      await NotificationManager().initNotification();
+      // await NotificationManager().initNotification();
       await Future.delayed(const Duration(milliseconds: 2000));
       if (!await Permission.notification.isGranted) {
         await openAppSettingsAndNavigateToPermissions();
@@ -145,8 +145,8 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    List<Map<String, dynamic>> remindUsers =
-        await NotificationManager().scheduleAllNotifications();
+    List<Map<String, dynamic>> remindUsers = [];
+    // await NotificationManager().scheduleAllNotifications();
     // await NotificationManager()
     //     .getPendingNotifications()
     //     .then(
@@ -394,17 +394,17 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic> coachData = {};
   // get userdata from firestore
   Future<void> getUserData() async {
-    await FirebaseFirestore.instance
-        .collection('Coaches')
-        .doc(user!.uid)
-        .get()
-        .then((DocumentSnapshot<Map<String, dynamic>> documentSnapshot) {
-      if (documentSnapshot.exists) {
-        setState(() {
-          coachData = documentSnapshot.data()!;
-        });
-      }
-    });
+    // await FirebaseFirestore.instance
+    //     .collection('Coaches')
+    //     .doc(user!.uid)
+    //     .get()
+    //     .then((DocumentSnapshot<Map<String, dynamic>> documentSnapshot) {
+    //   if (documentSnapshot.exists) {
+    //     setState(() {
+    //       coachData = documentSnapshot.data()!;
+    //     });
+    //   }
+    // });
   }
 
   @override

@@ -6,17 +6,27 @@ import '../components/ui/appbar.dart';
 
 class CustPlanHist extends StatelessWidget {
   final String name;
-  final List<Map<String, dynamic>> plans;
-  const CustPlanHist({Key? key, required this.name, required this.plans})
+  final Map<dynamic, dynamic> plans;
+  final Map<dynamic, dynamic> days;
+  final Map<dynamic, dynamic> homeProgram;
+  const CustPlanHist(
+      {Key? key,
+      required this.name,
+      required this.plans,
+      required this.days,
+      required this.homeProgram})
       : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
+    double joinedFontSize = width * 0.035;
+
+    List sortedKeys = days.keys.toList()..sort((a, b) => b.compareTo(a));
     return Scaffold(
         appBar: MyAppBar(
-          title: 'Payments of $name',
+          title: 'Plans of $name',
           leftIcon: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             color: Colors.black26,
@@ -26,144 +36,238 @@ class CustPlanHist extends StatelessWidget {
         body: Container(
           margin: EdgeInsets.all(width * 0.02),
           width: width,
-          child: ListView.builder(
-            itemCount: plans.length,
-            itemBuilder: (context, index) {
-              return paymentCard(
-                name: plans[index]['name'],
-                plan: plans[index]['plan'],
-                date: plans[index]['date'],
-                amount: plans[index]['amount'],
-                width: width,
-                height: height,
-              );
-            },
-          ),
+          child: sortedKeys.isNotEmpty
+              ? ListView.builder(
+                  itemCount: sortedKeys.length,
+                  itemBuilder: (context, index) {
+                    String key = sortedKeys[index];
+
+                    String actualDay = "Day ${sortedKeys.length - index - 1},";
+                    // dynamic values = days.values.elementAt(index);
+                    DateTime joinedTime = DateTime.fromMillisecondsSinceEpoch(
+                        days[key]['time'] ?? 0);
+                    String joined =
+                        "$actualDay Joined on: ${DateFormat.jm().format(joinedTime)}";
+                    if (homeProgram.containsKey(key)) {
+                      joined = "$actualDay Took in Home";
+                    }
+
+                    Map<dynamic, dynamic> plan = {};
+                    if (plans.containsKey(key)) {
+                      // remove the key from the map
+                      if (plans[key].containsKey('totalAmount')) {
+                        plans[key].remove('totalAmount');
+                      }
+
+                      // set first key as plan
+                      plan = plans[key][plans[key].keys.first];
+
+                      DateTime date =
+                          DateTime.parse(plan['date'] ?? '1999-12-31');
+
+                      return Column(
+                        children: [
+                          dateDivider(
+                            width: width,
+                            height: height,
+                            date: date,
+                          ),
+                          textWidget(
+                            joined,
+                            joinedFontSize,
+                          ),
+                          paymentCard(
+                            plan: plan['program'] ?? '',
+                            advancedPayment: plan['advancedPayment'] ?? false,
+                            mode: plan['mode'] ?? '',
+                            date: date,
+                            amount: plan['amount'] ?? 0,
+                            time: plan['time'] ?? 0,
+                            balance: plan['balance'] ?? 0,
+                            width: width,
+                            height: height,
+                          ),
+                        ],
+                      );
+                    }
+                    return Column(
+                      children: [
+                        dateDivider(
+                          width: width,
+                          height: height,
+                          date: DateTime.parse(key),
+                        ),
+                        textWidget(
+                          joined,
+                          joinedFontSize,
+                        ),
+                      ],
+                    );
+                  },
+                )
+              : textWidget('User yet to start....', width * 0.05),
         ));
   }
 }
 
+Widget textWidget(String text, double fontSize) {
+  return Center(
+    child: Text(
+      text,
+      style: GoogleFonts.montserrat(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+          color: Colors.black54),
+    ),
+  );
+}
+
+Widget dateDivider({
+  required double width,
+  required double height,
+  required DateTime date,
+}) {
+  return Container(
+    margin: EdgeInsets.symmetric(vertical: height * 0.02),
+    child: Row(
+      children: [
+        const Expanded(
+          child: Divider(
+            height: 1,
+            indent: 10,
+            endIndent: 5,
+            color: Color.fromARGB(255, 191, 191, 191),
+          ),
+        ),
+        SizedBox(
+          width: width * 0.02,
+        ),
+        Text(
+          DateFormat('dd MMM yyyy').format(date),
+          style: GoogleFonts.poppins(
+            fontSize: width * 0.05,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        SizedBox(
+          width: width * 0.02,
+        ),
+        const Expanded(
+          child: Divider(
+            height: 1,
+            indent: 5,
+            endIndent: 10,
+            color: Color.fromARGB(255, 191, 191, 191),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 // create a payment history card
 Widget paymentCard(
-    {required String name,
-    required String plan,
+    {required String plan,
+    required String mode,
     required DateTime date,
+    required int time,
     required int amount,
+    required int balance,
     required double width,
-    required double height}) {
-  return Column(
-    children: [
-      Container(
-        margin: EdgeInsets.symmetric(vertical: height * 0.02),
-        child: Row(
+    required double height,
+    required bool advancedPayment}) {
+  DateTime timex = DateTime.fromMillisecondsSinceEpoch(time);
+  String dateText =
+      "Entered: ${DateFormat('dd/MM/yyyy hh mm a').format(timex)}";
+  // check if timex is same as date
+  if (timex.day == date.day &&
+      timex.month == date.month &&
+      timex.year == date.year) {
+    dateText = "Time: ${DateFormat.jm().format(timex)}";
+  }
+  return Card(
+    elevation: 5,
+    margin: EdgeInsets.all(width * 0.04),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(15.0),
+    ),
+    child: Container(
+      decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15.0),
+          gradient: const LinearGradient(
+            colors: [
+              Colors.green,
+              Colors.blue,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(
+            vertical: height * 0.03, horizontal: width * 0.06),
+        title: Text(
+          "Program: $plan",
+          style: GoogleFonts.montserrat(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: Colors.white70,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
-              child: Divider(
-                height: 1,
-                indent: 10,
-                endIndent: 5,
-                color: Color.fromARGB(255, 191, 191, 191),
+            if (advancedPayment)
+              Text(
+                "Advanced Payment",
+                style: GoogleFonts.raleway(
+                  color: Colors.white70,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            SizedBox(
-              width: width * 0.02,
+            Text(
+              "Mode: $mode",
+              style: GoogleFonts.raleway(
+                color: Colors.white70,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             Text(
-              formatDate(date),
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+              // in am/pm format from ms
+              dateText,
+              style: GoogleFonts.montserrat(
+                color: Colors.white70,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            SizedBox(
-              width: width * 0.02,
+            Text(
+              'Paid: \u20B9 $amount',
+              style: GoogleFonts.montserrat(
+                color: Colors.white70,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            const Expanded(
-              child: Divider(
-                height: 1,
-                indent: 5,
-                endIndent: 10,
-                color: Color.fromARGB(255, 191, 191, 191),
+            Text(
+              'C. Balance: \u20B9 $balance',
+              style: GoogleFonts.montserrat(
+                color: Colors.white70,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
       ),
-      Card(
-        elevation: 5,
-        margin: EdgeInsets.all(width * 0.04),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15.0),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15.0),
-              gradient: const LinearGradient(
-                colors: [
-                  Colors.green,
-                  Colors.blue,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )),
-          child: ListTile(
-            contentPadding: EdgeInsets.symmetric(
-                vertical: height * 0.03, horizontal: width * 0.06),
-            title: Text(
-              "Program: $name",
-              style: GoogleFonts.montserrat(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white70,
-              ),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Mode: $plan",
-                  style: GoogleFonts.raleway(
-                    color: Colors.white70,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  // in am/pm format
-                  "Time: ${DateFormat.jm().format(date)}",
-                  style: GoogleFonts.raleway(
-                    color: Colors.white70,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  'Paid: \u20B9 $amount',
-                  style: GoogleFonts.montserrat(
-                    color: Colors.white70,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  'C. Balance: \u20B9 $amount',
-                  style: GoogleFonts.montserrat(
-                    color: Colors.white70,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ],
+    ),
   );
 }
 
-String formatDate(DateTime dateTime) {
-  final DateFormat formatter = DateFormat('dd MMM yyyy');
-  final String formatted = formatter.format(dateTime);
-  return formatted;
-}
+
+// String formatDate(DateTime dateTime) {
+//   final DateFormat formatter = DateFormat('dd MMM yyyy');
+//   final String formatted = formatter.format(dateTime);
+//   return formatted;
+// }
