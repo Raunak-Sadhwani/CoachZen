@@ -730,20 +730,25 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                             existingPlan = true;
                             planDate = key;
                             int cDay = day - (tempAllPlanDays - planDays);
-                            debugPrint('c day: $cDay');
-                            if (cDay == 1 && (planDate != formattedDate)) {
+                            final int planStartDay =
+                                (tempAllPlanDays - planDays) + 1;
+                            final List userDates = user['days'].keys.toList();
+                            userDates.sort((a, b) => a.compareTo(b));
+
+                            if (planDate != userDates[planStartDay]) {
+                              final String newDate = userDates[planStartDay];
                               String paymentId = plan['payments'].keys.first;
                               String paymentDate = plan['payments'][paymentId];
                               final Map<String, dynamic> updates = {
                                 'users/$id/plans/$planDate': null,
-                                'users/$id/plans/$formattedDate': plan,
+                                'users/$id/plans/$newDate': plan,
                                 'users/$id/plansPaid/$program/$planDate': null,
-                                'users/$id/plansPaid/$program/$formattedDate':
+                                'users/$id/plansPaid/$program/$newDate':
                                     user['plansPaid'][program][planDate],
                                 'attendance/$paymentDate/fees/$paymentId/planId':
-                                    formattedDate,
+                                    newDate,
                                 'users/$id/payments/$paymentDate/$paymentId/planId':
-                                    formattedDate,
+                                    newDate,
                               };
                               coachDb.child(cid).update(updates);
                             }
@@ -774,7 +779,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                             }
                             int planPaid = 0;
                             Map<dynamic, dynamic> planPaymentDates =
-                                plans[key]['payments'] ?? {};
+                                Map.from(plans[key]['payments'] ?? {});
                             // remove any date after today
                             planPaymentDates.removeWhere((key, value) {
                               final planPaymentDate = DateTime.parse(value);
@@ -1941,6 +1946,122 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                       null,
                                                 };
                                               }
+
+                                              if (existingPlan &&
+                                                  user['plans'] != null &&
+                                                  user['plans'].keys.length >
+                                                      1) {
+                                                // get next plan
+                                                final List sortedPlanKeys =
+                                                    user['plans'].keys.toList();
+                                                sortedPlanKeys.sort();
+                                                // check if any plan exists after current plan
+                                                if (sortedPlanKeys
+                                                        .indexOf(planDate) <
+                                                    sortedPlanKeys.length - 1) {
+                                                  final totalPlansAhead =
+                                                      sortedPlanKeys.length -
+                                                          sortedPlanKeys
+                                                              .indexOf(
+                                                                  planDate);
+
+                                                  final List userSortedDays =
+                                                      user['days']
+                                                          .keys
+                                                          .toList();
+                                                  userSortedDays.sort();
+                                                  // show dialog to not touvh screen
+                                                  Navigator.of(scaffoldKey
+                                                          .currentContext!)
+                                                      .pop();
+                                                  showDialog(
+                                                      barrierDismissible: false,
+                                                      context: context,
+                                                      builder: (BuildContext
+                                                          context) {
+                                                        return const AlertDialog(
+                                                            title: Text(
+                                                                'Confirmation'),
+                                                            content: Text(
+                                                                'Dont touch screen'));
+                                                      });
+                                                  final DateTime originalDate =
+                                                      DateTime.parse(
+                                                          formattedDate);
+                                                  await dbRef.update(updates);
+
+                                                  for (int i = 1;
+                                                      i < totalPlansAhead;
+                                                      i++) {
+                                                    final String nextPlanDate =
+                                                        sortedPlanKeys[
+                                                            sortedPlanKeys.indexOf(
+                                                                    planDate) +
+                                                                i];
+
+                                                    final int
+                                                        indexOfDateinUser =
+                                                        userSortedDays.indexOf(
+                                                            nextPlanDate);
+                                                    // check if next date is possible
+                                                    int next = 0;
+                                                    if (indexOfDateinUser <
+                                                        userSortedDays.length -
+                                                            1) {
+                                                      next = 1;
+                                                    }
+                                                    DateTime newDate = DateTime
+                                                        .parse(userSortedDays[
+                                                            indexOfDateinUser +
+                                                                next]);
+
+                                                    setState(() {
+                                                      selectedDate = newDate;
+                                                    });
+                                                    await setupDataListener(
+                                                        selectedDate);
+                                                    await Future.delayed(
+                                                        const Duration(
+                                                            milliseconds:
+                                                                1500));
+                                                  }
+                                                  setState(() {
+                                                    selectedDate = originalDate;
+                                                  });
+                                                  await setupDataListener(
+                                                      selectedDate);
+                                                  Navigator.of(scaffoldKey
+                                                          .currentContext!)
+                                                      .pop();
+                                                  changeSubmitted(false);
+                                                  return Flushbar(
+                                                    margin:
+                                                        const EdgeInsets.all(7),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            15),
+                                                    flushbarStyle:
+                                                        FlushbarStyle.FLOATING,
+                                                    flushbarPosition:
+                                                        FlushbarPosition.TOP,
+                                                    message:
+                                                        "${name.split(' ')[0]} has been removed from today's list. Please don't remove users from previous plans, it causes errors in the system",
+                                                    icon: Icon(
+                                                      // alert icon
+                                                      Icons
+                                                          .error_outline_rounded,
+                                                      size: 28.0,
+                                                      color: Colors.orange[300],
+                                                    ),
+                                                    duration: const Duration(
+                                                        milliseconds: 10000),
+                                                    leftBarIndicatorColor:
+                                                        Colors.orange[300],
+                                                  ).show(scaffoldKey
+                                                      .currentContext!);
+                                                }
+                                              }
+
                                               debugPrint('Updates: $updates');
                                               final bool popMsg = isHome;
                                               await dbRef.update(updates);
@@ -2443,6 +2564,77 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                   planId != null &&
                                                   planId.isNotEmpty) {
                                                 // get planId
+
+                                                if (user['plans'].keys.length >
+                                                    1) {
+                                                  // get next plan
+                                                  final List sortedPlanKeys =
+                                                      user['plans']
+                                                          .keys
+                                                          .toList();
+                                                  sortedPlanKeys.sort();
+                                                  // check if any plan exists after current plan
+                                                  if (sortedPlanKeys
+                                                          .indexOf(planId) <
+                                                      sortedPlanKeys.length -
+                                                          1) {
+                                                    final String nextPlanId =
+                                                        sortedPlanKeys[
+                                                            sortedPlanKeys
+                                                                    .indexOf(
+                                                                        planId) +
+                                                                1];
+                                                    final String nextPlanName =
+                                                        user['plans']
+                                                                [nextPlanId]
+                                                            ['program'];
+                                                    final List
+                                                        nextPlanPaymentKeys =
+                                                        user['plans']
+                                                                    [nextPlanId]
+                                                                ['payments']
+                                                            .values
+                                                            .toList();
+                                                    nextPlanPaymentKeys.sort();
+                                                    final String
+                                                        nextPlanPaymentLastId =
+                                                        nextPlanPaymentKeys[
+                                                            nextPlanPaymentKeys
+                                                                    .length -
+                                                                1];
+                                                    Navigator.of(scaffoldKey
+                                                            .currentContext!)
+                                                        .pop();
+                                                    changeSubmitted(false);
+                                                    return Flushbar(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              7),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              15),
+                                                      flushbarStyle:
+                                                          FlushbarStyle
+                                                              .FLOATING,
+                                                      flushbarPosition:
+                                                          FlushbarPosition.TOP,
+                                                      message:
+                                                          'Error: "${name.split(' ')[0]}" has a plan "$nextPlanName" after this plan, which starts on $nextPlanId. Please delete that plan\'s all payments, last payment is on $nextPlanPaymentLastId',
+                                                      icon: Icon(
+                                                        Icons
+                                                            .error_outline_rounded,
+                                                        size: 28.0,
+                                                        color: Colors.red[300],
+                                                      ),
+                                                      duration: const Duration(
+                                                          milliseconds: 10000),
+                                                      leftBarIndicatorColor:
+                                                          Colors.red[300],
+                                                    ).show(scaffoldKey
+                                                        .currentContext!);
+                                                  }
+                                                  throw 'err';
+                                                }
 
                                                 if (user['plans'][planId]
                                                             ['payments']
