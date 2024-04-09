@@ -53,6 +53,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   Color studentBox = const Color.fromARGB(255, 189, 189, 189);
   List<Map<dynamic, dynamic>> sortedPresentStudents = [];
   late String formattedDate;
+  final double screenWidth = (WidgetsBinding
+          .instance.platformDispatcher.views.first.physicalSize.width) /
+      1.35;
 
   void changeSubmitted(bool val) {
     setState(() {
@@ -82,8 +85,13 @@ class _DailyAttendanceState extends State<DailyAttendance> {
     // Close the previous listener if it exists
     _streamSubscription?.cancel();
     formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+    setState(() {
+      sortedPresentStudents = [];
+    });
 
     mystream = coachDb.child(cid).onValue;
+    final completer = Completer<void>();
+    // final event = await mystream.first;
     // Set up the new listener
     _streamSubscription = mystream.listen((event) {
       try {
@@ -254,6 +262,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               });
             });
           }
+          if (!completer.isCompleted) {
+            completer
+                .complete(); // Resolve the Completer when the first event is received
+          }
         }
       } catch (e) {
         Flushbar(
@@ -272,7 +284,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
         ).show(scaffoldKey.currentContext!);
       }
     });
-    print('Data listener initialized');
+    await completer.future;
+    debugPrint('Data listener initialized');
   }
 
   @override
@@ -287,7 +300,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     // final ScreenHeight = MediaQuery.of(context).size.height;
     return OrientationBuilder(
       builder: (context, orientation) {
@@ -327,12 +339,13 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         firstDate: DateTime(2023),
                         // one month ahead
                         lastDate: today.add(const Duration(days: 50)))
-                    .then((date) {
+                    .then((date) async {
                   if (date != null) {
                     setState(() {
                       selectedDate = date;
                     });
-                    setupDataListener(selectedDate);
+                    await setupDataListener(selectedDate);
+                    debugPrint('Date changed to $selectedDate');
                   }
                 });
               },
@@ -598,8 +611,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
-                  headingRowHeight: MediaQuery.of(context).size.width * 0.045,
-                  dataRowHeight: MediaQuery.of(context).size.width * 0.045,
+                  headingRowHeight: screenWidth * 0.045,
+                  dataRowHeight: screenWidth * 0.045,
                   headingRowColor: MaterialStateProperty.all(Colors.grey[200]),
                   dividerThickness: 1.5,
                   minWidth: screenWidth * 0.01,
@@ -633,6 +646,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   // check why sortedPresentStudents is regenerating
                   rows: List<DataRow>.generate(sortedPresentStudents.length,
                       (index) {
+                    debugPrint('Index init: $index');
+
                     // debugPrint('xxIndex: ${sortedPresentStudents.length}');
                     // get user
                     final user = users.firstWhere((user) =>
@@ -661,6 +676,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     String planName = gotPlan['plan'];
                     Map<String, int> allBalances = {};
                     Map<String, int> actualBalances = {};
+                    Map<String, String> prevPlanBalances = {};
                     bool existingPlan = false;
                     String? planDate;
                     int planDays = 0;
@@ -699,21 +715,22 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       if (user['plans'] != null) {
                         List sortAllKeys = user['plans'].keys.toList();
                         sortAllKeys.sort((a, b) => a.compareTo(b));
-
+                        int allPlansCost = 0;
                         // final allDaysMap = user['days'];
                         // check if today's date comes in between any plan
                         for (String key in sortAllKeys) {
                           final plan = user['plans'][key];
                           // final planDate = DateTime.parse(key);
                           planDays = plan['days'] as int;
+                          allPlansCost += planDays * shakePrice;
                           tempAllPlanDays += planDays;
                           // debugPrint('Existing Plan: $existingPlan');
                           if (user['totalDays'] <= tempAllPlanDays) {
                             final program = plan['program'];
                             existingPlan = true;
                             planDate = key;
-                            final int cDay = day - (tempAllPlanDays - planDays);
-
+                            int cDay = day - (tempAllPlanDays - planDays);
+                            debugPrint('c day: $cDay');
                             if (cDay == 1 && (planDate != formattedDate)) {
                               String paymentId = plan['payments'].keys.first;
                               String paymentDate = plan['payments'][paymentId];
@@ -736,12 +753,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                             days = gotNewPlan['day'];
                             planName = gotNewPlan['plan'];
                             const int fiveDayCost = 920;
-                            realBalance =
-                                (((user['plans'][key]['days'] as int) *
-                                            shakePrice) +
-                                        fiveDayCost) -
-                                    amountPaidTillNow;
+                            realBalance = (allPlansCost + fiveDayCost) -
+                                amountPaidTillNow;
+                            debugPrint('$amountPaidTillNow sd');
                             balance = realBalance.toString();
+                            debugPrint('New Plan: $amountPaidTillNow');
                             break;
                           }
                         }
@@ -754,6 +770,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                             String planName = plans[key]['program'];
                             if (bal != 0) {
                               actualBalances[planName] = bal;
+                              prevPlanBalances[planName] = key;
                             }
                             int planPaid = 0;
                             Map<dynamic, dynamic> planPaymentDates =
@@ -810,14 +827,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                             dbRef.update(updates);
                           }
                           days = '$currentDay / $currentDay';
-                          actualBalances['Paid'] = currentDay * shakePrice;
+                          // actualBalances['Paid'] = (currentDay * shakePrice);
                           allBalances['Extra ${currentDay}days'] =
                               currentDay * shakePrice;
                         }
                       } else {
                         final int currentDay = day - tempAllPlanDays;
                         days = '$currentDay / $currentDay';
-                        actualBalances['Paid'] = currentDay * shakePrice;
+                        // actualBalances['Paid'] = (currentDay * shakePrice);
                         allBalances['Extra ${currentDay}days'] =
                             currentDay * shakePrice;
                       }
@@ -846,16 +863,36 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                           child: TextButton(
                                               onPressed: () {
                                                 List<String> plans = [];
+                                                List checkWrongValues = [
+                                                  '0 day',
+                                                  '0 d',
+                                                  '0 dy',
+                                                  '0 da',
+                                                  '0 days',
+                                                  '3 day',
+                                                  '3 d',
+                                                  '3 dy',
+                                                  '3 da',
+                                                  '3 days',
+                                                ];
                                                 if (actualBalances.isNotEmpty) {
+                                                  bool previousPlanBalance =
+                                                      false;
                                                   for (String key
                                                       in actualBalances.keys) {
                                                     if (actualBalances[key]! >
                                                         0) {
+                                                      if (!checkWrongValues
+                                                          .contains(key)) {
+                                                        previousPlanBalance =
+                                                            true;
+                                                      }
                                                       plans.add(
                                                           "$key (Remaining - ₹${actualBalances[key]})");
                                                     }
                                                   }
-                                                  if (!existingPlan) {
+                                                  if (!existingPlan &&
+                                                      !previousPlanBalance) {
                                                     plans.addAll([
                                                       'Gold UMS',
                                                       'Plat UMS',
@@ -909,20 +946,17 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                       plans.addAll([
                                                         'Gold UMS',
                                                         'Plat UMS',
-                                                        'Paid',
                                                         'Other'
                                                       ]);
                                                     }
                                                   } else if (day <= 4) {
                                                     if (!threeDayOver) {
                                                       plans.add(threeDay);
-                                                      plans.addAll(
-                                                          ['Paid', 'Other']);
+                                                      plans.addAll(['Other']);
                                                     } else {
                                                       plans.addAll([
                                                         'Gold UMS',
                                                         'Plat UMS',
-                                                        'Paid',
                                                         'Other'
                                                       ]);
                                                     }
@@ -933,7 +967,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     plans.addAll([
                                                       'Gold UMS',
                                                       'Plat UMS',
-                                                      'Paid',
                                                       'Other'
                                                     ]);
                                                   }
@@ -946,19 +979,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                 // open a new dialog to enter the cash amount
                                                 Navigator.of(context).pop();
 
-                                                List checkWrongValues = [
-                                                  '0 day',
-                                                  '0 d',
-                                                  '0 dy',
-                                                  '0 da',
-                                                  '0 days',
-                                                  '3 day',
-                                                  '3 d',
-                                                  '3 dy',
-                                                  '3 da',
-                                                  '3 days',
-                                                  'Paid'
-                                                ];
                                                 showDialog(
                                                   barrierDismissible: true,
                                                   context: context,
@@ -1214,10 +1234,18 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                               // save to firebase
                                                                               // add to firebase
                                                                               try {
+                                                                                bool remaining = false;
                                                                                 if (initalPlan == 'Other') {
                                                                                   initalPlan = customPlan.text.trim();
                                                                                 } else {
                                                                                   // all text before (
+                                                                                  if (initalPlan.toLowerCase().contains('remaining')) {
+                                                                                    if (prevPlanBalances.isNotEmpty) {
+                                                                                      remaining = true;
+                                                                                      String firstkey = prevPlanBalances.keys.first;
+                                                                                      planDate = prevPlanBalances[firstkey];
+                                                                                    }
+                                                                                  }
                                                                                   initalPlan = initalPlan.split(' (')[0];
                                                                                 }
                                                                                 // balance
@@ -1230,9 +1258,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 bool advancedPayment = false;
                                                                                 int totalBal = realBalance - payAmount;
                                                                                 String iniPlan = initalPlan.toString().toLowerCase();
-                                                                                bool wrongPlan = iniPlan == '0 day' || iniPlan == '3 day' || iniPlan == 'Paid';
-                                                                                if (existingPlan) {
-                                                                                  if (!wrongPlan && (totalBal < 0)) {
+                                                                                bool wrongPlan = iniPlan == '0 day' || iniPlan == '3 day';
+                                                                                if (existingPlan || (!wrongPlan && remaining)) {
+                                                                                  if (!wrongPlan && (totalBal < 0) && !remaining) {
                                                                                     bool? result = await showDialog(
                                                                                         context: context,
                                                                                         builder: (BuildContext context) {
@@ -1299,6 +1327,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   } else {
                                                                                     days = int.parse(customPlanDays.text.trim());
                                                                                   }
+                                                                                  // throw '$planDate';
                                                                                   totalBal = (days * shakePrice) - payAmount;
                                                                                   try {
                                                                                     final plansPaid = user['plansPaid'];
@@ -1350,7 +1379,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   'users/$id/plansPaid/$initalPlan': ServerValue.increment(payAmount),
                                                                                 };
 
-                                                                                if (existingPlan && !wrongPlan) {
+                                                                                if ((existingPlan && !wrongPlan) || (remaining && !wrongPlan)) {
                                                                                   if (!allBalances.containsKey(initalPlan) && !advancedPayment) {
                                                                                     changeSubmitted(false);
                                                                                     throw 'Plan not found';
