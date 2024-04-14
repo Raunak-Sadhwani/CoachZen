@@ -61,7 +61,7 @@ class GetStarted extends StatelessWidget {
                           fontSize: 35,
                         ),
                       ),
-                      const Text('Create an account to talk with your coach ',
+                      const Text('Create an account and manage your users',
                           style: TextStyle(color: Colors.grey)),
                       Container(
                         height: MediaQuery.of(context).size.height * 0.075,
@@ -94,6 +94,7 @@ class GetStarted extends StatelessWidget {
                           minFontSize: 14,
                           softWrap: false,
                           maxLines: 1,
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
                       Container(

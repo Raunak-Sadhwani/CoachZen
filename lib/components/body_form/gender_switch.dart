@@ -4,9 +4,17 @@ import '../ui/card.dart';
 class GenderSwitch extends StatefulWidget {
   final Function(bool) onGenderChanged;
   final bool isMale;
-
+  final String title;
+  final String firstOpt;
+  final String secondOpt;
   const GenderSwitch(
-      {super.key, required this.onGenderChanged, required this.isMale});
+      {Key? key,
+      required this.onGenderChanged, // non-nullable and required
+      required this.isMale,
+      this.title = 'Gender',
+      this.firstOpt = 'Male',
+      this.secondOpt = 'Female'})
+      : super(key: key);
 
   @override
   State<GenderSwitch> createState() => _GenderSwitchState();
@@ -23,9 +31,9 @@ class _GenderSwitchState extends State<GenderSwitch> {
         Column(
           // crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Gender",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              widget.title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             Row(
@@ -49,7 +57,7 @@ class _GenderSwitchState extends State<GenderSwitch> {
                       ),
                       child: Center(
                         child: Text(
-                          "Male",
+                          widget.firstOpt,
                           style: TextStyle(
                               color: isMale ? Colors.white : Colors.grey[600],
                               fontWeight: FontWeight.bold),
@@ -77,7 +85,7 @@ class _GenderSwitchState extends State<GenderSwitch> {
                       ),
                       child: Center(
                         child: Text(
-                          "Female",
+                          widget.secondOpt,
                           style: TextStyle(
                               color: !isMale ? Colors.white : Colors.grey[600],
                               fontWeight: FontWeight.bold),

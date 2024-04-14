@@ -9,6 +9,11 @@
 // import 'package:timezone/timezone.dart' as tz;
 
 // class NotificationManager {
+
+//     // final BigPictureStyleInformation bigPictureStyleInformation =
+//     //   const BigPictureStyleInformation(
+//     //       FilePathAndroidBitmap('assets/icons/blue.png'),
+//     //       largeIcon: FilePathAndroidBitmap('assets/icons/blue.png'));
 //   final FlutterLocalNotificationsPlugin notificationsPlugin =
 //       FlutterLocalNotificationsPlugin();
 

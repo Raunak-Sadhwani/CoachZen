@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:another_flushbar/flushbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +13,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:coach_zen/pages/body_form_cust.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+// shared preferences
+import 'package:shared_preferences/shared_preferences.dart';
 import '../components/ui/appbar.dart';
 import 'body_form.dart';
 import 'cust_order_form.dart';
@@ -22,10 +26,20 @@ class BodyFormList extends StatefulWidget {
   State<BodyFormList> createState() => _BodyFormListState();
 }
 
+String capitalize(String value) {
+  return value
+      .split(' ')
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
+}
+
 class _BodyFormListState extends State<BodyFormList>
     with SingleTickerProviderStateMixin {
+  StreamSubscription? _streamSubscription;
+  DateTime? lastRefreshTime;
   late Future<Map<dynamic, dynamic>> userDataFuture;
   late AnimationController controller;
+  late Stream mystream;
   bool _hasInternet = true;
   bool _sortAscending = false; // Flag to track the sort order
   bool _showExpiredPlans = true; // Flag to track whether to show expired plans
@@ -34,8 +48,13 @@ class _BodyFormListState extends State<BodyFormList>
   FocusNode searchFocusNode = FocusNode();
   double opacity = 0.0;
   DateFormat formatter = DateFormat('dd MMM yyyy');
-  List<MapEntry<dynamic, dynamic>> _filteredData = [];
+  List<MapEntry<dynamic, dynamic>> filteredData = [];
+  Map<dynamic, dynamic> reminderList = {};
+  Map<dynamic, dynamic> userData = {};
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final double width = (WidgetsBinding
+          .instance.platformDispatcher.views.first.physicalSize.width) /
+      2.65;
   Future<void> checkInternetConnection() async {
     if (!await Method.checkInternetConnection(context)) {
       setState(() {
@@ -51,6 +70,7 @@ class _BodyFormListState extends State<BodyFormList>
       final result =
           await InternetAddress.lookup('firebasestorage.googleapis.com');
       if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        await setupDataListener();
         setState(() {
           _hasInternet = true;
         });
@@ -62,14 +82,101 @@ class _BodyFormListState extends State<BodyFormList>
     }
   }
 
+  void getFilteredData() {
+    debugPrint('getFilteredData');
+    final curFilteredData = userData.entries.where((entry) {
+      final Map<dynamic, dynamic> userData = entry.value;
+      final name = userData['name'].toString().toLowerCase();
+      final city = userData['city'].toString().toLowerCase();
+      final phone = userData['phone'].toString().toLowerCase();
+      final email = userData['email'].toString().toLowerCase();
+      final searchLower = searchQuery.toLowerCase();
+      return name.contains(searchLower) ||
+          city.contains(searchLower) ||
+          phone.contains(searchLower) ||
+          email.contains(searchLower);
+    }).toList();
+
+    curFilteredData.sort((a, b) {
+      final dateA = a.value['created'];
+      final dateB = b.value['created'];
+      final compareResult = dateA.compareTo(dateB);
+
+      return _sortAscending ? compareResult : -compareResult;
+    });
+
+    // show only active plans
+    // if (!_showExpiredPlans) {
+    //   filteredData.removeWhere((doc) {
+    //     final plans = doc.value['plans'];
+    //     if (plans == null) {
+    //       return true;
+    //     }
+    //     final activePlans = plans.where((plan) {
+    //       final daysSinceStarted = DateTime.now()
+    //               .difference(
+    //                   DateTime.fromMillisecondsSinceEpoch(plan['started']))
+    //               .inDays +
+    //           1;
+    //       return daysSinceStarted <= plan['days'];
+    //     }).toList();
+    //     return activePlans.isEmpty;
+    //   });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        filteredData = curFilteredData;
+      });
+    });
+  }
+
+  Future<void> setupDataListener() async {
+    _streamSubscription?.cancel();
+
+    setState(() {
+      userData = {};
+    });
+
+    final completer = Completer<void>();
+    try {
+      mystream = FirebaseDatabase.instance
+          .ref()
+          .child('Coaches')
+          .child(FirebaseAuth.instance.currentUser!.uid)
+          .child('users')
+          .onValue;
+      final event = await mystream.first;
+      userData = event.snapshot.value as Map<dynamic, dynamic>;
+      filteredData = userData.entries.toList();
+      getFilteredData();
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    } catch (e) {
+      Flushbar(
+        message: 'Error fetching data. Please try again later.',
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(8),
+        icon: const Icon(
+          Icons.error_outline_rounded,
+          size: 20,
+          color: Colors.red,
+        ),
+      ).show(_scaffoldKey.currentContext!);
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+    await completer.future;
+  }
+
   @override
   void initState() {
     super.initState();
     checkInternetConnection();
-    userDataFuture = fetchUserData();
     controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 750),
     );
   }
 
@@ -77,24 +184,8 @@ class _BodyFormListState extends State<BodyFormList>
   void dispose() {
     controller.dispose();
     searchFocusNode.dispose();
+    _streamSubscription?.cancel();
     super.dispose();
-  }
-
-  // @override
-  // void didUpdateWidget(covariant BodyFormList oldWidget) {
-  //   super.didUpdateWidget(oldWidget);
-  //   debugPrint('didUpdateWidget');
-  //   userDataFuture = fetchUserData();
-  // }
-
-  Future<Map<dynamic, dynamic>> fetchUserData() async {
-    final dataSnapshot = await FirebaseDatabase.instance
-        .ref()
-        .child('Coaches')
-        .child(FirebaseAuth.instance.currentUser!.uid)
-        .child('users')
-        .once();
-    return dataSnapshot.snapshot.value as Map<dynamic, dynamic>;
   }
 
   TextStyle selStyle = GoogleFonts.montserrat(
@@ -179,6 +270,7 @@ class _BodyFormListState extends State<BodyFormList>
     setState(() {
       _sortAscending = ascending;
     });
+    getFilteredData();
     Navigator.pop(context);
   }
 
@@ -186,12 +278,12 @@ class _BodyFormListState extends State<BodyFormList>
     setState(() {
       _showExpiredPlans = showExpired;
     });
+    getFilteredData();
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    double width = MediaQuery.of(context).size.width;
     // double height = MediaQuery.of(context).size.height;
     if (!_hasInternet) {
       // Show appropriate UI or display an error message
@@ -251,6 +343,7 @@ class _BodyFormListState extends State<BodyFormList>
                     setState(() {
                       searchQuery = value.toLowerCase();
                     });
+                    getFilteredData();
                   },
                   focusNode: searchFocusNode,
                 ),
@@ -301,136 +394,33 @@ class _BodyFormListState extends State<BodyFormList>
             ),
         ],
       ),
-      body: FutureBuilder(
-        future: userDataFuture,
-        builder: (context, AsyncSnapshot<Map<dynamic, dynamic>> snapshot) {
-          if (snapshot.hasData) {
-            final userData = snapshot.data!;
-            final filteredData = userData.entries.where((entry) {
-              final Map<dynamic, dynamic> userData = entry.value;
-              final name = userData['name'].toString().toLowerCase();
-              final city = userData['city'].toString().toLowerCase();
-              final phone = userData['phone'].toString().toLowerCase();
-              final email = userData['email'].toString().toLowerCase();
-              final searchLower = searchQuery.toLowerCase();
-              return name.contains(searchLower) ||
-                  city.contains(searchLower) ||
-                  phone.contains(searchLower) ||
-                  email.contains(searchLower);
-            }).toList();
-
-            filteredData.sort((a, b) {
-              final dateA = a.value['created'];
-              final dateB = b.value['created'];
-              final compareResult = dateA.compareTo(dateB);
-
-              return _sortAscending ? compareResult : -compareResult;
-            });
-
-            // show only active plans
-            if (!_showExpiredPlans) {
-              filteredData.removeWhere((doc) {
-                final plans = doc.value['plans'];
-                if (plans == null) {
-                  return true;
-                }
-                final activePlans = plans.where((plan) {
-                  final daysSinceStarted = DateTime.now()
-                          .difference(DateTime.fromMillisecondsSinceEpoch(
-                              plan['started']))
-                          .inDays +
-                      1;
-                  return daysSinceStarted <= plan['days'];
-                }).toList();
-                return activePlans.isEmpty;
-              });
-
-              if (_sortAscending) {
-                filteredData.sort((a, b) {
-                  final planA = a.value['plans'].firstWhere((plan) {
-                    DateTime.fromMillisecondsSinceEpoch(plan['started']);
-                    final daysSinceStarted = DateTime.now()
-                            .difference(DateTime.fromMillisecondsSinceEpoch(
-                                plan['started']))
-                            .inDays +
-                        1;
-                    return daysSinceStarted <= plan['days'];
-                  });
-                  final planB = b.value['plans'].firstWhere((plan) {
-                    final daysSinceStarted = DateTime.now()
-                            .difference(DateTime.fromMillisecondsSinceEpoch(
-                                plan['started']))
-                            .inDays +
-                        1;
-                    return daysSinceStarted <= plan['days'];
-                  });
-
-                  final remainingDaysA = planA['days'] -
-                      (DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  planA['started']))
-                              .inDays +
-                          1);
-
-                  final remainingDaysB = planB['days'] -
-                      (DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  planB['started']))
-                              .inDays +
-                          1);
-
-                  return remainingDaysA.compareTo(remainingDaysB);
-                });
-              } else {
-                filteredData.sort((a, b) {
-                  final planA = a.value['plans'].firstWhere((plan) {
-                    DateTime.fromMillisecondsSinceEpoch(plan['started']);
-                    final daysSinceStarted = DateTime.now()
-                            .difference(DateTime.fromMillisecondsSinceEpoch(
-                                plan['started']))
-                            .inDays +
-                        1;
-                    return daysSinceStarted <= plan['days'];
-                  });
-                  final planB = b.value['plans'].firstWhere((plan) {
-                    final daysSinceStarted = DateTime.now()
-                            .difference(DateTime.fromMillisecondsSinceEpoch(
-                                plan['started']))
-                            .inDays +
-                        1;
-                    return daysSinceStarted <= plan['days'];
-                  });
-
-                  final remainingDaysA = planA['days'] -
-                      (DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  planA['started']))
-                              .inDays +
-                          1);
-
-                  final remainingDaysB = planB['days'] -
-                      (DateTime.now()
-                              .difference(DateTime.fromMillisecondsSinceEpoch(
-                                  planB['started']))
-                              .inDays +
-                          1);
-
-                  return remainingDaysB.compareTo(remainingDaysA);
-                });
-              }
-            }
-
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              setState(() {
-                _filteredData = filteredData;
-              });
-            });
-            return ListView.builder(
+      body: filteredData.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.person_add_disabled_rounded,
+                    size: 50,
+                    color: Colors.black26,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No Customers Found',
+                    style: GoogleFonts.raleway(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
               physics: const BouncingScrollPhysics(),
-              itemCount: _filteredData.length,
+              itemCount: filteredData.length,
               itemBuilder: (context, index) {
                 // final userInfo = _filteredData[index].data();
-                final userInfo = _filteredData[index].value;
+                final userInfo = filteredData[index].value;
                 final phone = "+91${userInfo['phone']}";
                 final DateTime timeStamp =
                     DateTime.fromMillisecondsSinceEpoch(userInfo['created']);
@@ -463,39 +453,80 @@ class _BodyFormListState extends State<BodyFormList>
                       List<Map<dynamic, dynamic>>.from([])
                           .cast<Map<dynamic, dynamic>>();
                 }
-                List<Map<dynamic, dynamic>> plans = [];
+                // List<Map<dynamic, dynamic>> plans = [];
                 String planName = '';
                 String planStatus = '';
                 Color planColor = Colors.grey;
+                String? image = userInfo['image'];
+                final String uid = filteredData[index].key;
+                String gender = userInfo['gender'];
 
-                if (userInfo['plans'] != null && userInfo['plans'].isNotEmpty) {
-                  plans = List<Map<dynamic, dynamic>>.from(userInfo['plans']);
-                  plans.sort((a, b) => b['started'].compareTo(a['started']));
-                  Map<dynamic, dynamic> plan = plans[0];
-                  planName = plan['name'];
-                  final daysSinceStarted = DateTime.now()
-                      .difference(
-                          DateTime.fromMillisecondsSinceEpoch(plan['started']))
-                      .inDays;
-                  final daysLeft = plan['days'] - daysSinceStarted;
-                  planStatus = daysLeft < 0
-                      ? 'Expired'
-                      : daysLeft > 0
+                final int userDays = userInfo['days'].keys.length;
+
+                if (userInfo['existed'] != null) {
+                  planName = 'Not Started';
+                  planStatus = 'No Plans';
+                  planColor = Colors.red;
+                }
+
+                if (userInfo['plans'] != null) {
+                  bool existingPlan = false;
+                  int tempAllPlanDays = 4;
+                  List sortAllKeys = userInfo['plans'].keys.toList();
+                  sortAllKeys.sort((a, b) => a.compareTo(b));
+                  // final allDaysMap = user['days'];
+                  // check if today's date comes in between any plan
+                  for (String key in sortAllKeys) {
+                    final plan = userInfo['plans'][key];
+                    planName = plan['program'];
+                    // final planDate = DateTime.parse(key);
+                    final int planDays = plan['days'] as int;
+                    tempAllPlanDays += planDays;
+                    // debugPrint('Existing Plan: $existingPlan');
+                    if (userDays <= tempAllPlanDays) {
+                      existingPlan = true;
+                      final int daysLeft = tempAllPlanDays - userDays;
+                      planStatus = daysLeft > 0
                           ? '$daysLeft days left'
                           : 'Expires today';
-                  if (daysLeft > 7) {
-                    planColor = Colors.green;
-                  } else if (daysLeft > 0) {
-                    planColor = Colors.orange;
-                  } else {
+                      if (daysLeft > 7) {
+                        planColor = Colors.green;
+                      } else {
+                        planColor = Colors.orange;
+                        reminderList[uid] = {
+                          'name': name,
+                          'phone': phone,
+                          'planName': planName,
+                          'planColor': 'orange',
+                          'planStatus': planStatus,
+                          'gender' : gender,
+                          'image' : image,
+                          
+                        };
+                      }
+                      break;
+                    }
+                  }
+                  if (!existingPlan) {
+                    planStatus = 'Expired';
                     planColor = Colors.red;
+                    reminderList[uid] = {
+                      'name': name,
+                      'phone': phone,
+                      'planName': planName,
+                      'planColor': 'red',
+                      'planStatus': '$tempAllPlanDays'
+                    };
                   }
                 }
-                // // var age = filteredData[index].data()['age'];
-
-                String? image = userInfo['image'];
-                final String uid = _filteredData[index].key;
-                String gender = userInfo['gender'];
+                debugPrint('reminderList: $reminderList');
+                // if last index save reminderList to shared preferences
+                if (index == filteredData.length - 1) {
+                  SharedPreferences.getInstance().then((prefs) {
+                    final reminderListJSON = jsonEncode(reminderList);
+                    prefs.setString('reminderList', reminderListJSON);
+                  });
+                }
 
                 return Slidable(
                   startActionPane: ActionPane(
@@ -605,8 +636,9 @@ class _BodyFormListState extends State<BodyFormList>
                     ],
                   ),
                   child: OpenContainerWrapper(
-                    page:
-                        BodyFormCustomerWrap(uid: uid, callback: handleRefresh),
+                    page: BodyFormCustomerWrap(
+                        uid: uid,
+                        callback: () => handleRefresh(fromPage: true)),
                     content: Container(
                         decoration: const BoxDecoration(
                           border: Border(
@@ -663,7 +695,7 @@ class _BodyFormListState extends State<BodyFormList>
                                     ),
                                     if (planName.isNotEmpty)
                                       Text(
-                                        "Plan: $planName",
+                                        capitalize("Plan: $planName".trim()),
                                         style: GoogleFonts.montserrat(
                                             color: Colors.grey,
                                             fontWeight: FontWeight.w500,
@@ -708,30 +740,41 @@ class _BodyFormListState extends State<BodyFormList>
                   ),
                 );
               },
-            );
-          } else if (snapshot.hasError) {
-            return const Center(child: Text('No User Data Found'));
-          } else {
-            return const Center(child: CircularProgressIndicator());
-          }
-          // return const SizedBox.shrink();
-        },
-      ),
+            ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.blue,
         onPressed: handleRefresh,
         tooltip: 'Refresh',
         child: RotationTransition(
-            turns: Tween(begin: 0.0, end: 2.0).animate(controller),
-            child: const Icon(Icons.refresh)),
+            turns: Tween(begin: 0.0, end: 3.0).animate(controller),
+            child: const Icon(Icons.refresh_rounded, color: Colors.white)),
       ),
     );
   }
 
-  void handleRefresh() {
-    controller.reset();
-    controller.forward(from: 0.0);
-    setState(() {
-      userDataFuture = fetchUserData();
-    });
+  void handleRefresh({bool? fromPage}) async {
+    final bool fromPagex = fromPage ?? false;
+    if (fromPagex ||
+        (lastRefreshTime == null ||
+            DateTime.now().difference(lastRefreshTime!).inSeconds > 30)) {
+      controller.reset();
+      await setupDataListener();
+      lastRefreshTime = DateTime.now();
+      controller.forward(from: 0.0);
+    } else {
+      final secondsLeft =
+          30 - DateTime.now().difference(lastRefreshTime!).inSeconds;
+      Flushbar(
+        message:
+            'Please wait for $secondsLeft seconds before refreshing again.',
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(8),
+        icon: const Icon(
+          Icons.error_outline_rounded,
+          size: 20,
+          color: Colors.red,
+        ),
+      ).show(_scaffoldKey.currentContext!);
+    }
   }
 }

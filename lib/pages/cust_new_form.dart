@@ -31,6 +31,7 @@ class _CustNewFormState extends State<CustNewForm> {
   final ScrollController _scrollController = ScrollController();
   bool autoValidate = false;
   bool isMale = true;
+  bool existingCustomer = false;
   bool isFabEnabled = true;
 
   @override
@@ -114,6 +115,17 @@ class _CustNewFormState extends State<CustNewForm> {
                     return null;
                   },
                 ),
+                GenderSwitch(
+                    title: "Existing Customer?",
+                    firstOpt: "Yes",
+                    secondOpt: "No",
+                    onGenderChanged: (e) {
+                      setState(() {
+                        existingCustomer = e;
+                      });
+                    },
+                    isMale: existingCustomer),
+                SizedBox(height: height * 0.02),
                 CustomTextFormField(
                   controller: _nameController,
                   labelText: 'Name',
@@ -281,8 +293,52 @@ class _CustNewFormState extends State<CustNewForm> {
                   'email': _emailController.text.trim(),
                   'created': realtime,
                   'cid': cid,
-                  // 'paid': 0,
                 };
+                if (existingCustomer) {
+                  data['existed'] = true;
+                  data['paid'] = 920;
+                  data['plansPaid'] = {
+                    '0 day': 200,
+                    '3 day': 720,
+                  };
+                  data['days'] = {
+                    "1970-01-01": {"shakes": 1, "time": 0},
+                    "1970-01-02": {"shakes": 1, "time": 86400000},
+                    "1970-01-03": {"shakes": 1, "time": 172800000},
+                    "1970-01-04": {"shakes": 1, "time": 259200000},
+                    "1970-01-05": {"shakes": 1, "time": 345600000},
+                  };
+                  // random generated string
+                  final String payId =
+                      FirebaseDatabase.instance.ref().push().key!;
+                  final String payId2 =
+                      FirebaseDatabase.instance.ref().push().key!;
+
+                  data['payments'] = {
+                    "1970-01-01": {
+                      "totalAmount": 200,
+                      payId: {
+                        'date': "1970-01-01",
+                        'time': 0,
+                        'amount': 200,
+                        'mode': 'cash',
+                        'balance': 0,
+                        'program': '0 day',
+                      }
+                    },
+                    "1970-01-05": {
+                      "totalAmount": 720,
+                      payId2: {
+                        'date': "1970-01-05",
+                        'time': 345600000,
+                        'amount': 720,
+                        'mode': 'cash',
+                        'balance': 0,
+                        'program': '3 day',
+                      }
+                    },
+                  };
+                }
 
                 String? newUserUid = FirebaseDatabase.instance.ref().push().key;
                 if (newUserUid == null) {

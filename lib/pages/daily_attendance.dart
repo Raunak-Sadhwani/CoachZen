@@ -18,6 +18,14 @@ final DateFormat format = DateFormat('dd MMM yyyy');
 final DateTime today = DateTime.now();
 const int shakePrice = 240;
 
+// capitalize first letter of a string
+String capitalize(String value) {
+  return value
+      .split(' ')
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
+}
+
 class DailyAttendance extends StatefulWidget {
   const DailyAttendance({super.key});
 
@@ -1253,6 +1261,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   }
                                                                                   initalPlan = initalPlan.split(' (')[0];
                                                                                 }
+                                                                                initalPlan = initalPlan.toLowerCase();
                                                                                 // balance
                                                                                 const time = ServerValue.timestamp;
                                                                                 final int payAmount = int.parse(amount.text.trim());
@@ -1837,7 +1846,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           },
                         ),
                         DataCell(
-                          Text(planName),
+                          Text(capitalize(planName)),
                         ),
                         DataCell(
                           Text(days,
@@ -2633,7 +2642,6 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     ).show(scaffoldKey
                                                         .currentContext!);
                                                   }
-                                                  throw 'err';
                                                 }
 
                                                 if (user['plans'][planId]

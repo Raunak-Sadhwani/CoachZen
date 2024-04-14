@@ -27,12 +27,6 @@ class BodyFormCustomerWrap extends StatefulWidget {
   State<BodyFormCustomerWrap> createState() => _BodyFormCustomerWrapState();
 }
 
-// String formatDate(Timestamp timestamp) {
-//   DateTime dateTime = timestamp.toDate();
-//   String formattedDate = DateFormat('dd MMM yyyy').format(dateTime);
-//   return formattedDate;
-// }
-
 class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
   bool _hasInternet = true;
   late Future<Map<dynamic, dynamic>> userDataFuture;
@@ -127,132 +121,114 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
       );
     }
 
-    return
-        // StreamBuilder(
-        //     stream: FirebaseDatabase.instance
-        //         .ref()
-        //         .child('Users')
-        //         .child(widget.uid)
-        //         .onValue,
-        //     builder: (context, snapshot) {
-        FutureBuilder(
-            future: userDataFuture,
-            builder: (context, AsyncSnapshot<Map<dynamic, dynamic>> snapshot) {
-              if (snapshot.hasData) {
-                final user = snapshot.data;
+    return FutureBuilder(
+        future: userDataFuture,
+        builder: (context, AsyncSnapshot<Map<dynamic, dynamic>> snapshot) {
+          if (snapshot.hasData) {
+            final user = snapshot.data;
 
-                if (user == null) {
-                  return const Center(
-                    child: Text(
-                        'Something went wrong, please contact support or try again later'),
-                  );
-                }
+            if (user == null) {
+              return const Center(
+                child: Text(
+                    'Something went wrong, please contact support or try again later'),
+              );
+            }
 
-                Map<dynamic, dynamic> userData = {};
-                // remove any list dataytype from filteredData and any exceptionList keys, add to userData
-                List exceptionList = [
-                  "cid",
-                  "reg",
-                  "cname",
-                  "image",
-                  "measurements",
-                  "productsHistory",
-                  "plans",
-                  "medicalHistory",
-                  "payments",
-                  "homeProgram",
-                  "plansPaid",
-                  "paid",
-                  "days"
-                ];
-                user.forEach((key, value) {
-                  if (value.runtimeType != List &&
-                      !exceptionList.contains(key)) {
-                    userData[key] = value;
-                  }
-                  // if its last key, add id
-                  if (key == user.keys.last && userData[key] != 'created') {
-                    DateTime cr = DateTime.fromMillisecondsSinceEpoch(
-                        userData['created']);
-                    String formattedcr =
-                        DateFormat('dd MMM yyyy - hh:mm a').format(cr);
-                    userData.remove('created');
-                    userData['created'] = formattedcr;
-                  }
-                });
-                List toBeOnTop = ["name", "phone", "city", "dob"];
-                userData = Map.fromEntries([
-                  ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
-                  ...userData.entries
-                      .where((entry) => !toBeOnTop.contains(entry.key))
-                ]);
-                List<Map<dynamic, dynamic>> measurements = [];
-                List<Map<dynamic, dynamic>> products = [];
-                Map<dynamic, dynamic> plans = {};
-                Map<dynamic, dynamic> days = {};
-                Map<dynamic, dynamic> homeProgram = {};
-                List medicalHistory = user['medicalHistory'] ?? [];
-                String? image = user['image'];
-
-                if (user['measurements'] != null) {
-                  measurements = (user['measurements'] as List)
-                      .cast<Map<dynamic, dynamic>>()
-                      .toList()
-                    ..forEach((e) {
-                      final weight = {'weight': e['weight']};
-                      e.remove('weight');
-                      e.addAll(weight);
-                    });
-                }
-                if (user['productsHistory'] != null) {
-                  products = (user['productsHistory'] as List)
-                      .cast<Map<dynamic, dynamic>>()
-                      .toList();
-                  products.sort((a, b) => b['date'].compareTo(a['date']));
-                }
-                if (user['payments'] != null) {
-                  //         "payments": {
-                  //   "310324": {
-                  //     "-NuOzCKycm2j1r0aLk16": {
-                  //       "amount": 100,
-                  //       "balance": 100,
-                  //       "date": "310324",
-                  //       "mode": "Cash",
-                  //       "program": "0 day",
-                  //       "time": 1711980467795
-                  //     },
-                  //     "totalAmount": 100
-                  //   }
-                  // },
-
-                  plans =  user['payments'];
-                }
-
-                if (user['days'] != null) {
-                  days = user['days'];
-                }
-
-                if (user['homeProgram'] != null) {
-                  homeProgram = user['homeProgram'];
-                }
-
-                measurements.sort((a, b) => a['date'].compareTo(b['date']));
-                return BodyFormCustomer(
-                    callback: widget.callback,
-                    userData: userData,
-                    measurements: measurements,
-                    products: products,
-                    plans: plans,
-                    days: days,
-                    homeProgram: homeProgram,
-                    medicalHistory: medicalHistory,
-                    uid: widget.uid,
-                    image: image);
-              } else {
-                // Handle loading or empty state...
-                return const CircularProgressIndicator();
+            Map<dynamic, dynamic> userData = {};
+            // remove any list dataytype from filteredData and any exceptionList keys, add to userData
+            List exceptionList = [
+              "cid",
+              "reg",
+              "cname",
+              "image",
+              "measurements",
+              "productsHistory",
+              "plans",
+              "medicalHistory",
+              "payments",
+              "homeProgram",
+              "plansPaid",
+              "paid",
+              "existed",
+              "days"
+            ];
+            user.forEach((key, value) {
+              if (value.runtimeType != List && !exceptionList.contains(key)) {
+                userData[key] = value;
+              }
+              // if its last key, add id
+              if (key == user.keys.last && userData[key] != 'created') {
+                DateTime cr =
+                    DateTime.fromMillisecondsSinceEpoch(userData['created']);
+                String formattedcr =
+                    DateFormat('dd MMM yyyy - hh:mm a').format(cr);
+                userData.remove('created');
+                userData['created'] = formattedcr;
               }
             });
+            List toBeOnTop = ["name", "phone", "city", "dob"];
+            userData = Map.fromEntries([
+              ...toBeOnTop.map((key) => MapEntry(key, userData[key])),
+              ...userData.entries
+                  .where((entry) => !toBeOnTop.contains(entry.key))
+            ]);
+            List<Map<dynamic, dynamic>> measurements = [];
+            List<Map<dynamic, dynamic>> products = [];
+            Map<dynamic, dynamic> plans = {};
+            Map<dynamic, dynamic> days = {};
+            Map<dynamic, dynamic> homeProgram = {};
+            List medicalHistory = user['medicalHistory'] ?? [];
+            String? image = user['image'];
+
+            if (user['measurements'] != null) {
+              measurements = (user['measurements'] as List)
+                  .cast<Map<dynamic, dynamic>>()
+                  .toList()
+                ..forEach((e) {
+                  final weight = {'weight': e['weight']};
+                  e.remove('weight');
+                  e.addAll(weight);
+                });
+            }
+            if (user['productsHistory'] != null) {
+              products = (user['productsHistory'] as List)
+                  .cast<Map<dynamic, dynamic>>()
+                  .toList();
+            }
+
+            if (user['medicalHistory'] != null) {
+              medicalHistory =
+                  (user['medicalHistory'] as List).cast<String>().toList();
+              medicalHistory.sort((a, b) => b['date'].compareTo(a['date']));
+            }
+            if (user['payments'] != null) {
+              plans = user['payments'];
+            }
+
+            if (user['days'] != null) {
+              days = user['days'];
+            }
+
+            if (user['homeProgram'] != null) {
+              homeProgram = user['homeProgram'];
+            }
+            measurements.sort((a, b) => a['date'].compareTo(b['date']));
+            return BodyFormCustomer(
+                callback: widget.callback,
+                userData: userData,
+                measurements: measurements,
+                products: products,
+                plans: plans,
+                days: days,
+                homeProgram: homeProgram,
+                medicalHistory: medicalHistory,
+                uid: widget.uid,
+                image: image);
+          } else {
+            // Handle loading or empty state...
+            return const CircularProgressIndicator();
+          }
+        });
   }
 }
 
@@ -442,6 +418,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                               name: widget.userData['name'].split(' ')[0],
                               uid: widget.uid,
                               medicalhistory: widget.medicalHistory,
+                              callback: widget.callback,
                             )),
                         CustButton(
                             height: height,
@@ -739,44 +716,50 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       });
                       return;
                     }
-                    final users = FirebaseDatabase.instance
-                        .ref()
-                        .child('Coaches')
-                        .child(uid)
-                        .child('users')
-                        .child(widget.uid);
+                    final coaches =
+                        FirebaseDatabase.instance.ref().child('Coaches');
+                    final users = coaches.child(uid).child('users');
+                    final userRef = users.child(widget.uid);
+
                     if (updateFields.containsKey('phone')) {
-                      final coaches =
-                          FirebaseDatabase.instance.ref().child('Coaches');
                       // check if phone number already exists
-                      final phoneExistsInUsers = await users
-                          .orderByChild('phone')
-                          .equalTo(updateFields['phone'])
-                          .once();
-                      final phoneExistsInCoaches = await coaches
-                          .orderByChild('phone')
-                          .equalTo(updateFields['phone'])
-                          .once();
-                      if (phoneExistsInUsers.snapshot.value != null ||
-                          phoneExistsInCoaches.snapshot.value != null) {
+                      try {
+                        //  try putting number in phone collection
+                        // if it fails, then user already exists
+
+                        final Map<String, dynamic> updates = {
+                          'Phones/${updateFields['phone'].toString()}': {
+                            'cid': uid,
+                            'uid': widget.uid,
+                            'user': true,
+                            'created': ServerValue.timestamp,
+                          },
+                          'Phones/${originalData['phone']}': null,
+                        };
+                        await FirebaseDatabase.instance.ref().set(updates);
+                      } catch (e) {
+                        setState(() {
+                          isFabVisible = true;
+                        });
                         return Flushbar(
                           margin: const EdgeInsets.all(7),
                           borderRadius: BorderRadius.circular(15),
                           flushbarStyle: FlushbarStyle.FLOATING,
                           flushbarPosition: FlushbarPosition.BOTTOM,
-                          message: "Phone number already exists, please change",
+                          message:
+                              "User with this phone number already exists!",
                           icon: Icon(
-                            Icons.phone_android_rounded,
+                            Icons.error_outline,
                             size: 28.0,
                             color: Colors.red[300],
                           ),
-                          duration: const Duration(milliseconds: 1500),
+                          duration: const Duration(milliseconds: 4000),
                           leftBarIndicatorColor: Colors.red[300],
                         ).show(scaffoldKey.currentContext!);
                       }
                     }
 
-                    final userRef = users.child(widget.uid);
+                    // throw '$updateFields';
 
                     await userRef
                         .update(Map<String, Object?>.from(updateFields));

@@ -264,8 +264,12 @@ class _LoginPageState extends State<LoginPage> {
                                                       builder: (context) =>
                                                           const Register())),
                                             text: ' Sign Up',
+                                            // underline
                                             style: GoogleFonts.notoSans(
-                                              color: Colors.black,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                              color: const Color.fromARGB(
+                                                  255, 226, 255, 82),
                                               fontWeight: FontWeight.w700,
                                               fontSize: 14,
                                             ),
@@ -303,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
     var emailT = email.text.trim().toLowerCase();
 
     showDialog(
-        context: context,
+        context: _scaffoldKey.currentContext!,
         barrierDismissible: false,
         builder: (context) => const Center(
               child: CircularProgressIndicator(),
@@ -317,7 +321,8 @@ class _LoginPageState extends State<LoginPage> {
         .get();
 
     if (coachSnapshot.docs.isEmpty) {
-      Navigator.of(context, rootNavigator: true).pop('dialog');
+      Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
+          .pop('dialog');
       return Flushbar(
         message:
             'Unauthorized User or User not found. Please check your credentials',
@@ -334,15 +339,17 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: emailT, password: password.text.trim());
-      Navigator.of(context, rootNavigator: true).pop('dialog');
+      Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
+          .pop('dialog');
 
       Navigator.pushAndRemoveUntil(
-        context,
+        _scaffoldKey.currentContext!,
         MaterialPageRoute(builder: (context) => const HomePage()),
         (Route<dynamic> route) => false,
       );
     } on FirebaseAuthException catch (e) {
-      Navigator.of(context, rootNavigator: true).pop('dialog');
+      Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
+          .pop('dialog');
       if (e.code == 'user-not-found') {
         return Flushbar(
           message: 'User not found. Please check your credentials',

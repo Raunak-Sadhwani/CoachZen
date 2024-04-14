@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
 
+int dayx = 0;
+
 class CustPlanHist extends StatelessWidget {
   final String name;
   final Map<dynamic, dynamic> plans;
@@ -21,7 +23,18 @@ class CustPlanHist extends StatelessWidget {
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
+    debugPrint('days: $days');
     double joinedFontSize = width * 0.035;
+    // check if any dates are in 1970
+    // if so remove them
+    if (days.containsKey('1970-01-01')) {
+      dayx = 1;
+      days.removeWhere((key, value) => key == '1970-01-01');
+      days.removeWhere((key, value) => key == '1970-01-02');
+      days.removeWhere((key, value) => key == '1970-01-03');
+      days.removeWhere((key, value) => key == '1970-01-04');
+      days.removeWhere((key, value) => key == '1970-01-05');
+    }
 
     List sortedKeys = days.keys.toList()..sort((a, b) => b.compareTo(a));
     return Scaffold(
@@ -42,7 +55,8 @@ class CustPlanHist extends StatelessWidget {
                   itemBuilder: (context, index) {
                     String key = sortedKeys[index];
 
-                    String actualDay = "Day ${sortedKeys.length - index - 1},";
+                    String actualDay =
+                        "Day ${(sortedKeys.length - index - 1) + dayx},";
                     // dynamic values = days.values.elementAt(index);
                     DateTime joinedTime = DateTime.fromMillisecondsSinceEpoch(
                         days[key]['time'] ?? 0);

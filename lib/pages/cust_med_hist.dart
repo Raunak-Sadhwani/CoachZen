@@ -12,11 +12,13 @@ class CustMedHist extends StatefulWidget {
     required this.name,
     required this.medicalhistory,
     required this.uid,
+    required this.callback,
   }) : super(key: key);
 
   final String name;
   final List medicalhistory;
   final String uid;
+  final VoidCallback callback;
 
   @override
   State<CustMedHist> createState() => _CustMedHistState();
@@ -133,6 +135,8 @@ class _CustMedHistState extends State<CustMedHist> {
                       await userRef.update({
                         'medicalHistory': medicalHistoryList,
                       });
+                      widget.callback();
+                      Navigator.pop(scaffoldKey.currentContext!);
                       Navigator.pop(scaffoldKey.currentContext!);
                       return Flushbar(
                         margin: const EdgeInsets.all(7),

@@ -65,6 +65,7 @@ dependencies:
   flutter_native_splash: ^2.3.1
   data_table_2: ^2.5.10
   firebase_database: ^10.4.6
+  package_info_plus: ^5.0.1
 
 
 flutter_native_splash:

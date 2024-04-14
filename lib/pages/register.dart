@@ -84,7 +84,7 @@ class _RegisterState extends State<Register> {
                   children: [
                     Text(
                       'Sign Up',
-                      style: GoogleFonts.notoSans(
+                      style: GoogleFonts.inter(
                         color: Colors.black,
                         fontWeight: FontWeight.w600,
                         fontSize: 32,
@@ -357,7 +357,8 @@ class _RegisterState extends State<Register> {
                                       fontSize: 20,
                                     ),
                                   ),
-                                  child: const Text('Sign Up'),
+                                  child: const Text('Sign Up',
+                                      style: TextStyle(color: Colors.white)),
                                 ),
                                 SizedBox(
                                   height:

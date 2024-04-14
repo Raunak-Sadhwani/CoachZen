@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:auto_size_text/auto_size_text.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:coach_zen/pages/daily_attendance.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -15,6 +17,8 @@ import 'package:coach_zen/pages/body_form_list.dart';
 import 'package:coach_zen/pages/cust_new_form.dart';
 import 'package:coach_zen/pages/profile.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 // import '../components/services/notifi_service.dart';
 import '../components/ui/appbar.dart';
@@ -28,9 +32,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  bool correctVersion = true;
   bool internet = true;
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-
+  final screenHeight = WidgetsBinding
+      .instance.platformDispatcher.views.first.physicalSize.height;
   Future<void> checkInternetAndAuth() async {
     bool hasInternet = await Method.checkInternetConnection(context);
     if (!hasInternet) {
@@ -55,7 +61,7 @@ class _HomePageState extends State<HomePage> {
         });
       }
       user = FirebaseAuth.instance.currentUser;
-      FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      FirebaseAuth.instance.authStateChanges().listen((User? user) async {
         if (user == null) {
           Navigator.pushAndRemoveUntil(
               context,
@@ -63,8 +69,11 @@ class _HomePageState extends State<HomePage> {
               (Route<dynamic> route) => false);
           return;
         }
-        getUserData();
-        updateText();
+        await getVersion();
+        if (correctVersion) {
+          requestNotificationPermission();
+          updateText();
+        }
       });
     }
   }
@@ -84,6 +93,63 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> getVersion() async {
+    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    final String version = packageInfo.version;
+
+    // get 'version' node from firebase
+    final DatabaseReference versionDb =
+        FirebaseDatabase.instance.ref().child('Version');
+    await versionDb.once().then((DatabaseEvent event) {
+      final String fVerision = event.snapshot.value as String;
+      if (fVerision != version) {
+        setState(() {
+          correctVersion = false;
+        });
+        showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Update Available'),
+            content: const Text(
+                'A new version of the app is available. Please update to continue using the app.'),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  // final Uri uri = Uri.parse(
+                  //     'https://play.google.com/store/apps/details?id=com.coach_zen');
+
+                  // if (await canLaunchUrl(uri)) {
+                  //   await launchUrl(uri);
+                  // } else {
+                  showDialog(
+                    barrierDismissible: false,
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Error'),
+                      content: const Text(
+                          'Could not open the link. Please update the app manually from the Play Store.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                  // }
+                },
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
+  }
+
   Future<void> openAppSettingsAndNavigateToPermissions() async {
     await showDialog(
         context: context,
@@ -98,7 +164,7 @@ class _HomePageState extends State<HomePage> {
               TextButton(
                   onPressed: () async {
                     await openAppSettings();
-                    Navigator.pop(context);
+                    Navigator.pop(scaffoldKey.currentContext!);
                     fetchUserPlans();
                   },
                   child: const Text('Open Settings'))
@@ -145,7 +211,6 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    List<Map<String, dynamic>> remindUsers = [];
     // await NotificationManager().scheduleAllNotifications();
     // await NotificationManager()
     //     .getPendingNotifications()
@@ -159,10 +224,26 @@ class _HomePageState extends State<HomePage> {
     //   print(e);
     // });
 
+    Map<String, dynamic> remindUsers = {};
+    // get from shared preferences
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? reminderListJSON = prefs.getString('reminderList');
+    if (reminderListJSON != null) {
+      remindUsers = jsonDecode(reminderListJSON);
+    }
+
     // show dialog if there are users to remind
     if (remindUsers.isNotEmpty) {
-      final screenHeight =
-          MediaQuery.of(scaffoldKey.currentContext!).size.height;
+      Color getColorFromString(String colorName) {
+        Map<String, Color> colorMap = {
+          'red': Colors.red,
+          'orange': Colors.orange,
+        };
+
+        return colorMap[colorName.toLowerCase()] ??
+            Colors.grey; // Default to grey if color not found
+      }
+
       showDialog(
         context: scaffoldKey.currentContext!,
         builder: (context) => AlertDialog(
@@ -179,7 +260,7 @@ class _HomePageState extends State<HomePage> {
               top: screenHeight * 0.02,
             ),
             child: SizedBox(
-              height: screenHeight * 0.5,
+              height: screenHeight * 0.175,
               width: MediaQuery.of(context).size.width * 0.9,
               child: ListView.builder(
                 itemCount: remindUsers.length,
@@ -187,17 +268,18 @@ class _HomePageState extends State<HomePage> {
                 // shrinkWrap: true,
                 itemBuilder: (context, index) {
                   double width = MediaQuery.of(context).size.width;
-                  final String phone = "+91 ${remindUsers[index]['phone']}";
-                  final name = remindUsers[index]['name'];
-                  final planName = remindUsers[index]['plan'];
-                  final image = remindUsers[index]['image'];
-                  final gender = remindUsers[index]['gender'];
-                  final remainingDays = remindUsers[index]['remainingDays'] - 1;
-                  final planStatus = remainingDays == 0
-                      ? 'Expires today'
-                      : remainingDays == 1
-                          ? 'Expires tomorrow'
-                          : 'Expires in $remainingDays days';
+                  final String uid = remindUsers.keys.elementAt(index);
+                  final values = remindUsers[uid];
+                  final String phone = values['phone'];
+                  final name = values['name'];
+                  final planName = values['planName'];
+                  final planStatus = values['planStatus'];
+                  final image = values['image'];
+                  final gender = values['gender'];
+
+                  final String planColor = values['planColor'];
+                  // convert string to color
+                  final Color color = getColorFromString(planColor);
                   return Slidable(
                     startActionPane: ActionPane(
                       motion: const BehindMotion(),
@@ -307,20 +389,19 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                     Text(
-                                      "+91 $phone",
+                                      phone,
                                       style: GoogleFonts.montserrat(
                                           color: Colors.grey,
                                           fontWeight: FontWeight.w500,
                                           fontSize: 13),
                                     ),
-                                    if (planName.isNotEmpty)
-                                      Text(
-                                        "Plan: $planName",
-                                        style: GoogleFonts.montserrat(
-                                            color: Colors.grey,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 13),
-                                      ),
+                                    Text(
+                                      "Plan: $planName",
+                                      style: GoogleFonts.montserrat(
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 13),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -339,7 +420,7 @@ class _HomePageState extends State<HomePage> {
                                       maxFontSize: 13,
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.montserrat(
-                                          color: Colors.red,
+                                          color: color,
                                           fontWeight: FontWeight.w500,
                                           fontSize: 13),
                                     ),
@@ -388,24 +469,10 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     checkInternetAndAuth();
-    requestNotificationPermission();
   }
 
   Map<String, dynamic> coachData = {};
   // get userdata from firestore
-  Future<void> getUserData() async {
-    // await FirebaseFirestore.instance
-    //     .collection('Coaches')
-    //     .doc(user!.uid)
-    //     .get()
-    //     .then((DocumentSnapshot<Map<String, dynamic>> documentSnapshot) {
-    //   if (documentSnapshot.exists) {
-    //     setState(() {
-    //       coachData = documentSnapshot.data()!;
-    //     });
-    //   }
-    // });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -433,6 +500,12 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
+        ),
+      );
+    } else if (!correctVersion) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
         ),
       );
     }
