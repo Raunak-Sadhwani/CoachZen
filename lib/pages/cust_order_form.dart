@@ -45,7 +45,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
   final productQuantityController = TextEditingController();
   Map<String, int> productMap = {};
 
-  int total = 0;
+  // int total = 0;
   @override
   void initState() {
     super.initState();
@@ -61,9 +61,9 @@ class _CustOrderFormState extends State<CustOrderForm> {
       selectedDateTime = DateTime.fromMillisecondsSinceEpoch(
           widget.productsHistory[widget.index!]['date']);
 
-      setState(() {
-        total = widget.productsHistory[widget.index!]['total'];
-      });
+      // setState(() {
+      //   total = widget.productsHistory[widget.index!]['total'];
+      // });
     }
   }
 
@@ -527,6 +527,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                   DiscountModes? mode = DiscountModes.manual;
                   TextEditingController discountController =
                       TextEditingController();
+
                   final shakeMate = allProducts['183K'];
                   TextEditingController shakeMateController =
                       TextEditingController(
@@ -541,19 +542,54 @@ class _CustOrderFormState extends State<CustOrderForm> {
                   final bool isShakeMate = productMap.containsKey('183K');
                   int shakemateDiscount = 0;
                   int discount = 0;
-                  int total = tCost;
                   String initalAutoMode = '15%';
                   TextEditingController customPriceController =
                       TextEditingController(text: tCost.toString());
-
+                  TextEditingController paidController =
+                      TextEditingController(text: tCost.toString());
                   void calcAutoPrice() {
                     final int discountedPrice = productMap.keys
                         .map((e) =>
                             allProducts[e][initalAutoMode] * productMap[e])
                         .reduce((a, b) => a + b);
+
                     setState(() {
                       discount = tCost - discountedPrice;
+                      paidController.text =
+                          (tCost - (discount + shakemateDiscount)).toString();
                     });
+                  }
+
+                  // sample text widget
+                  Widget paidWidget() {
+                    return Expanded(
+                      child: TextFormField(
+                        controller: paidController,
+                        maxLength: 3,
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          labelText: 'Total Paid (₹)',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final int tempTotal =
+                              tCost - (discount + shakemateDiscount);
+
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a given amount';
+                          } else if (int.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          // no more than 50% discount
+                          else if (int.parse(value) > tempTotal) {
+                            return 'Please enter a valid number';
+                          } else if (int.parse(value) <= 0) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
+                      ),
+                    );
                   }
 
                   return showDialog(
@@ -701,6 +737,10 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                               discountController
                                                                   .clear();
                                                               discount = 0;
+                                                              paidController
+                                                                      .text =
+                                                                  tCost
+                                                                      .toString();
                                                               mode = value;
                                                             });
                                                           },
@@ -736,6 +776,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                       .toString();
                                                               shakemateDiscount =
                                                                   0;
+
                                                               mode = value;
                                                             });
                                                           },
@@ -766,6 +807,10 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                               discount = 0;
                                                               shakemateDiscount =
                                                                   0;
+                                                              paidController
+                                                                      .text =
+                                                                  tCost
+                                                                      .toString();
                                                               mode = value;
                                                             });
                                                           },
@@ -785,163 +830,178 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                   padding: EdgeInsets.symmetric(
                                                       horizontal:
                                                           dialogWidth * .05),
-                                                  child: Row(
+                                                  child: Column(
                                                     children: [
-                                                      Expanded(
-                                                        child: TextFormField(
-                                                          controller:
-                                                              discountController,
-                                                          maxLength: 2,
-                                                          onChanged: (value) {
-                                                            if (value.isEmpty ||
-                                                                value == '0' ||
-                                                                int.tryParse(
-                                                                        value) ==
-                                                                    null) {
-                                                              setState(() {
-                                                                discount = 0;
-                                                              });
-                                                              return;
-                                                            }
-                                                            final int disc =
-                                                                int.tryParse(
-                                                                    value)!;
-                                                            int tempTotalCost =
-                                                                tCost;
-
-                                                            if (isShakeMate) {
-                                                              final int
-                                                                  smPrice =
-                                                                  int.tryParse(
-                                                                          shakeMateController
-                                                                              .text) ??
-                                                                      0;
-                                                              final tShakeMatePrice =
-                                                                  smPrice *
-                                                                      productMap[
-                                                                          '183K']!;
-                                                              tempTotalCost -=
-                                                                  tShakeMatePrice;
-                                                            }
-                                                            setState(() {
-                                                              discount =
-                                                                  tempTotalCost *
-                                                                      disc ~/
-                                                                      100;
-                                                            });
-                                                          },
-                                                          decoration:
-                                                              const InputDecoration(
-                                                            counterText: '',
-                                                            labelText:
-                                                                'Discount %',
-                                                          ),
-                                                          keyboardType:
-                                                              TextInputType
-                                                                  .number,
-                                                          validator: (value) {
-                                                            if (value == null) {
-                                                              return 'Please enter a given amount';
-                                                            } else if (value
-                                                                .isEmpty) {
-                                                              return null;
-                                                            } else if (int
-                                                                    .tryParse(
-                                                                        value) ==
-                                                                null) {
-                                                              return 'Please enter a valid number';
-                                                            } else if (int
-                                                                    .parse(
-                                                                        value) >
-                                                                50) {
-                                                              return 'Please enter a valid number';
-                                                            } else if (int
-                                                                    .parse(
-                                                                        value) <
-                                                                0) {
-                                                              return 'Please enter a valid number';
-                                                            }
-                                                            return null;
-                                                          },
-                                                        ),
-                                                      ),
-                                                      if (isShakeMate)
-                                                        Expanded(
-                                                          child: Row(
-                                                            children: [
-                                                              SizedBox(
-                                                                width:
-                                                                    dialogWidth *
-                                                                        .05,
-                                                              ),
-                                                              Expanded(
-                                                                child:
-                                                                    TextFormField(
-                                                                  controller:
-                                                                      shakeMateController,
-                                                                  maxLength: 3,
-                                                                  onChanged:
-                                                                      (value) {
-                                                                    if (value
-                                                                            .isNotEmpty &&
-                                                                        int.tryParse(value) !=
-                                                                            null) {
-                                                                      setState(
-                                                                          () {
-                                                                        shakemateDiscount =
-                                                                            (shakeMate['price'] - int.parse(value)) *
-                                                                                productMap['183K']!;
-                                                                      });
-                                                                    } else {
-                                                                      setState(
-                                                                          () {
-                                                                        shakemateDiscount =
-                                                                            shakeMate['price'] *
-                                                                                productMap['183K']!;
-                                                                      });
-                                                                    }
-                                                                  },
-                                                                  decoration:
-                                                                      const InputDecoration(
-                                                                    counterText:
-                                                                        '',
-                                                                    labelText:
-                                                                        'ShakeMate Price',
-                                                                  ),
-                                                                  keyboardType:
-                                                                      TextInputType
-                                                                          .number,
-                                                                  validator:
-                                                                      (value) {
-                                                                    if (value ==
-                                                                            null ||
-                                                                        value
-                                                                            .isEmpty) {
-                                                                      return 'Please enter a given amount';
-                                                                    } else if (int.tryParse(
+                                                      Row(
+                                                        children: [
+                                                          Expanded(
+                                                            child:
+                                                                TextFormField(
+                                                              controller:
+                                                                  discountController,
+                                                              maxLength: 2,
+                                                              onChanged:
+                                                                  (value) {
+                                                                if (value
+                                                                        .isEmpty ||
+                                                                    value ==
+                                                                        '0' ||
+                                                                    int.tryParse(
                                                                             value) ==
                                                                         null) {
-                                                                      return 'Please enter a valid number';
-                                                                    }
-                                                                    // no more than 50% discount
-                                                                    else if (shakeMate[
-                                                                            '50%'] >
-                                                                        int.parse(
-                                                                            value)) {
-                                                                      return 'Please enter a valid number';
-                                                                    } else if (int.parse(
-                                                                            value) >
-                                                                        shakeMate[
-                                                                            'price']) {
-                                                                      return 'Please enter a valid number';
-                                                                    }
-                                                                    return null;
-                                                                  },
-                                                                ),
+                                                                  setState(() {
+                                                                    discount =
+                                                                        0;
+                                                                  });
+                                                                  return;
+                                                                }
+                                                                final int disc =
+                                                                    int.tryParse(
+                                                                        value)!;
+                                                                int tempTotalCost =
+                                                                    tCost;
+
+                                                                if (isShakeMate) {
+                                                                  final int
+                                                                      smPrice =
+                                                                      int.tryParse(
+                                                                              shakeMateController.text) ??
+                                                                          0;
+                                                                  final tShakeMatePrice =
+                                                                      smPrice *
+                                                                          productMap[
+                                                                              '183K']!;
+                                                                  tempTotalCost -=
+                                                                      tShakeMatePrice;
+                                                                }
+                                                                setState(() {
+                                                                  discount =
+                                                                      tempTotalCost *
+                                                                          disc ~/
+                                                                          100;
+                                                                  paidController
+                                                                      .text = (tCost -
+                                                                          (discount +
+                                                                              shakemateDiscount))
+                                                                      .toString();
+                                                                });
+                                                              },
+                                                              decoration:
+                                                                  const InputDecoration(
+                                                                counterText: '',
+                                                                labelText:
+                                                                    'Discount %',
                                                               ),
-                                                            ],
+                                                              keyboardType:
+                                                                  TextInputType
+                                                                      .number,
+                                                              validator:
+                                                                  (value) {
+                                                                if (value ==
+                                                                    null) {
+                                                                  return 'Please enter a given amount';
+                                                                } else if (value
+                                                                    .isEmpty) {
+                                                                  return null;
+                                                                } else if (int
+                                                                        .tryParse(
+                                                                            value) ==
+                                                                    null) {
+                                                                  return 'Please enter a valid number';
+                                                                } else if (int
+                                                                        .parse(
+                                                                            value) >
+                                                                    50) {
+                                                                  return 'Please enter a valid number';
+                                                                } else if (int
+                                                                        .parse(
+                                                                            value) <
+                                                                    0) {
+                                                                  return 'Please enter a valid number';
+                                                                }
+                                                                return null;
+                                                              },
+                                                            ),
                                                           ),
-                                                        ),
+                                                          Expanded(
+                                                            child: Row(
+                                                              children: [
+                                                                SizedBox(
+                                                                  width:
+                                                                      dialogWidth *
+                                                                          .05,
+                                                                ),
+                                                                if (isShakeMate)
+                                                                  Expanded(
+                                                                    child:
+                                                                        TextFormField(
+                                                                      controller:
+                                                                          shakeMateController,
+                                                                      maxLength:
+                                                                          3,
+                                                                      onChanged:
+                                                                          (value) {
+                                                                        if (value.isNotEmpty &&
+                                                                            int.tryParse(value) !=
+                                                                                null) {
+                                                                          setState(
+                                                                              () {
+                                                                            shakemateDiscount =
+                                                                                (shakeMate['price'] - int.parse(value)) * productMap['183K']!;
+                                                                            paidController.text =
+                                                                                (tCost - (discount + shakemateDiscount)).toString();
+                                                                          });
+                                                                        } else {
+                                                                          setState(
+                                                                              () {
+                                                                            shakemateDiscount =
+                                                                                shakeMate['price'] * productMap['183K']!;
+                                                                          });
+                                                                        }
+                                                                      },
+                                                                      decoration:
+                                                                          const InputDecoration(
+                                                                        counterText:
+                                                                            '',
+                                                                        labelText:
+                                                                            'ShakeMate Price',
+                                                                      ),
+                                                                      keyboardType:
+                                                                          TextInputType
+                                                                              .number,
+                                                                      validator:
+                                                                          (value) {
+                                                                        if (value ==
+                                                                                null ||
+                                                                            value
+                                                                                .isEmpty) {
+                                                                          return 'Please enter a given amount';
+                                                                        } else if (int.tryParse(value) ==
+                                                                            null) {
+                                                                          return 'Please enter a valid number';
+                                                                        }
+                                                                        // no more than 50% discount
+                                                                        else if (shakeMate['50%'] >
+                                                                            int.parse(
+                                                                                value)) {
+                                                                          return 'Please enter a valid number';
+                                                                        } else if (int.parse(value) >
+                                                                            shakeMate['price']) {
+                                                                          return 'Please enter a valid number';
+                                                                        }
+                                                                        return null;
+                                                                      },
+                                                                    ),
+                                                                  )
+                                                                else
+                                                                  paidWidget()
+                                                              ],
+                                                            ),
+                                                          )
+                                                        ],
+                                                      ),
+                                                      if (isShakeMate)
+                                                        paidWidget()
                                                     ],
                                                   ),
                                                 ),
@@ -950,41 +1010,48 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                   padding: EdgeInsets.symmetric(
                                                       horizontal:
                                                           dialogWidth * .05),
-                                                  child: Expanded(
-                                                    child:
-                                                        DropdownButtonFormField<
-                                                            String>(
-                                                      decoration:
-                                                          const InputDecoration(
-                                                        contentPadding: EdgeInsets
-                                                            .zero, // Remove any content padding
-                                                        isDense: true,
-                                                        labelText: 'Mode',
+                                                  child: Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child:
+                                                            DropdownButtonFormField<
+                                                                String>(
+                                                          decoration:
+                                                              const InputDecoration(
+                                                            labelText: 'Mode',
+                                                          ),
+                                                          value: initalAutoMode,
+                                                          items: [
+                                                            '15%',
+                                                            '25%',
+                                                            '35%',
+                                                            '42%',
+                                                            '50%'
+                                                          ].map((String value) {
+                                                            return DropdownMenuItem<
+                                                                String>(
+                                                              value: value,
+                                                              child:
+                                                                  Text(value),
+                                                            );
+                                                          }).toList(),
+                                                          onChanged: (String?
+                                                              newValue) {
+                                                            setState(() {
+                                                              initalAutoMode =
+                                                                  newValue!;
+                                                            });
+                                                            // calculate discount
+                                                            calcAutoPrice();
+                                                          },
+                                                        ),
                                                       ),
-                                                      value: initalAutoMode,
-                                                      items: [
-                                                        '15%',
-                                                        '25%',
-                                                        '35%',
-                                                        '42%',
-                                                        '50%'
-                                                      ].map((String value) {
-                                                        return DropdownMenuItem<
-                                                            String>(
-                                                          value: value,
-                                                          child: Text(value),
-                                                        );
-                                                      }).toList(),
-                                                      onChanged:
-                                                          (String? newValue) {
-                                                        setState(() {
-                                                          initalAutoMode =
-                                                              newValue!;
-                                                        });
-                                                        // calculate discount
-                                                        calcAutoPrice();
-                                                      },
-                                                    ),
+                                                      SizedBox(
+                                                        width:
+                                                            dialogWidth * .05,
+                                                      ),
+                                                      paidWidget()
+                                                    ],
                                                   ),
                                                 ),
                                               if (mode == DiscountModes.custom)
@@ -1018,6 +1085,11 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                             setState(() {
                                                               discount = tCost -
                                                                   cusPrice;
+                                                              paidController
+                                                                  .text = (tCost -
+                                                                      (discount +
+                                                                          shakemateDiscount))
+                                                                  .toString();
                                                             });
                                                           },
                                                           decoration:
@@ -1057,7 +1129,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                             return null;
                                                           },
                                                         ),
-                                                      )
+                                                      ),
+                                                      SizedBox(
+                                                        width:
+                                                            dialogWidth * .05,
+                                                      ),
+                                                      paidWidget()
                                                     ],
                                                   ),
                                                 ),
@@ -1131,7 +1208,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                             ),
                                                           ),
                                                           Text(
-                                                            'Total:  ₹${total - (discount + shakemateDiscount)}',
+                                                            'Total:  ₹${tCost - (discount + shakemateDiscount)}',
                                                             style: GoogleFonts
                                                                 .montserrat(
                                                                     fontWeight:

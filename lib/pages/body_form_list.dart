@@ -499,9 +499,8 @@ class _BodyFormListState extends State<BodyFormList>
                           'planName': planName,
                           'planColor': 'orange',
                           'planStatus': planStatus,
-                          'gender' : gender,
-                          'image' : image,
-                          
+                          'gender': gender,
+                          'image': image,
                         };
                       }
                       break;
@@ -515,7 +514,9 @@ class _BodyFormListState extends State<BodyFormList>
                       'phone': phone,
                       'planName': planName,
                       'planColor': 'red',
-                      'planStatus': '$tempAllPlanDays'
+                      'planStatus': planStatus,
+                      'gender': gender,
+                      'image': image,
                     };
                   }
                 }

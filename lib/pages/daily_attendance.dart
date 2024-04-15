@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:another_flushbar/flushbar.dart';
 import 'package:coach_zen/pages/body_form_cust.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../components/ui/appbar.dart';
 import 'package:data_table_2/data_table_2.dart';
 
@@ -48,6 +50,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   List<Map<dynamic, dynamic>> homeProgram = [];
   Map<String, String> studentsNameUID = {};
   Map<dynamic, dynamic> presentStudentsUID = {};
+  Map<dynamic, dynamic> reminderList = {};
   bool isEdit = false;
   int zdays = 0;
   int revenue = 0;
@@ -107,6 +110,43 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           datas += 1;
           debugPrint('got data - $datas');
           final eventData = event.snapshot.value;
+
+// Process attendance data
+          final attendanceData = eventData['attendance'] != null
+              ? eventData['attendance'][formattedDate]
+              : null;
+          final presentStudents = attendanceData != null
+              ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
+              : {};
+
+          List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
+
+          // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
+          presentStudents.forEach((studentId, studentData) {
+            // Check if shakes > 1
+            if ((studentData['shakes'] as int) > 1) {
+              // Add student twice if shakes > 1
+              tempSortedPresentStudents.add({
+                'id': studentId,
+                'time': studentData['time'],
+                'home': true,
+              });
+              tempSortedPresentStudents.add({
+                'id': studentId,
+                'time': studentData['time'],
+                'second': true,
+              });
+            } else {
+              // Add student once if shakes <= 1
+              tempSortedPresentStudents.add({
+                'id': studentId,
+                'time': studentData['time'],
+              });
+            }
+          });
+          final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
+              tempSortedPresentStudents;
+
           // Process users data
           final usersData = eventData['users'] ?? {};
           final updatedUsers = usersData.entries.map((entry) {
@@ -152,6 +192,67 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 }
               });
             }
+
+            String rePlanName = '';
+            String planStatus = '';
+            String? image = userData['image'];
+            final String uid = key;
+            String gender = userData['gender'];
+
+            final int userDays = userData['days'].keys.length;
+
+            if (userData['existed'] != null) {
+              rePlanName = 'Not Started';
+              planStatus = 'No Plans';
+            }
+
+            if (userData['plans'] != null) {
+              bool existingPlan = false;
+              int tempAllPlanDays = 4;
+              List sortAllKeys = userData['plans'].keys.toList();
+              sortAllKeys.sort((a, b) => a.compareTo(b));
+              // final allDaysMap = user['days'];
+              // check if today's date comes in between any plan
+              for (String key in sortAllKeys) {
+                final plan = userData['plans'][key];
+                rePlanName = plan['program'];
+                // final planDate = DateTime.parse(key);
+                final int planDays = plan['days'] as int;
+                tempAllPlanDays += planDays;
+                // debugPrint('Existing Plan: $existingPlan');
+                if (userDays <= tempAllPlanDays) {
+                  existingPlan = true;
+                  final int daysLeft = tempAllPlanDays - userDays;
+                  planStatus =
+                      daysLeft > 0 ? '$daysLeft days left' : 'Expires today';
+                  if (daysLeft < 7) {
+                    reminderList[uid] = {
+                      'name': userData['name'],
+                      'phone': '+91${userData['phone']}',
+                      'planName': rePlanName,
+                      'planColor': 'orange',
+                      'planStatus': planStatus,
+                      'gender': gender,
+                      'image': image,
+                    };
+                  }
+                  break;
+                }
+              }
+              if (!existingPlan) {
+                planStatus = 'Expired';
+                reminderList[uid] = {
+                  'name': userData['name'],
+                  'phone': '+91${userData['phone']}',
+                  'planName': rePlanName,
+                  'planColor': 'red',
+                  'planStatus': planStatus,
+                  'gender': gender,
+                  'image': image,
+                };
+              }
+            }
+
             return {
               'id': key,
               'name': userData['name'],
@@ -173,46 +274,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               'plans': userData['plans'],
               'onHomeProgram': userData['homeProgram'] != null &&
                   userData['homeProgram'][formattedDate] != null,
-
-              // Add other user fields as needed
+              'gender': userData['gender'],
+              'image': userData['image'],
             };
           }).toList();
-
-          // Process attendance data
-          final attendanceData = eventData['attendance'] != null
-              ? eventData['attendance'][formattedDate]
-              : null;
-          final presentStudents = attendanceData != null
-              ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
-              : {};
-
-          List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
-
-          // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
-          presentStudents.forEach((studentId, studentData) {
-            // Check if shakes > 1
-            if ((studentData['shakes'] as int) > 1) {
-              // Add student twice if shakes > 1
-              tempSortedPresentStudents.add({
-                'id': studentId,
-                'time': studentData['time'],
-                'home': true,
-              });
-              tempSortedPresentStudents.add({
-                'id': studentId,
-                'time': studentData['time'],
-                'second': true,
-              });
-            } else {
-              // Add student once if shakes <= 1
-              tempSortedPresentStudents.add({
-                'id': studentId,
-                'time': studentData['time'],
-              });
-            }
-          });
-          final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
-              tempSortedPresentStudents;
 
           // process home program data
           final homeProgramData = eventData['attendance'] != null
@@ -656,8 +721,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       (index) {
                     debugPrint('Index init: $index');
 
-                    // debugPrint('xxIndex: ${sortedPresentStudents.length}');
-                    // get user
                     final user = users.firstWhere((user) =>
                         user['id'] == sortedPresentStudents[index]['id']);
                     String id = user['id'];
@@ -720,6 +783,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         actualBalances['0 day'] = 200;
                         actualBalances['3 day'] = 720;
                       }
+
                       if (user['plans'] != null) {
                         List sortAllKeys = user['plans'].keys.toList();
                         sortAllKeys.sort((a, b) => a.compareTo(b));
@@ -732,6 +796,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           planDays = plan['days'] as int;
                           allPlansCost += planDays * shakePrice;
                           tempAllPlanDays += planDays;
+
                           // debugPrint('Existing Plan: $existingPlan');
                           if (user['totalDays'] <= tempAllPlanDays) {
                             final program = plan['program'];
