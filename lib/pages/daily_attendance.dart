@@ -15,6 +15,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/ui/appbar.dart';
 import 'package:data_table_2/data_table_2.dart';
+import '../components/products.dart';
 
 final DateFormat format = DateFormat('dd MMM yyyy');
 final DateTime today = DateTime.now();
@@ -48,7 +49,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   DateTime selectedDate = DateTime.now();
   List<Map<dynamic, dynamic>> clubFees = [];
   List<Map<dynamic, dynamic>> homeProgram = [];
-  Map<String, String> studentsNameUID = {};
+  Map<dynamic, dynamic> allUsers = {};
+  Map<dynamic, dynamic> productsHistory = {};
   Map<dynamic, dynamic> presentStudentsUID = {};
   Map<dynamic, dynamic> reminderList = {};
   bool isEdit = false;
@@ -152,7 +154,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           final updatedUsers = usersData.entries.map((entry) {
             final key = entry.key;
             final userData = entry.value;
-            studentsNameUID[key] = userData['name'];
             int totalDays = -1;
 
             // Iterate through entries in 'days' map
@@ -192,65 +193,236 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 }
               });
             }
+            final bool onHomeProgram = userData['homeProgram'] != null &&
+                userData['homeProgram'][formattedDate] != null;
 
-            String rePlanName = '';
-            String planStatus = '';
-            String? image = userData['image'];
-            final String uid = key;
-            String gender = userData['gender'];
+            final int day = totalDays;
 
-            final int userDays = userData['days'].keys.length;
+            final gotPlan = getPlan(day);
+            int totalBalance = gotPlan['balance'];
+            int realBalance = totalBalance - amountPaidTillNow;
+            String days = gotPlan['day'];
+            String planName = gotPlan['plan'];
+            Map<String, int> allBalances = {};
+            Map<String, int> actualBalances = {};
+            Map<String, String> prevPlanBalances = {};
+            bool remindExistingPlan = false;
+            bool existingPlan = false;
+            String? planDate;
+            // int planDays = 0;
+            int reTempAllPlanDays = 4;
+            int tempAllPlanDays = 4;
+            int planDays = 0;
+            final bool advancedPaymentx =
+                userData['advancedPayments'] != null &&
+                    userData['advancedPayments']['pid'] != null;
+            // ----------------------
 
-            if (userData['existed'] != null) {
-              rePlanName = 'Not Started';
-              planStatus = 'No Plans';
+            if (day0PaidTillNow < 200) {
+              int tempBal = 200 - (day0PaidTillNow);
+              allBalances['0 day'] = tempBal;
+            }
+            if (day > 1 && day3PaidTillNow < 720) {
+              int tempBal = 720 - (day3PaidTillNow);
+              allBalances['3 day'] = tempBal;
             }
 
-            if (userData['plans'] != null) {
-              bool existingPlan = false;
-              int tempAllPlanDays = 4;
-              List sortAllKeys = userData['plans'].keys.toList();
-              sortAllKeys.sort((a, b) => a.compareTo(b));
-              // final allDaysMap = user['days'];
-              // check if today's date comes in between any plan
-              for (String key in sortAllKeys) {
-                final plan = userData['plans'][key];
-                rePlanName = plan['program'];
-                // final planDate = DateTime.parse(key);
-                final int planDays = plan['days'] as int;
-                tempAllPlanDays += planDays;
-                // debugPrint('Existing Plan: $existingPlan');
-                if (userDays <= tempAllPlanDays) {
-                  existingPlan = true;
-                  final int daysLeft = tempAllPlanDays - userDays;
-                  planStatus =
-                      daysLeft > 0 ? '$daysLeft days left' : 'Expires today';
-                  if (daysLeft < 7) {
-                    reminderList[uid] = {
-                      'name': userData['name'],
-                      'phone': '+91${userData['phone']}',
-                      'planName': rePlanName,
-                      'planColor': 'orange',
-                      'planStatus': planStatus,
-                      'gender': gender,
-                      'image': image,
-                    };
-                  }
-                  break;
+            // ----------------------
+            if (day > 4) {
+              String rePlanName = '';
+              String planStatus = '';
+              String? image = userData['image'];
+              final String uid = key;
+              String gender = userData['gender'];
+              final int userDays = userData['days'].keys.length;
+
+              if (userData['existed'] != null) {
+                rePlanName = 'Not Started';
+                planStatus = 'No Plans';
+              }
+
+              // ---------------------------------
+
+              final plansPaid = userData['plansPaid'];
+              if (plansPaid != null) {
+                final actDay0 = plansPaid['0 day'] ?? 0;
+                final actDay3 = plansPaid['3 day'] ?? 0;
+                if (actDay0 < 200) {
+                  int tempBal = 200 - (actDay0 as int);
+                  actualBalances['0 day'] = tempBal;
                 }
+                if (actDay3 < 720) {
+                  int tempBal = 720 - (actDay3 as int);
+                  actualBalances['3 day'] = tempBal;
+                }
+              } else {
+                actualBalances['0 day'] = 200;
+                actualBalances['3 day'] = 720;
               }
-              if (!existingPlan) {
-                planStatus = 'Expired';
-                reminderList[uid] = {
-                  'name': userData['name'],
-                  'phone': '+91${userData['phone']}',
-                  'planName': rePlanName,
-                  'planColor': 'red',
-                  'planStatus': planStatus,
-                  'gender': gender,
-                  'image': image,
-                };
+              final user = userData;
+              final String id = key;
+              final plans = user['plans'];
+              if (plans != null) {
+                List sortAllKeys = userData['plans'].keys.toList();
+                sortAllKeys.sort((a, b) => a.compareTo(b));
+                int allPlansCost = 0;
+                // final allDaysMap = user['days'];
+                // check if today's date comes in between any plan
+                for (String key in sortAllKeys) {
+                  final plan = userData['plans'][key];
+
+                  if (plansPaid != null) {
+                    int bal = plan['balance'] as int;
+                    String planName = plan['program'];
+                    if (bal != 0) {
+                      actualBalances[planName] = bal;
+                      prevPlanBalances[planName] = key;
+                    }
+                    int planPaid = 0;
+                    Map<dynamic, dynamic> planPaymentDates =
+                        plan['payments'] ?? {};
+                    // remove any date after today
+                    planPaymentDates.removeWhere((key, value) {
+                      final planPaymentDate = DateTime.parse(value);
+                      return planPaymentDate.isAfter(selectedDate);
+                    });
+                    if (planPaymentDates.isNotEmpty) {
+                      for (String key in planPaymentDates.keys) {
+                        final paymentId = key;
+                        final datex = planPaymentDates[key];
+                        planPaid +=
+                            user['payments'][datex][paymentId]['amount'] as int;
+                      }
+                    }
+                    int planCost =
+                        ((user['plans'][key]['days'] as int) * shakePrice);
+                    final int finBal = planCost - planPaid;
+                    if (finBal != 0) {
+                      allBalances[plans[key]['program']] = finBal;
+                    }
+                  }
+
+                  rePlanName = plan['program'];
+                  planDays = plan['days'] as int;
+                  if (!existingPlan) {
+                    tempAllPlanDays += planDays;
+                  }
+                  reTempAllPlanDays += planDays;
+                  allPlansCost += planDays * shakePrice;
+
+                  if (!existingPlan &&
+                      presentStudents.containsKey(id) &&
+                      (day <= tempAllPlanDays)) {
+                    final program = plan['program'];
+                    existingPlan = true;
+                    planDate = key;
+                    int cDay = day - (tempAllPlanDays - planDays);
+                    final int planStartDay = (tempAllPlanDays - planDays) + 1;
+                    final List userDates = user['days'].keys.toList();
+                    userDates.sort((a, b) => a.compareTo(b));
+
+                    if (planDate != userDates[planStartDay]) {
+                      final String newDate = userDates[planStartDay];
+                      String paymentId = plan['payments'].keys.first;
+                      String paymentDate = plan['payments'][paymentId];
+                      final Map<String, dynamic> updates = {
+                        'users/$id/plans/$planDate': null,
+                        'users/$id/plans/$newDate': plan,
+                        'users/$id/plansPaid/$program/$planDate': null,
+                        'users/$id/plansPaid/$program/$newDate':
+                            user['plansPaid'][program][planDate],
+                        'attendance/$paymentDate/fees/$paymentId/planId':
+                            newDate,
+                        'users/$id/payments/$paymentDate/$paymentId/planId':
+                            newDate,
+                      };
+                      coachDb.child(cid).update(updates);
+                    }
+
+                    final gotNewPlan = getPlan(cDay,
+                        assignedPlanDays: planDays, planName: program);
+                    days = gotNewPlan['day'];
+                    planName = gotNewPlan['plan'];
+                    const int fiveDayCost = 920;
+                    realBalance =
+                        (allPlansCost + fiveDayCost) - amountPaidTillNow;
+                    debugPrint('$amountPaidTillNow sd');
+                    debugPrint('New Plan: $amountPaidTillNow');
+                  }
+
+                  if (userDays <= reTempAllPlanDays) {
+                    remindExistingPlan = true;
+                    final int daysLeft = reTempAllPlanDays - userDays;
+                    planStatus =
+                        daysLeft > 0 ? '$daysLeft days left' : 'Expires today';
+                    if (daysLeft < 7) {
+                      reminderList[uid] = {
+                        'name': userData['name'],
+                        'phone': '+91${userData['phone']}',
+                        'planName': rePlanName,
+                        'planColor': 'orange',
+                        'planStatus': planStatus,
+                        'gender': gender,
+                        'image': image,
+                      };
+                    }
+                  }
+                }
+
+                if (!existingPlan) {
+                  final int currentDay = day - tempAllPlanDays;
+                  if (currentDay == 1 && advancedPaymentx) {
+                    // query to firebase to set plan
+                    final DatabaseReference dbRef = coachDb.child(cid);
+                    final Map<dynamic, dynamic> pid =
+                        user['advancedPayments']['pid'];
+                    final int pidAmount = pid['amount'] as int;
+                    // remove amount from advanced payments
+                    pid.remove('amount');
+                    final String program = pid['program'];
+                    final String paymentId = pid['payments'].keys.first;
+                    final String paymentDate = pid['payments'][paymentId];
+
+                    final Map<String, dynamic> updates = {
+                      'users/$id/plans/$formattedDate': pid,
+                      'users/$id/plansPaid/$program/$formattedDate': pidAmount,
+                      'users/$id/advancedPayments': null,
+                      'attendance/$paymentDate/fees/$paymentId/planId':
+                          formattedDate,
+                      'users/$id/payments/$paymentDate/$paymentId/planId':
+                          formattedDate,
+                    };
+                    dbRef.update(updates);
+                  }
+                  days = '$currentDay / $currentDay';
+                  // actualBalances['Paid'] = (currentDay * shakePrice);
+                  allBalances['Extra ${currentDay}days'] =
+                      currentDay * shakePrice;
+                }
+
+                if (!remindExistingPlan) {
+                  planStatus = 'Expired';
+                  reminderList[uid] = {
+                    'name': userData['name'],
+                    'phone': '+91${userData['phone']}',
+                    'planName': rePlanName,
+                    'planColor': 'red',
+                    'planStatus': planStatus,
+                    'gender': gender,
+                    'image': image,
+                  };
+                }
+              } else {
+                final int currentDay = day - tempAllPlanDays;
+                days = '$currentDay / $currentDay';
+                // actualBalances['Paid'] = (currentDay * shakePrice);
+                allBalances['Extra ${currentDay}days'] =
+                    currentDay * shakePrice;
               }
+              SharedPreferences.getInstance().then((prefs) {
+                final reminderListJSON = jsonEncode(reminderList);
+                prefs.setString('reminderList', reminderListJSON);
+              });
             }
 
             return {
@@ -258,8 +430,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               'name': userData['name'],
               'phone': userData['phone'],
               'paid': userData['paid'],
-              'productsHistory': List<Map<dynamic, dynamic>>.from(
-                  userData['productsHistory'] ?? []),
+              'productsHistory': userData['productsHistory'],
               'days': userData['days'],
               'payments': userData['payments'],
               'homeProgram': userData['homeProgram'],
@@ -272,10 +443,21 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               },
               'plansPaid': userData['plansPaid'],
               'plans': userData['plans'],
-              'onHomeProgram': userData['homeProgram'] != null &&
-                  userData['homeProgram'][formattedDate] != null,
+              'onHomeProgram': onHomeProgram,
               'gender': userData['gender'],
               'image': userData['image'],
+              'advancedPaymentx': advancedPaymentx,
+              'tempAllPlanDays': tempAllPlanDays,
+              'planDays': planDays,
+              'planDate': planDate,
+              'existingPlan': existingPlan,
+              'allBalances': allBalances,
+              'actualBalances': actualBalances,
+              'prevPlanBalances': prevPlanBalances,
+              'realBalance': realBalance,
+              'planName': planName,
+              'daysString': days,
+              'day': day,
             };
           }).toList();
 
@@ -291,18 +473,29 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 homeProgramData['homeProgram'].values);
           }
 
+          // Process products history data
+          final Map<dynamic, dynamic> productsHistoryData =
+              attendanceData != null
+                  ? attendanceData['productsHistory'] != null
+                      ? Map<dynamic, dynamic>.from(
+                          attendanceData['productsHistory'])
+                      : {}
+                  : {};
+
           // Update state
           setState(() {
             users = updatedUsers;
             homeProgram = homeProgramx;
             presentStudentsUID = presentStudents;
             sortedPresentStudents = sortedPresentStudentsx;
+            allUsers = usersData;
             zdays = presentStudents.keys
                 .where((student) =>
                     users.firstWhere(
                         (user) => user['id'] == student)['totalDays'] ==
                     0)
                 .length;
+            productsHistory = productsHistoryData;
             clubFees = [];
             revenue = 0;
           });
@@ -335,6 +528,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               });
             });
           }
+
           if (!completer.isCompleted) {
             completer
                 .complete(); // Resolve the Completer when the first event is received
@@ -346,7 +540,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           borderRadius: BorderRadius.circular(15),
           flushbarStyle: FlushbarStyle.FLOATING,
           flushbarPosition: FlushbarPosition.TOP,
-          message: "Unable to get data. Please check your internet connection",
+          message:
+              "$e Unable to get data. Please check your internet connection",
           icon: Icon(
             Icons.error_outline_rounded,
             size: 28.0,
@@ -461,12 +656,13 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       builder: (context) => DailyDetails(
                         selectedDate: selectedDate,
                         clubFees: clubFees,
-                        studentsNameUID: studentsNameUID,
+                        allUsers: allUsers,
                         zdays: zdays.toString(),
                         shakes: presentStudentsUID.length.toString(),
                         revenue: revenue.toString(),
                         homeProgram: homeProgram,
                         users: users,
+                        productsHistory: productsHistory,
                       ),
                     ),
                   );
@@ -723,10 +919,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
                     final user = users.firstWhere((user) =>
                         user['id'] == sortedPresentStudents[index]['id']);
-                    String id = user['id'];
-                    String name = user['name'];
-                    int amountPaidTillNow = user['amountPaidTillNow']['total'];
-                    int day = user['totalDays'];
+                    final String id = user['id'];
+                    final String name = user['name'];
+                    int dayx = user['day'];
                     bool onHomeProgram = user['onHomeProgram'];
                     String sno = (index + 1).toString();
                     // check if 'home' is true
@@ -736,187 +931,25 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     if ((isHome || onHomeProgram) && !isSecond) {
                       sno += ' (H)';
                       if (isHome) {
-                        day -= 1;
+                        dayx--;
                       }
                     }
-                    final gotPlan = getPlan(day);
-                    int totalBalance = gotPlan['balance'];
-                    int realBalance = totalBalance - amountPaidTillNow;
-                    String balance = realBalance.toString();
-                    String days = gotPlan['day'];
-                    String planName = gotPlan['plan'];
-                    Map<String, int> allBalances = {};
-                    Map<String, int> actualBalances = {};
-                    Map<String, String> prevPlanBalances = {};
-                    bool existingPlan = false;
-                    String? planDate;
-                    int planDays = 0;
-                    int tempAllPlanDays = 4;
-                    final bool advancedPaymentx =
-                        user['advancedPayments'] != null &&
-                            user['advancedPayments']['pid'] != null;
+                    final int day = dayx;
+                    final int realBalance = user['realBalance'];
+                    final String balance = realBalance.toString();
+                    final String days = user['daysString'];
+                    final String planName = user['planName'];
+                    final Map<String, int> allBalances = user['allBalances'];
+                    final Map<String, int> actualBalances =
+                        user['actualBalances'];
+                    final Map<String, String> prevPlanBalances =
+                        user['prevPlanBalances'];
+                    bool existingPlan = user['existingPlan'];
+                    String? planDate = user['planDate'];
+                    final int planDays = user['planDays'];
+                    final int tempAllPlanDays = user['tempAllPlanDays'];
+                    final bool advancedPaymentx = user['advancedPaymentx'];
 
-                    if (day > 4) {
-                      final day0 = user['amountPaidTillNow']['0 day'] ?? 0;
-                      final day3 = user['amountPaidTillNow']['3 day'] ?? 0;
-                      if (day0 < 200) {
-                        int tempBal = 200 - (day0 as int);
-                        allBalances['0 day'] = tempBal;
-                      }
-                      if (day3 < 720) {
-                        int tempBal = 720 - (day3 as int);
-                        allBalances['3 day'] = tempBal;
-                      }
-                      final plansPaid = user['plansPaid'];
-                      if (plansPaid != null) {
-                        final actDay0 = plansPaid['0 day'] ?? 0;
-                        final actDay3 = plansPaid['3 day'] ?? 0;
-                        if (actDay0 < 200) {
-                          int tempBal = 200 - (actDay0 as int);
-                          actualBalances['0 day'] = tempBal;
-                        }
-                        if (actDay3 < 720) {
-                          int tempBal = 720 - (actDay3 as int);
-                          actualBalances['3 day'] = tempBal;
-                        }
-                      } else {
-                        actualBalances['0 day'] = 200;
-                        actualBalances['3 day'] = 720;
-                      }
-
-                      if (user['plans'] != null) {
-                        List sortAllKeys = user['plans'].keys.toList();
-                        sortAllKeys.sort((a, b) => a.compareTo(b));
-                        int allPlansCost = 0;
-                        // final allDaysMap = user['days'];
-                        // check if today's date comes in between any plan
-                        for (String key in sortAllKeys) {
-                          final plan = user['plans'][key];
-                          // final planDate = DateTime.parse(key);
-                          planDays = plan['days'] as int;
-                          allPlansCost += planDays * shakePrice;
-                          tempAllPlanDays += planDays;
-
-                          // debugPrint('Existing Plan: $existingPlan');
-                          if (user['totalDays'] <= tempAllPlanDays) {
-                            final program = plan['program'];
-                            existingPlan = true;
-                            planDate = key;
-                            int cDay = day - (tempAllPlanDays - planDays);
-                            final int planStartDay =
-                                (tempAllPlanDays - planDays) + 1;
-                            final List userDates = user['days'].keys.toList();
-                            userDates.sort((a, b) => a.compareTo(b));
-
-                            if (planDate != userDates[planStartDay]) {
-                              final String newDate = userDates[planStartDay];
-                              String paymentId = plan['payments'].keys.first;
-                              String paymentDate = plan['payments'][paymentId];
-                              final Map<String, dynamic> updates = {
-                                'users/$id/plans/$planDate': null,
-                                'users/$id/plans/$newDate': plan,
-                                'users/$id/plansPaid/$program/$planDate': null,
-                                'users/$id/plansPaid/$program/$newDate':
-                                    user['plansPaid'][program][planDate],
-                                'attendance/$paymentDate/fees/$paymentId/planId':
-                                    newDate,
-                                'users/$id/payments/$paymentDate/$paymentId/planId':
-                                    newDate,
-                              };
-                              coachDb.child(cid).update(updates);
-                            }
-
-                            final gotNewPlan = getPlan(cDay,
-                                assignedPlanDays: planDays, planName: program);
-                            days = gotNewPlan['day'];
-                            planName = gotNewPlan['plan'];
-                            const int fiveDayCost = 920;
-                            realBalance = (allPlansCost + fiveDayCost) -
-                                amountPaidTillNow;
-                            debugPrint('$amountPaidTillNow sd');
-                            balance = realBalance.toString();
-                            debugPrint('New Plan: $amountPaidTillNow');
-                            break;
-                          }
-                        }
-
-                        if (plansPaid != null) {
-                          final Map<dynamic, dynamic> plans = user['plans'];
-
-                          for (String key in plans.keys) {
-                            int bal = plans[key]['balance'] as int;
-                            String planName = plans[key]['program'];
-                            if (bal != 0) {
-                              actualBalances[planName] = bal;
-                              prevPlanBalances[planName] = key;
-                            }
-                            int planPaid = 0;
-                            Map<dynamic, dynamic> planPaymentDates =
-                                Map.from(plans[key]['payments'] ?? {});
-                            // remove any date after today
-                            planPaymentDates.removeWhere((key, value) {
-                              final planPaymentDate = DateTime.parse(value);
-                              return planPaymentDate.isAfter(selectedDate);
-                            });
-                            if (planPaymentDates.isNotEmpty) {
-                              for (String key in planPaymentDates.keys) {
-                                final paymentId = key;
-                                final datex = planPaymentDates[key];
-                                planPaid += user['payments'][datex][paymentId]
-                                    ['amount'] as int;
-                              }
-                            }
-
-                            int planCost =
-                                ((user['plans'][key]['days'] as int) *
-                                    shakePrice);
-                            final int finBal = planCost - planPaid;
-                            if (finBal != 0) {
-                              allBalances[plans[key]['program']] = finBal;
-                            }
-                          }
-                        }
-
-                        if (!existingPlan) {
-                          final int currentDay = day - tempAllPlanDays;
-                          if (currentDay == 1 && advancedPaymentx) {
-                            // query to firebase to set plan
-                            final DatabaseReference dbRef = coachDb.child(cid);
-                            final Map<dynamic, dynamic> pid =
-                                user['advancedPayments']['pid'];
-                            final int pidAmount = pid['amount'] as int;
-                            // remove amount from advanced payments
-                            pid.remove('amount');
-                            final String program = pid['program'];
-                            final String paymentId = pid['payments'].keys.first;
-                            final String paymentDate =
-                                pid['payments'][paymentId];
-
-                            final Map<String, dynamic> updates = {
-                              'users/$id/plans/$formattedDate': pid,
-                              'users/$id/plansPaid/$program/$formattedDate':
-                                  pidAmount,
-                              'users/$id/advancedPayments': null,
-                              'attendance/$paymentDate/fees/$paymentId/planId':
-                                  formattedDate,
-                              'users/$id/payments/$paymentDate/$paymentId/planId':
-                                  formattedDate,
-                            };
-                            dbRef.update(updates);
-                          }
-                          days = '$currentDay / $currentDay';
-                          // actualBalances['Paid'] = (currentDay * shakePrice);
-                          allBalances['Extra ${currentDay}days'] =
-                              currentDay * shakePrice;
-                        }
-                      } else {
-                        final int currentDay = day - tempAllPlanDays;
-                        days = '$currentDay / $currentDay';
-                        // actualBalances['Paid'] = (currentDay * shakePrice);
-                        allBalances['Extra ${currentDay}days'] =
-                            currentDay * shakePrice;
-                      }
-                    }
                     return DataRow(
                       cells: <DataCell>[
                         DataCell(
@@ -1565,11 +1598,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     builder: (context) =>
                                                         CustOrderForm(
                                                       uid: id,
-                                                      productsHistory: user[
-                                                          'productsHistory'],
                                                       name: name,
                                                       popIndex: 2,
                                                       attendance: true,
+                                                      attendanceDate:
+                                                          formattedDate,
                                                     ),
                                                   ),
                                                 );
@@ -2243,7 +2276,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 class DailyDetails extends StatefulWidget {
   final DateTime selectedDate;
   final List<Map<dynamic, dynamic>> clubFees;
-  final dynamic studentsNameUID;
+  final Map<dynamic, dynamic> productsHistory;
+  final Map<dynamic, dynamic> allUsers;
   final String zdays;
   final String shakes;
   final String revenue;
@@ -2253,12 +2287,13 @@ class DailyDetails extends StatefulWidget {
     super.key,
     required this.selectedDate,
     required this.clubFees,
-    required this.studentsNameUID,
+    required this.allUsers,
     required this.zdays,
     required this.shakes,
     required this.revenue,
     required this.users,
     required this.homeProgram,
+    required this.productsHistory,
   });
 
   @override
@@ -2272,7 +2307,6 @@ class _DailyDetailsState extends State<DailyDetails> {
   bool isEdit = false;
   bool submitted = false;
   final String cid = FirebaseAuth.instance.currentUser!.uid;
-  List<Map<dynamic, dynamic>> todaysProductsHistory = [];
   final DatabaseReference coachDb =
       FirebaseDatabase.instance.ref().child('Coaches');
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
@@ -2512,302 +2546,314 @@ class _DailyDetailsState extends State<DailyDetails> {
                 SizedBox(
                   height: MediaQuery.of(context).size.width * 0.04,
                 ),
-                Center(
-                  child: DataTable(
-                    headingRowColor:
-                        MaterialStateProperty.all(Colors.grey[200]),
-                    border: TableBorder.all(
-                      color: Colors.black12,
-                      width: 1,
-                    ),
-                    horizontalMargin: MediaQuery.of(context).size.width * 0.02,
-                    columns: <DataColumn>[
-                      const DataColumn(
-                        label: Text('Name'),
+                if (widget.clubFees.isNotEmpty)
+                  Center(
+                    child: DataTable(
+                      headingRowColor:
+                          MaterialStateProperty.all(Colors.grey[200]),
+                      border: TableBorder.all(
+                        color: Colors.black12,
+                        width: 1,
                       ),
-                      const DataColumn(
-                        label: Text('Program'),
-                      ),
-                      const DataColumn(
-                        label: Text('Mode'),
-                      ),
-                      const DataColumn(
-                        label: Text('Amount'),
-                      ),
-                      const DataColumn(
-                        label: Text('C. Balance'),
-                      ),
-                      if (isEdit)
-                        const DataColumn2(
-                          label: Text('Delete'),
-                          size: ColumnSize.S,
+                      horizontalMargin:
+                          MediaQuery.of(context).size.width * 0.02,
+                      columns: <DataColumn>[
+                        const DataColumn(
+                          label: Text('Name'),
                         ),
-                    ],
-                    rows:
-                        List<DataRow>.generate(widget.clubFees.length, (index) {
-                      String uid = widget.clubFees[index]['uid'];
-                      String name = widget.studentsNameUID[uid];
-                      String program = widget.clubFees[index]['program'];
-                      String mode = widget.clubFees[index]['mode'];
-                      String amount =
-                          widget.clubFees[index]['amount'].toString();
-                      String balance =
-                          widget.clubFees[index]['balance'].toString();
-                      return DataRow(cells: <DataCell>[
-                        DataCell(Text(name)),
-                        DataCell(Text(program)),
-                        DataCell(Text(mode)),
-                        DataCell(Text(amount)),
-                        DataCell(Text(balance,
-                            style: TextStyle(
-                                color: widget.clubFees[index]['balance'] >= 0
-                                    ? Colors.black
-                                    : Colors.red))),
+                        const DataColumn(
+                          label: Text('Program'),
+                        ),
+                        const DataColumn(
+                          label: Text('Mode'),
+                        ),
+                        const DataColumn(
+                          label: Text('Amt'),
+                        ),
+                        const DataColumn(
+                          label: Text('C. Bal'),
+                        ),
                         if (isEdit)
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                // ask for confirmation
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: const Text('Confirmation'),
-                                      content: Text(
-                                          'Are you sure you want to delete "${name.split(' ')[0]}\'s" payment?'),
-                                      actions: [
-                                        TextButton(
-                                          child: const Text('Cancel'),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                        TextButton(
-                                          child: const Text('Delete'),
-                                          onPressed: () async {
-                                            if (submitted) {
-                                              return;
-                                            }
-                                            changeSubmitted(true);
-                                            // get payment id
-                                            try {
-                                              final DatabaseReference dbRef =
-                                                  coachDb.child(cid);
-
-                                              final String paymentId = widget
-                                                  .clubFees[index]['paymentId'];
-                                              final String plan = widget
-                                                  .clubFees[index]['program'];
-                                              final planId = widget
-                                                  .clubFees[index]['planId'];
-                                              final advancedPayment =
-                                                  widget.clubFees[index]
-                                                      ['advancedPayment'];
-
-                                              final user = widget.users
-                                                  .firstWhere((element) =>
-                                                      element['id'] == uid);
-
-                                              // delete from firebase
-                                              Map<String, dynamic> updates = {
-                                                // delete from club fees
-                                                'attendance/$formattedDate/fees/$paymentId':
-                                                    null,
-                                                'users/$uid/paid':
-                                                    ServerValue.increment(
-                                                        -int.parse(amount)),
-                                              };
-
-                                              if (user['payments']
-                                                          [formattedDate]
-                                                      .keys
-                                                      .length <=
-                                                  2) {
-                                                updates['users/$uid/payments/$formattedDate'] =
-                                                    null;
-                                              } else {
-                                                updates['users/$uid/payments/$formattedDate/$paymentId'] =
-                                                    null;
-                                                updates['users/$uid/payments/$formattedDate/totalAmount'] =
-                                                    ServerValue.increment(
-                                                        -int.parse(amount));
+                          const DataColumn(
+                            label: Text('Delete'),
+                          ),
+                      ],
+                      rows: List<DataRow>.generate(widget.clubFees.length,
+                          (index) {
+                        String uid = widget.clubFees[index]['uid'];
+                        String name = widget.allUsers[uid]['name'];
+                        String program = widget.clubFees[index]['program'];
+                        String mode = widget.clubFees[index]['mode'];
+                        String amount =
+                            widget.clubFees[index]['amount'].toString();
+                        String balance =
+                            widget.clubFees[index]['balance'].toString();
+                        return DataRow(cells: <DataCell>[
+                          DataCell(Text(name)),
+                          DataCell(Text(program)),
+                          DataCell(Text(mode)),
+                          DataCell(Text(amount)),
+                          DataCell(Text(balance,
+                              style: TextStyle(
+                                  color: widget.clubFees[index]['balance'] >= 0
+                                      ? Colors.black
+                                      : Colors.red))),
+                          if (isEdit)
+                            DataCell(
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  // ask for confirmation
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        title: const Text('Confirmation'),
+                                        content: Text(
+                                            'Are you sure you want to delete "${name.split(' ')[0]}\'s" payment?'),
+                                        actions: [
+                                          TextButton(
+                                            child: const Text('Cancel'),
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                            },
+                                          ),
+                                          TextButton(
+                                            child: const Text('Delete'),
+                                            onPressed: () async {
+                                              if (submitted) {
+                                                return;
                                               }
-                                              // delete from plans
-                                              if ((user['plans'] != null) &&
-                                                  planId != null &&
-                                                  planId.isNotEmpty) {
-                                                // get planId
+                                              changeSubmitted(true);
+                                              // get payment id
+                                              try {
+                                                final DatabaseReference dbRef =
+                                                    coachDb.child(cid);
 
-                                                if (user['plans'].keys.length >
-                                                    1) {
-                                                  // get next plan
-                                                  final List sortedPlanKeys =
-                                                      user['plans']
+                                                final String paymentId =
+                                                    widget.clubFees[index]
+                                                        ['paymentId'];
+                                                final String plan = widget
+                                                    .clubFees[index]['program'];
+                                                final planId = widget
+                                                    .clubFees[index]['planId'];
+                                                final advancedPayment =
+                                                    widget.clubFees[index]
+                                                        ['advancedPayment'];
+
+                                                final user = widget.users
+                                                    .firstWhere((element) =>
+                                                        element['id'] == uid);
+
+                                                // delete from firebase
+                                                Map<String, dynamic> updates = {
+                                                  // delete from club fees
+                                                  'attendance/$formattedDate/fees/$paymentId':
+                                                      null,
+                                                  'users/$uid/paid':
+                                                      ServerValue.increment(
+                                                          -int.parse(amount)),
+                                                };
+
+                                                if (user['payments']
+                                                            [formattedDate]
+                                                        .keys
+                                                        .length <=
+                                                    2) {
+                                                  updates['users/$uid/payments/$formattedDate'] =
+                                                      null;
+                                                } else {
+                                                  updates['users/$uid/payments/$formattedDate/$paymentId'] =
+                                                      null;
+                                                  updates['users/$uid/payments/$formattedDate/totalAmount'] =
+                                                      ServerValue.increment(
+                                                          -int.parse(amount));
+                                                }
+                                                // delete from plans
+                                                if ((user['plans'] != null) &&
+                                                    planId != null &&
+                                                    planId.isNotEmpty) {
+                                                  // get planId
+
+                                                  if (user['plans']
                                                           .keys
-                                                          .toList();
-                                                  sortedPlanKeys.sort();
-                                                  // check if any plan exists after current plan
-                                                  if (sortedPlanKeys
-                                                          .indexOf(planId) <
-                                                      sortedPlanKeys.length -
-                                                          1) {
-                                                    final String nextPlanId =
-                                                        sortedPlanKeys[
-                                                            sortedPlanKeys
-                                                                    .indexOf(
-                                                                        planId) +
-                                                                1];
-                                                    final String nextPlanName =
+                                                          .length >
+                                                      1) {
+                                                    // get next plan
+                                                    final List sortedPlanKeys =
                                                         user['plans']
-                                                                [nextPlanId]
-                                                            ['program'];
-                                                    final List
-                                                        nextPlanPaymentKeys =
-                                                        user['plans']
-                                                                    [nextPlanId]
-                                                                ['payments']
-                                                            .values
+                                                            .keys
                                                             .toList();
-                                                    nextPlanPaymentKeys.sort();
-                                                    final String
-                                                        nextPlanPaymentLastId =
-                                                        nextPlanPaymentKeys[
-                                                            nextPlanPaymentKeys
-                                                                    .length -
-                                                                1];
-                                                    Navigator.of(scaffoldKey
-                                                            .currentContext!)
-                                                        .pop();
-                                                    changeSubmitted(false);
-                                                    return Flushbar(
-                                                      margin:
-                                                          const EdgeInsets.all(
-                                                              7),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              15),
-                                                      flushbarStyle:
-                                                          FlushbarStyle
-                                                              .FLOATING,
-                                                      flushbarPosition:
-                                                          FlushbarPosition.TOP,
-                                                      message:
-                                                          'Error: "${name.split(' ')[0]}" has a plan "$nextPlanName" after this plan, which starts on $nextPlanId. Please delete that plan\'s all payments, last payment is on $nextPlanPaymentLastId',
-                                                      icon: Icon(
-                                                        Icons
-                                                            .error_outline_rounded,
-                                                        size: 28.0,
-                                                        color: Colors.red[300],
-                                                      ),
-                                                      duration: const Duration(
-                                                          milliseconds: 10000),
-                                                      leftBarIndicatorColor:
-                                                          Colors.red[300],
-                                                    ).show(scaffoldKey
-                                                        .currentContext!);
+                                                    sortedPlanKeys.sort();
+                                                    // check if any plan exists after current plan
+                                                    if (sortedPlanKeys
+                                                            .indexOf(planId) <
+                                                        sortedPlanKeys.length -
+                                                            1) {
+                                                      final String nextPlanId =
+                                                          sortedPlanKeys[
+                                                              sortedPlanKeys
+                                                                      .indexOf(
+                                                                          planId) +
+                                                                  1];
+                                                      final String
+                                                          nextPlanName =
+                                                          user['plans']
+                                                                  [nextPlanId]
+                                                              ['program'];
+                                                      final List
+                                                          nextPlanPaymentKeys =
+                                                          user['plans'][
+                                                                      nextPlanId]
+                                                                  ['payments']
+                                                              .values
+                                                              .toList();
+                                                      nextPlanPaymentKeys
+                                                          .sort();
+                                                      final String
+                                                          nextPlanPaymentLastId =
+                                                          nextPlanPaymentKeys[
+                                                              nextPlanPaymentKeys
+                                                                      .length -
+                                                                  1];
+                                                      Navigator.of(scaffoldKey
+                                                              .currentContext!)
+                                                          .pop();
+                                                      changeSubmitted(false);
+                                                      return Flushbar(
+                                                        margin: const EdgeInsets
+                                                            .all(7),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(15),
+                                                        flushbarStyle:
+                                                            FlushbarStyle
+                                                                .FLOATING,
+                                                        flushbarPosition:
+                                                            FlushbarPosition
+                                                                .TOP,
+                                                        message:
+                                                            'Error: "${name.split(' ')[0]}" has a plan "$nextPlanName" after this plan, which starts on $nextPlanId. Please delete that plan\'s all payments, last payment is on $nextPlanPaymentLastId',
+                                                        icon: Icon(
+                                                          Icons
+                                                              .error_outline_rounded,
+                                                          size: 28.0,
+                                                          color:
+                                                              Colors.red[300],
+                                                        ),
+                                                        duration:
+                                                            const Duration(
+                                                                milliseconds:
+                                                                    10000),
+                                                        leftBarIndicatorColor:
+                                                            Colors.red[300],
+                                                      ).show(scaffoldKey
+                                                          .currentContext!);
+                                                    }
+                                                  }
+
+                                                  if (user['plans'][planId]
+                                                              ['payments']
+                                                          .keys
+                                                          .length ==
+                                                      1) {
+                                                    updates['users/$uid/plans/$planId'] =
+                                                        null;
+                                                    updates['users/$uid/plansPaid/$plan/$planId'] =
+                                                        null;
+                                                  } else {
+                                                    updates['users/$uid/plans/$planId/payments/$paymentId'] =
+                                                        null;
+                                                    updates['users/$uid/plans/$planId/balance'] =
+                                                        ServerValue.increment(
+                                                            int.parse(amount));
+                                                    updates['users/$uid/plansPaid/$plan/$planId'] =
+                                                        ServerValue.increment(
+                                                            -int.parse(amount));
+                                                  }
+                                                } else {
+                                                  if (advancedPayment != null) {
+                                                    updates['users/$uid/advancedPayments'] =
+                                                        null;
+                                                  } else {
+                                                    updates['users/$uid/plansPaid/$plan'] =
+                                                        ServerValue.increment(
+                                                            -int.parse(amount));
                                                   }
                                                 }
 
-                                                if (user['plans'][planId]
-                                                            ['payments']
-                                                        .keys
-                                                        .length ==
-                                                    1) {
-                                                  updates['users/$uid/plans/$planId'] =
-                                                      null;
-                                                  updates['users/$uid/plansPaid/$plan/$planId'] =
-                                                      null;
-                                                } else {
-                                                  updates['users/$uid/plans/$planId/payments/$paymentId'] =
-                                                      null;
-                                                  updates['users/$uid/plans/$planId/balance'] =
-                                                      ServerValue.increment(
-                                                          int.parse(amount));
-                                                  updates['users/$uid/plansPaid/$plan/$planId'] =
-                                                      ServerValue.increment(
-                                                          -int.parse(amount));
-                                                }
-                                              } else {
-                                                if (advancedPayment != null) {
-                                                  updates['users/$uid/advancedPayments'] =
-                                                      null;
-                                                } else {
-                                                  updates['users/$uid/plansPaid/$plan'] =
-                                                      ServerValue.increment(
-                                                          -int.parse(amount));
-                                                }
+                                                await dbRef.update(updates);
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                                Flushbar(
+                                                  margin:
+                                                      const EdgeInsets.all(7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                  flushbarStyle:
+                                                      FlushbarStyle.FLOATING,
+                                                  flushbarPosition:
+                                                      FlushbarPosition.TOP,
+                                                  message:
+                                                      "Payment deleted successfully",
+                                                  icon: Icon(
+                                                    Icons.check_circle_outline,
+                                                    size: 28.0,
+                                                    color: Colors.green[300],
+                                                  ),
+                                                  duration: const Duration(
+                                                      milliseconds: 2000),
+                                                  leftBarIndicatorColor:
+                                                      Colors.green[300],
+                                                ).show(scaffoldKey
+                                                    .currentContext!);
+                                                changeSubmitted(false);
+                                              } catch (e) {
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                                Flushbar(
+                                                  margin:
+                                                      const EdgeInsets.all(7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                  flushbarStyle:
+                                                      FlushbarStyle.FLOATING,
+                                                  flushbarPosition:
+                                                      FlushbarPosition.TOP,
+                                                  message:
+                                                      "$e Please check the data and try again or contact support",
+                                                  icon: Icon(
+                                                    Icons.error_outline_rounded,
+                                                    size: 28.0,
+                                                    color: Colors.red[300],
+                                                  ),
+                                                  duration: const Duration(
+                                                      milliseconds: 3000),
+                                                  leftBarIndicatorColor:
+                                                      Colors.red[300],
+                                                ).show(scaffoldKey
+                                                    .currentContext!);
+                                                changeSubmitted(false);
                                               }
-
-                                              await dbRef.update(updates);
-                                              Navigator.of(scaffoldKey
-                                                      .currentContext!)
-                                                  .pop();
-                                              Navigator.of(scaffoldKey
-                                                      .currentContext!)
-                                                  .pop();
-                                              Flushbar(
-                                                margin: const EdgeInsets.all(7),
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                                flushbarStyle:
-                                                    FlushbarStyle.FLOATING,
-                                                flushbarPosition:
-                                                    FlushbarPosition.TOP,
-                                                message:
-                                                    "Payment deleted successfully",
-                                                icon: Icon(
-                                                  Icons.check_circle_outline,
-                                                  size: 28.0,
-                                                  color: Colors.green[300],
-                                                ),
-                                                duration: const Duration(
-                                                    milliseconds: 2000),
-                                                leftBarIndicatorColor:
-                                                    Colors.green[300],
-                                              ).show(
-                                                  scaffoldKey.currentContext!);
-                                              changeSubmitted(false);
-                                            } catch (e) {
-                                              Navigator.of(scaffoldKey
-                                                      .currentContext!)
-                                                  .pop();
-                                              Flushbar(
-                                                margin: const EdgeInsets.all(7),
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                                flushbarStyle:
-                                                    FlushbarStyle.FLOATING,
-                                                flushbarPosition:
-                                                    FlushbarPosition.TOP,
-                                                message:
-                                                    "$e Please check the data and try again or contact support",
-                                                icon: Icon(
-                                                  Icons.error_outline_rounded,
-                                                  size: 28.0,
-                                                  color: Colors.red[300],
-                                                ),
-                                                duration: const Duration(
-                                                    milliseconds: 3000),
-                                                leftBarIndicatorColor:
-                                                    Colors.red[300],
-                                              ).show(
-                                                  scaffoldKey.currentContext!);
-                                              changeSubmitted(false);
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
+                                            },
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                      ]);
-                    }),
+                        ]);
+                      }),
+                    ),
                   ),
-                ),
                 SizedBox(
                   height: MediaQuery.of(context).size.width * 0.04,
                 ),
@@ -2847,91 +2893,265 @@ class _DailyDetailsState extends State<DailyDetails> {
                 SizedBox(
                   height: MediaQuery.of(context).size.width * 0.04,
                 ),
-                Center(
-                  child: DataTable(
-                      headingRowColor:
-                          MaterialStateProperty.all(Colors.grey[200]),
-                      border: TableBorder.all(
-                        color: Colors.black12,
-                        width: 1,
-                      ),
-                      horizontalMargin:
-                          MediaQuery.of(context).size.width * 0.02,
-                      columns: const <DataColumn>[
-                        DataColumn(
-                          label: Text('Name'),
+                if (widget.productsHistory.isNotEmpty)
+                  Center(
+                    child: DataTable(
+                        headingRowColor:
+                            MaterialStateProperty.all(Colors.grey[200]),
+                        border: TableBorder.all(
+                          color: Colors.black12,
+                          width: 1,
                         ),
-                        DataColumn(
-                          label: Text('Product'),
-                        ),
-                        DataColumn(
-                          label: Text('Mode'),
-                        ),
-                        DataColumn(
-                          label: Text('Amount'),
-                        ),
-                        DataColumn(label: Text('Balance')),
-                      ],
-                      rows: List<DataRow>.generate(todaysProductsHistory.length,
-                          (index) {
-                        String name =
-                            todaysProductsHistory[index]['name'].toString();
-                        String amount =
-                            todaysProductsHistory[index]['given'].toString();
-                        String prodName = todaysProductsHistory[index]
-                                ['products']
-                            .keys
-                            .first
-                            .toString();
-                        prodName =
-                            prodName.substring(0, prodName.indexOf('(')).trim();
-
-                        String prodValue = todaysProductsHistory[index]
-                                ['products']
-                            .values
-                            .first
-                            .toString();
-                        String prod = '$prodName x$prodValue';
-                        return DataRow(cells: <DataCell>[
-                          DataCell(Text(name)),
-                          if (todaysProductsHistory[index]['products'].length <=
-                              1)
-                            DataCell(Text(prod))
-                          else
-                            DataCell(
-                              IconButton(
-                                icon: const Icon(Icons.arrow_drop_down_rounded),
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        title: Text('$name\'s Retail'),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // for loop in todaysProductsHistory[index]['products']
-                                            for (var product
-                                                in todaysProductsHistory[index]
-                                                        ['products']
-                                                    .entries)
-                                              Text(
-                                                  '${product.key.substring(0, product.key.indexOf('(')).trim()} x${product.value}'),
-                                          ],
+                        horizontalMargin:
+                            MediaQuery.of(context).size.width * 0.02,
+                        columns: <DataColumn>[
+                          const DataColumn(
+                            label: Text('Name'),
+                          ),
+                          const DataColumn(
+                            label: Text('Product'),
+                          ),
+                          const DataColumn(
+                            label: Text('Mode'),
+                          ),
+                          const DataColumn(
+                            label: Text('Amt'),
+                          ),
+                          const DataColumn(label: Text('Bal')),
+                          if (isEdit) const DataColumn(label: Text('I')),
+                        ],
+                        rows: List<DataRow>.generate(
+                            widget.productsHistory.length, (index) {
+                          String key =
+                              widget.productsHistory.keys.elementAt(index);
+                          String uid = widget.productsHistory[key];
+                          final user = widget.allUsers[uid];
+                          final product = user['productsHistory'][key];
+                          String name = user['name'];
+                          String amount = product['paid'].toString();
+                          String mode = product['mode'];
+                          String balance = product['balance'].toString();
+                          String prod = '';
+                          final bool isCustom = product['custom'] != null &&
+                              product['custom'] == true;
+                          if (isCustom) {
+                            prod = product['products'].keys.first;
+                          } else {
+                            final String prodName =
+                                allProducts[product['products'].keys.first]
+                                    ['name'];
+                            final String prodValue =
+                                product['products'].values.first.toString();
+                            prod = '$prodName x$prodValue';
+                          }
+                          return DataRow(cells: <DataCell>[
+                            DataCell(Text(name)),
+                            if (product['products'].length <= 1)
+                              DataCell(Text(prod))
+                            else
+                              DataCell(
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.arrow_drop_down_rounded),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: Text('$name\'s Retail'),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: product['products']
+                                                .entries
+                                                .map((e) {
+                                                  String name = '';
+                                                  if (isCustom) {
+                                                    name =
+                                                        '${e.key} - ₹${e.value}';
+                                                  } else {
+                                                    final String prodName =
+                                                        allProducts[e.key]
+                                                            ['name'];
+                                                    final String prodValue =
+                                                        product['products']
+                                                                [e.key]
+                                                            .toString();
+                                                    final String prodPrice =
+                                                        allProducts[e.key]
+                                                                ['price']
+                                                            .toString();
+                                                    name =
+                                                        '$prodName ($prodPrice) x$prodValue = ₹${int.parse(prodPrice) * int.parse(prodValue)}';
+                                                  }
+                                                  return Text(name);
+                                                })
+                                                .toList()
+                                                .cast<Widget>(),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            DataCell(Text(mode)),
+                            DataCell(Text(amount)),
+                            DataCell(Text(balance,
+                                style: TextStyle(
+                                    color: balance == '0'
+                                        ? Colors.black
+                                        : Colors.red))),
+                            if (isEdit)
+                              DataCell(IconButton(
+                                  icon: !isCustom
+                                      ? const Icon(Icons.info_outline_rounded,
+                                          color: Colors.blue)
+                                      : const Icon(Icons.delete_forever_rounded,
+                                          color: Colors.red),
+                                  onPressed: () {
+                                    if (!isCustom) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => CustOrderForm(
+                                            uid: uid,
+                                            productMap: Map<String, int>.from(
+                                                product['products']),
+                                            name: name,
+                                            popIndex: 3,
+                                            index: key,
+                                            formattedDate: formattedDate,
+                                            attendance: true,
+                                            existingData: {
+                                              'discount': product['discount'],
+                                              'discountMode':
+                                                  product['discountMode'],
+                                              'discountManual':
+                                                  product['discountManual'],
+                                              'shakemateDiscount':
+                                                  product['shakemateDiscount'],
+                                              'initalAutoMode':
+                                                  product['initalAutoMode'],
+                                              'customPrice':
+                                                  product['customPrice'],
+                                              'paid': product['paid'],
+                                              'balance': product['balance'],
+                                              'chosenDate':
+                                                  product['chosenDate'],
+                                              'timestamp': product['timestamp'],
+                                              'mode': product['mode'],
+                                            },
+                                          ),
                                         ),
                                       );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          const DataCell(Text('Online')),
-                          DataCell(Text(amount)),
-                          const DataCell(Text('1000',
-                              style: TextStyle(color: Colors.red))),
-                        ]);
-                      })),
-                ),
+                                    } else {
+                                      showDialog(
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return AlertDialog(
+                                            title: const Text('Confirmation'),
+                                            content: const Text(
+                                                'Are you sure you want to delete this product?'),
+                                            actions: [
+                                              TextButton(
+                                                child: const Text('Cancel'),
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              TextButton(
+                                                child: const Text('Delete'),
+                                                onPressed: () async {
+                                                  if (submitted) {
+                                                    return;
+                                                  }
+                                                  changeSubmitted(true);
+                                                  try {
+                                                    final Map<String, dynamic>
+                                                        updates = {
+                                                      'users/$uid/productsHistory/$key':
+                                                          null,
+                                                      'attendance/$formattedDate/productsHistory/$key':
+                                                          null,
+                                                    };
+                                                    await coachDb
+                                                        .child(cid)
+                                                        .update(updates);
+                                                    Navigator.of(scaffoldKey
+                                                            .currentContext!)
+                                                        .pop();
+                                                    Navigator.of(scaffoldKey
+                                                            .currentContext!)
+                                                        .pop();
+                                                    Flushbar(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              7),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              15),
+                                                      flushbarStyle:
+                                                          FlushbarStyle
+                                                              .FLOATING,
+                                                      flushbarPosition:
+                                                          FlushbarPosition.TOP,
+                                                      message:
+                                                          'Product deleted successfully',
+                                                      icon: Icon(
+                                                        Icons
+                                                            .check_circle_outline,
+                                                        size: 28.0,
+                                                        color:
+                                                            Colors.green[300],
+                                                      ),
+                                                      duration: const Duration(
+                                                          milliseconds: 2000),
+                                                      leftBarIndicatorColor:
+                                                          Colors.green[300],
+                                                    ).show(scaffoldKey
+                                                        .currentContext!);
+                                                    changeSubmitted(false);
+                                                  } catch (e) {
+                                                    Navigator.of(context).pop();
+                                                    Flushbar(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              7),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              15),
+                                                      flushbarStyle:
+                                                          FlushbarStyle
+                                                              .FLOATING,
+                                                      flushbarPosition:
+                                                          FlushbarPosition.TOP,
+                                                      message:
+                                                          'Error deleting product',
+                                                      icon: Icon(
+                                                        Icons
+                                                            .error_outline_rounded,
+                                                        size: 28.0,
+                                                        color: Colors.red[300],
+                                                      ),
+                                                      duration: const Duration(
+                                                          milliseconds: 3000),
+                                                      leftBarIndicatorColor:
+                                                          Colors.red[300],
+                                                    ).show(scaffoldKey
+                                                        .currentContext!);
+                                                    changeSubmitted(false);
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    }
+                                  }))
+                          ]);
+                        })),
+                  ),
                 SizedBox(
                   height: MediaQuery.of(context).size.width * 0.04,
                 ),
@@ -2971,202 +3191,208 @@ class _DailyDetailsState extends State<DailyDetails> {
                 SizedBox(
                   height: MediaQuery.of(context).size.width * 0.04,
                 ),
-                Center(
-                  child: DataTable(
-                    headingRowColor:
-                        MaterialStateProperty.all(Colors.grey[200]),
-                    border: TableBorder.all(
-                      color: Colors.black12,
-                      width: 1,
-                    ),
-                    horizontalMargin: MediaQuery.of(context).size.width * 0.02,
-                    columns: <DataColumn>[
-                      const DataColumn(
-                        label: Text('Name'),
+                if (widget.homeProgram.isNotEmpty)
+                  Center(
+                    child: DataTable(
+                      headingRowColor:
+                          MaterialStateProperty.all(Colors.grey[200]),
+                      border: TableBorder.all(
+                        color: Colors.black12,
+                        width: 1,
                       ),
-                      const DataColumn(
-                        label: Text('Days'),
-                      ),
-                      const DataColumn(
-                        label: Text('Until'),
-                      ),
-                      if (isEdit)
-                        const DataColumn2(
-                          label: Text('Delete'),
-                          size: ColumnSize.S,
+                      horizontalMargin:
+                          MediaQuery.of(context).size.width * 0.02,
+                      columns: <DataColumn>[
+                        const DataColumn(
+                          label: Text('Name'),
                         ),
-                    ],
-                    rows: List<DataRow>.generate(widget.homeProgram.length,
-                        (index) {
-                      String name = widget
-                          .studentsNameUID[widget.homeProgram[index]['uid']];
-                      String days =
-                          widget.homeProgram[index]['days'].toString();
-                      String until = DateFormat('dd/MM/yy').format(
-                          selectedDate.add(Duration(days: int.parse(days))));
-                      return DataRow(cells: <DataCell>[
-                        DataCell(Text(name)),
-                        DataCell(Text(days)),
-                        DataCell(Text(until)),
+                        const DataColumn(
+                          label: Text('Days'),
+                        ),
+                        const DataColumn(
+                          label: Text('Until'),
+                        ),
                         if (isEdit)
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                // ask for confirmation
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: const Text('Confirmation'),
-                                      content: Text(
-                                          'Are you sure you want to delete "${name.split(' ')[0]}\'s" home program?'),
-                                      actions: [
-                                        TextButton(
-                                          child: const Text('Cancel'),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                        TextButton(
-                                          child: const Text('Delete'),
-                                          onPressed: () async {
-                                            if (submitted) {
-                                              return;
-                                            }
-                                            changeSubmitted(true);
-                                            // get payment id
-                                            try {
-                                              final DatabaseReference dbRef =
-                                                  coachDb.child(cid);
-                                              final String uid = widget
-                                                  .homeProgram[index]['uid'];
-                                              final String homeProgramId =
-                                                  widget.homeProgram[index]
-                                                      ['homeProgramID'];
+                          const DataColumn2(
+                            label: Text('Delete'),
+                            size: ColumnSize.S,
+                          ),
+                      ],
+                      rows: List<DataRow>.generate(widget.homeProgram.length,
+                          (index) {
+                        String name =
+                            widget.allUsers[widget.homeProgram[index]['uid']]
+                                ['name']!;
+                        String days =
+                            widget.homeProgram[index]['days'].toString();
+                        String until = DateFormat('dd/MM/yy').format(
+                            selectedDate.add(Duration(days: int.parse(days))));
+                        return DataRow(cells: <DataCell>[
+                          DataCell(Text(name)),
+                          DataCell(Text(days)),
+                          DataCell(Text(until)),
+                          if (isEdit)
+                            DataCell(
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  // ask for confirmation
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        title: const Text('Confirmation'),
+                                        content: Text(
+                                            'Are you sure you want to delete "${name.split(' ')[0]}\'s" home program?'),
+                                        actions: [
+                                          TextButton(
+                                            child: const Text('Cancel'),
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                            },
+                                          ),
+                                          TextButton(
+                                            child: const Text('Delete'),
+                                            onPressed: () async {
+                                              if (submitted) {
+                                                return;
+                                              }
+                                              changeSubmitted(true);
+                                              // get payment id
+                                              try {
+                                                final DatabaseReference dbRef =
+                                                    coachDb.child(cid);
+                                                final String uid = widget
+                                                    .homeProgram[index]['uid'];
+                                                final String homeProgramId =
+                                                    widget.homeProgram[index]
+                                                        ['homeProgramID'];
 
-                                              // delete from firebase
-                                              final Map<String, dynamic>
-                                                  updates = {};
-                                              final user = widget.users
-                                                  .firstWhere((element) =>
-                                                      element['id'] == uid);
-                                              bool missingDays = false;
-                                              int missedDays = 0;
+                                                // delete from firebase
+                                                final Map<String, dynamic>
+                                                    updates = {};
+                                                final user = widget.users
+                                                    .firstWhere((element) =>
+                                                        element['id'] == uid);
+                                                bool missingDays = false;
+                                                int missedDays = 0;
 
-                                              for (int i = 1;
-                                                  i <= int.parse(days);
-                                                  i++) {
-                                                final String newDate =
-                                                    DateFormat('yyyy-MM-dd')
-                                                        .format(selectedDate
-                                                            .add(Duration(
-                                                                days: i)));
+                                                for (int i = 1;
+                                                    i <= int.parse(days);
+                                                    i++) {
+                                                  final String newDate =
+                                                      DateFormat('yyyy-MM-dd')
+                                                          .format(selectedDate
+                                                              .add(Duration(
+                                                                  days: i)));
 
-                                                // check if shakes is 2
-                                                if (user['homeProgram'] !=
-                                                        null &&
-                                                    user['homeProgram']
-                                                            [newDate] !=
-                                                        null) {
-                                                  updates['users/$uid/days/$newDate'] =
-                                                      null;
-                                                  updates['users/$uid/homeProgram/$newDate'] =
-                                                      null;
-                                                  updates['attendance/$newDate/students/$uid'] =
-                                                      null;
-                                                } else {
-                                                  missedDays++;
+                                                  // check if shakes is 2
+                                                  if (user['homeProgram'] !=
+                                                          null &&
+                                                      user['homeProgram']
+                                                              [newDate] !=
+                                                          null) {
+                                                    updates['users/$uid/days/$newDate'] =
+                                                        null;
+                                                    updates['users/$uid/homeProgram/$newDate'] =
+                                                        null;
+                                                    updates['attendance/$newDate/students/$uid'] =
+                                                        null;
+                                                  } else {
+                                                    missedDays++;
+                                                  }
                                                 }
-                                              }
-                                              updates['attendance/$formattedDate/homeProgram/$homeProgramId'] =
-                                                  null;
+                                                updates['attendance/$formattedDate/homeProgram/$homeProgramId'] =
+                                                    null;
 
-                                              await dbRef.update(updates);
-                                              missingDays = missedDays > 0;
-                                              String msg =
-                                                  "Home Program deleted successfully";
-                                              if (missingDays) {
-                                                msg +=
-                                                    ". But ${missedDays.toString()} days were already deleted from the home program";
-                                              }
-                                              Navigator.of(scaffoldKey
-                                                      .currentContext!)
-                                                  .pop();
-                                              Navigator.of(scaffoldKey
-                                                      .currentContext!)
-                                                  .pop();
-                                              Flushbar(
-                                                margin: const EdgeInsets.all(7),
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                                flushbarStyle:
-                                                    FlushbarStyle.FLOATING,
-                                                flushbarPosition:
-                                                    FlushbarPosition.TOP,
-                                                message: msg,
-                                                icon: Icon(
-                                                  missingDays
-                                                      ? Icons
-                                                          .error_outline_rounded
-                                                      : Icons
-                                                          .check_circle_outline,
-                                                  size: 28.0,
-                                                  color: missingDays
-                                                      ? Colors.orange[300]
-                                                      : Colors.green[300],
-                                                ),
-                                                duration: Duration(
-                                                    milliseconds: missingDays
-                                                        ? 5000
-                                                        : 2000),
-                                                leftBarIndicatorColor:
+                                                await dbRef.update(updates);
+                                                missingDays = missedDays > 0;
+                                                String msg =
+                                                    "Home Program deleted successfully";
+                                                if (missingDays) {
+                                                  msg +=
+                                                      ". But ${missedDays.toString()} days were already deleted from the home program";
+                                                }
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                                Flushbar(
+                                                  margin:
+                                                      const EdgeInsets.all(7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                  flushbarStyle:
+                                                      FlushbarStyle.FLOATING,
+                                                  flushbarPosition:
+                                                      FlushbarPosition.TOP,
+                                                  message: msg,
+                                                  icon: Icon(
                                                     missingDays
+                                                        ? Icons
+                                                            .error_outline_rounded
+                                                        : Icons
+                                                            .check_circle_outline,
+                                                    size: 28.0,
+                                                    color: missingDays
                                                         ? Colors.orange[300]
                                                         : Colors.green[300],
-                                              ).show(
-                                                  scaffoldKey.currentContext!);
-                                              changeSubmitted(false);
-                                            } catch (e) {
-                                              Navigator.of(scaffoldKey
-                                                      .currentContext!)
-                                                  .pop();
-                                              Flushbar(
-                                                margin: const EdgeInsets.all(7),
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                                flushbarStyle:
-                                                    FlushbarStyle.FLOATING,
-                                                flushbarPosition:
-                                                    FlushbarPosition.TOP,
-                                                message:
-                                                    "$e Please check the data and try again or contact support",
-                                                icon: Icon(
-                                                  Icons.error_outline_rounded,
-                                                  size: 28.0,
-                                                  color: Colors.red[300],
-                                                ),
-                                                duration: const Duration(
-                                                    milliseconds: 3000),
-                                                leftBarIndicatorColor:
-                                                    Colors.red[300],
-                                              ).show(
-                                                  scaffoldKey.currentContext!);
-                                              changeSubmitted(false);
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
+                                                  ),
+                                                  duration: Duration(
+                                                      milliseconds: missingDays
+                                                          ? 5000
+                                                          : 2000),
+                                                  leftBarIndicatorColor:
+                                                      missingDays
+                                                          ? Colors.orange[300]
+                                                          : Colors.green[300],
+                                                ).show(scaffoldKey
+                                                    .currentContext!);
+                                                changeSubmitted(false);
+                                              } catch (e) {
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                                Flushbar(
+                                                  margin:
+                                                      const EdgeInsets.all(7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                  flushbarStyle:
+                                                      FlushbarStyle.FLOATING,
+                                                  flushbarPosition:
+                                                      FlushbarPosition.TOP,
+                                                  message:
+                                                      "$e Please check the data and try again or contact support",
+                                                  icon: Icon(
+                                                    Icons.error_outline_rounded,
+                                                    size: 28.0,
+                                                    color: Colors.red[300],
+                                                  ),
+                                                  duration: const Duration(
+                                                      milliseconds: 3000),
+                                                  leftBarIndicatorColor:
+                                                      Colors.red[300],
+                                                ).show(scaffoldKey
+                                                    .currentContext!);
+                                                changeSubmitted(false);
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                      ]);
-                    }),
+                        ]);
+                      }),
+                    ),
                   ),
-                ),
               ]),
         ),
       ),

@@ -30,11 +30,22 @@ class CustPlanHist extends StatelessWidget {
     if (days.containsKey('1970-01-01')) {
       dayx = 1;
       days.removeWhere((key, value) => key == '1970-01-01');
+      plans.removeWhere((key, value) => key == '1970-01-01');
       days.removeWhere((key, value) => key == '1970-01-02');
       days.removeWhere((key, value) => key == '1970-01-03');
       days.removeWhere((key, value) => key == '1970-01-04');
       days.removeWhere((key, value) => key == '1970-01-05');
+      plans.removeWhere((key, value) => key == '1970-01-05');
     }
+
+    List absentDates = [];
+
+    // check if any payment date is not in days
+    plans.forEach((key, value) {
+      if (!days.containsKey(key)) {
+        absentDates.add(key);
+      }
+    });
 
     List sortedKeys = days.keys.toList()..sort((a, b) => b.compareTo(a));
     return Scaffold(
@@ -62,12 +73,62 @@ class CustPlanHist extends StatelessWidget {
                         days[key]['time'] ?? 0);
                     String joined =
                         "$actualDay Joined on: ${DateFormat.jm().format(joinedTime)}";
+
                     if (homeProgram.containsKey(key)) {
                       joined = "$actualDay Took in Home";
                     }
 
+                    bool showPayment = false;
+                    String? absentDate;
+                    final DateTime currentDate = DateTime.parse(key);
+                    final DateTime nextDate = DateTime.parse(
+                        sortedKeys.length - index - 1 >= 0
+                            ? sortedKeys[sortedKeys.length - index - 1]
+                            : key);
+
+                    for (int i = 0; i < absentDates.length; i++) {
+                      if (index == 0) {
+                        if (DateTime.parse(absentDates[i])
+                            .isAfter(currentDate)) {
+                          showPayment = true;
+                          absentDate = absentDates[i];
+                        }
+                      }
+                      if (DateTime.parse(absentDates[i])
+                              .isBefore(currentDate) &&
+                          DateTime.parse(absentDates[i]).isAfter(nextDate)) {
+                        showPayment = true;
+                        absentDate = absentDates[i];
+                        break;
+                      }
+                      if (index == (sortedKeys.length - 1)) {
+                        if (DateTime.parse(absentDates[i])
+                            .isBefore(currentDate)) {
+                          showPayment = true;
+                          absentDate = absentDates[i];
+                        }
+                      }
+                    }
                     Map<dynamic, dynamic> plan = {};
-                    if (plans.containsKey(key)) {
+                    String? secondKey;
+                    dynamic secondPlan;
+                    DateTime? secondDate;
+                    if (showPayment || plans.containsKey(key)) {
+                      if (showPayment && absentDate != null) {
+                        if (!plans.containsKey(key)) {
+                          key = absentDate;
+                        } else {
+                          secondKey = key;
+                          key = absentDate;
+                          if (plans[secondKey].containsKey('totalAmount')) {
+                            plans[secondKey].remove('totalAmount');
+                          }
+                          secondPlan =
+                              plans[secondKey][plans[secondKey].keys.first];
+                          secondDate = DateTime.parse(
+                              secondPlan['date'] ?? '1999-12-31');
+                        }
+                      }
                       // remove the key from the map
                       if (plans[key].containsKey('totalAmount')) {
                         plans[key].remove('totalAmount');
@@ -81,13 +142,42 @@ class CustPlanHist extends StatelessWidget {
 
                       return Column(
                         children: [
+                          if (showPayment && absentDate != null)
+                            Column(
+                              children: [
+                                dateDivider(
+                                  width: width,
+                                  height: height,
+                                  date: currentDate,
+                                ),
+                                textWidget(
+                                  joined,
+                                  joinedFontSize,
+                                ),
+                                if (secondKey != null &&
+                                    secondPlan != null &&
+                                    secondDate != null)
+                                  paymentCard(
+                                    plan: secondPlan['program'] ?? '',
+                                    advancedPayment:
+                                        secondPlan['advancedPayment'] ?? false,
+                                    mode: secondPlan['mode'] ?? '',
+                                    date: secondDate,
+                                    amount: secondPlan['amount'] ?? 0,
+                                    time: secondPlan['time'] ?? 0,
+                                    balance: secondPlan['balance'] ?? 0,
+                                    width: width,
+                                    height: height,
+                                  ),
+                              ],
+                            ),
                           dateDivider(
                             width: width,
                             height: height,
                             date: date,
                           ),
                           textWidget(
-                            joined,
+                            showPayment ? 'Absent' : joined,
                             joinedFontSize,
                           ),
                           paymentCard(

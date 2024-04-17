@@ -173,7 +173,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                   .where((entry) => !toBeOnTop.contains(entry.key))
             ]);
             List<Map<dynamic, dynamic>> measurements = [];
-            List<Map<dynamic, dynamic>> products = [];
+            Map<dynamic, dynamic> products = user['productsHistory'] ?? {};
             Map<dynamic, dynamic> plans = {};
             Map<dynamic, dynamic> days = {};
             Map<dynamic, dynamic> homeProgram = {};
@@ -189,11 +189,6 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                   e.remove('weight');
                   e.addAll(weight);
                 });
-            }
-            if (user['productsHistory'] != null) {
-              products = (user['productsHistory'] as List)
-                  .cast<Map<dynamic, dynamic>>()
-                  .toList();
             }
 
             if (user['medicalHistory'] != null) {
@@ -236,7 +231,7 @@ class BodyFormCustomer extends StatefulWidget {
   final VoidCallback callback;
   final Map<dynamic, dynamic> userData;
   final List<Map<dynamic, dynamic>> measurements;
-  final List<Map<dynamic, dynamic>> products;
+  final Map<dynamic, dynamic> products;
   final Map<dynamic, dynamic> plans;
   final Map<dynamic, dynamic> days;
   final Map<dynamic, dynamic> homeProgram;

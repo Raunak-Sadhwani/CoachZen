@@ -1,5 +1,4 @@
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -314,27 +313,27 @@ class _LoginPageState extends State<LoginPage> {
             ));
 
     // Check if the email belongs to a coach
-    var coachSnapshot = await FirebaseFirestore.instance
-        .collection('Coaches')
-        .where('email', isEqualTo: emailT)
-        .limit(1)
-        .get();
+    // var coachSnapshot = await FirebaseFirestore.instance
+    //     .collection('Coaches')
+    //     .where('email', isEqualTo: emailT)
+    //     .limit(1)
+    //     .get();
 
-    if (coachSnapshot.docs.isEmpty) {
-      Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
-          .pop('dialog');
-      return Flushbar(
-        message:
-            'Unauthorized User or User not found. Please check your credentials',
-        icon: Icon(
-          Icons.info_outline,
-          size: 28.0,
-          color: Colors.blue[300],
-        ),
-        duration: const Duration(milliseconds: 3000),
-        leftBarIndicatorColor: Colors.blue[300],
-      )..show(_scaffoldKey.currentContext!);
-    }
+    // if (coachSnapshot.docs.isEmpty) {
+    //   Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
+    //       .pop('dialog');
+    //   return Flushbar(
+    //     message:
+    //         'Unauthorized User or User not found. Please check your credentials',
+    //     icon: Icon(
+    //       Icons.info_outline,
+    //       size: 28.0,
+    //       color: Colors.blue[300],
+    //     ),
+    //     duration: const Duration(milliseconds: 3000),
+    //     leftBarIndicatorColor: Colors.blue[300],
+    //   )..show(_scaffoldKey.currentContext!);
+    // }
 
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(

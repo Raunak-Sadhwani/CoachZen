@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -444,15 +443,7 @@ class _BodyFormListState extends State<BodyFormList>
                       List<Map<dynamic, dynamic>>.from([])
                           .cast<Map<dynamic, dynamic>>();
                 }
-                if (userInfo['productsHistory'] != null) {
-                  userInfo['productsHistory'] =
-                      List<Map<dynamic, dynamic>>.from(
-                          userInfo['productsHistory']);
-                } else {
-                  userInfo['productsHistory'] =
-                      List<Map<dynamic, dynamic>>.from([])
-                          .cast<Map<dynamic, dynamic>>();
-                }
+
                 // List<Map<dynamic, dynamic>> plans = [];
                 String planName = '';
                 String planStatus = '';
@@ -626,9 +617,8 @@ class _BodyFormListState extends State<BodyFormList>
                             MaterialPageRoute(
                               builder: (context) => CustOrderForm(
                                 uid: uid,
-                                productsHistory: userInfo['productsHistory'],
                                 name: name,
-                                popIndex: 1,
+                                popIndex: 2,
                               ),
                             ),
                           );

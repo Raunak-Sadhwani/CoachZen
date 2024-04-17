@@ -4,29 +4,36 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import '../components/ui/appbar.dart';
+import '../components/products.dart';
+import 'cust_order_cust_form.dart';
 
 class CustOrderForm extends StatefulWidget {
   final String name;
   final String uid;
-  final List<Map<dynamic, dynamic>> productsHistory;
+  final Map<String, int>? productMap;
   final int popIndex;
-  final int? index;
+  final String? index;
   final bool? attendance;
+  final String? attendanceDate;
+  final String? formattedDate;
+  final Map<String, dynamic>? existingData;
   const CustOrderForm({
     Key? key,
     required this.name,
     required this.uid,
-    required this.productsHistory,
+    this.productMap,
     required this.popIndex,
     this.index,
     this.attendance,
+    this.attendanceDate,
+    this.formattedDate,
+    this.existingData,
   }) : super(key: key);
 
   @override
@@ -34,9 +41,6 @@ class CustOrderForm extends StatefulWidget {
 }
 
 class _CustOrderFormState extends State<CustOrderForm> {
-  final screenHeight = WidgetsBinding
-      .instance.platformDispatcher.views.first.physicalSize.height;
-
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime selectedDateTime = DateTime.now();
@@ -45,7 +49,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
   final productQuantityController = TextEditingController();
   Map<String, int> productMap = {};
 
-  // int total = 0;
   @override
   void initState() {
     super.initState();
@@ -55,15 +58,28 @@ class _CustOrderFormState extends State<CustOrderForm> {
         DeviceOrientation.portraitDown,
       ]);
     }
-    if (widget.index == null) {
-    } else {
-      final products = widget.productsHistory[widget.index!]['products'];
-      selectedDateTime = DateTime.fromMillisecondsSinceEpoch(
-          widget.productsHistory[widget.index!]['date']);
-
-      // setState(() {
-      //   total = widget.productsHistory[widget.index!]['total'];
-      // });
+    if (widget.index != null && widget.productMap != null) {
+      productMap = widget.productMap!;
+    }
+    if (widget.attendanceDate != null) {
+      final DateTime newDate = DateTime.parse(widget.attendanceDate!);
+      // set current time to the new date
+      setState(() {
+        selectedDateTime = DateTime(
+          newDate.year,
+          newDate.month,
+          newDate.day,
+          DateTime.now().hour,
+          DateTime.now().minute,
+          DateTime.now().second,
+        );
+      });
+    }
+    if (widget.existingData != null && widget.existingData!.isNotEmpty) {
+      setState(() {
+        selectedDateTime = DateTime.fromMillisecondsSinceEpoch(
+            widget.existingData!['chosenDate']);
+      });
     }
   }
 
@@ -88,6 +104,34 @@ class _CustOrderFormState extends State<CustOrderForm> {
     return formatted;
   }
 
+  void addProduct() {
+    setState(() {
+      autoValidate = true;
+    });
+    debugPrint('productSku: $productSku');
+    if (_formKey.currentState!.validate()) {
+      if (allProducts[productSku]['name'].toLowerCase() ==
+          productNameController.text.trim().toLowerCase()) {
+        setState(() {
+          productMap[productSku] = int.parse(productQuantityController.text);
+          isFabEnabled = true;
+          debugPrint('productMap: $productMap');
+          autoValidate = false;
+          scrollController.animateTo(
+            0.0,
+            curve: Curves.easeOut,
+            duration: const Duration(milliseconds: 300),
+          );
+        });
+      }
+      setState(() {
+        productSku = '';
+      });
+      productNameController.clear();
+      productQuantityController.clear();
+    }
+  }
+
   final ScrollController scrollController = ScrollController();
   bool isFabEnabled = false;
   bool autoValidate = false;
@@ -107,58 +151,158 @@ class _CustOrderFormState extends State<CustOrderForm> {
             Navigator.pop(context);
           },
         ),
+        rightIcons: [
+          if (widget.index != null)
+            IconButton(
+              icon: const Icon(Icons.delete_forever_rounded),
+              color: Colors.black26,
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: const Text('Delete order?'),
+                      content: const Text(
+                          'Are you sure you want to delete this order?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            debugPrint('isFabEnabled: $isFabEnabled');
+                            if (isFabEnabled) {
+                              return;
+                            }
+                            if (!await Method.checkInternetConnection(
+                                context)) {
+                              return setState(() {
+                                isFabEnabled = false;
+                              });
+                            }
+                            setState(() {
+                              isFabEnabled = true;
+                            });
+                            try {
+                              final Map<String, dynamic> updates = {
+                                'users/${widget.uid}/productsHistory/${widget.index}':
+                                    null,
+                                'attendance/${widget.formattedDate}/productsHistory/${widget.index}':
+                                    null,
+                              };
+                              await FirebaseDatabase.instance
+                                  .ref()
+                                  .child('Coaches')
+                                  .child(FirebaseAuth.instance.currentUser!.uid)
+                                  .update(updates);
+                              for (int i = 0; i < widget.popIndex; i++) {
+                                Navigator.pop(context);
+                              }
+                              Flushbar(
+                                margin: const EdgeInsets.all(7),
+                                borderRadius: BorderRadius.circular(15),
+                                flushbarStyle: FlushbarStyle.FLOATING,
+                                flushbarPosition: FlushbarPosition.BOTTOM,
+                                message: 'Order deleted successfully',
+                                icon: Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 28.0,
+                                  color: Colors.green[300],
+                                ),
+                                duration: const Duration(milliseconds: 1500),
+                                leftBarIndicatorColor: Colors.green[300],
+                              ).show(context);
+                            } catch (e) {
+                              await Flushbar(
+                                margin: const EdgeInsets.all(7),
+                                borderRadius: BorderRadius.circular(15),
+                                flushbarStyle: FlushbarStyle.FLOATING,
+                                flushbarPosition: FlushbarPosition.BOTTOM,
+                                message: "Error deleting order",
+                                icon: Icon(
+                                  Icons.error_outline_rounded,
+                                  size: 28.0,
+                                  color: Colors.red[300],
+                                ),
+                                duration: const Duration(milliseconds: 1500),
+                                leftBarIndicatorColor: Colors.red[300],
+                              ).show(context);
+                              setState(() {
+                                isFabEnabled = false;
+                              });
+                            }
+                          },
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.dashboard_customize_outlined),
+              color: Colors.black26,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CustOrderCustForm(
+                      name: widget.name,
+                      uid: widget.uid,
+                      popIndex: widget.popIndex,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: Padding(
         padding: EdgeInsets.symmetric(horizontal: width * 0.035),
         child: Column(
           children: [
-            // if (tempList.isEmpty)
-            //   Container(
-            //     margin:
-            //         EdgeInsets.only(top: height * 0.1, bottom: height * 0.02),
-            //     child: Center(
-            //       child: Text(
-            //           'No products added yet. ${widget.index != null ? '  \n  \nif you want to delete this order, please click on the delete button without adding any products' : ''}',
-            //           style: GoogleFonts.workSans(
-            //               fontWeight: FontWeight.w500,
-            //               letterSpacing: .5,
-            //               fontSize: 19.5)),
-            //     ),
-            //   ),
-            Container(
-              margin:
-                  EdgeInsets.only(top: height * 0.01, bottom: height * 0.02),
-              child: Card(
-                elevation: 10,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: GestureDetector(
-                    onTap: () async {
-                      final selected = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDateTime,
-                        firstDate: DateTime.now()
-                            .subtract(const Duration(days: 13 * 365)),
-                        lastDate: DateTime.now(),
+            GestureDetector(
+              onTap: () async {
+                final selected = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDateTime,
+                  firstDate:
+                      selectedDateTime.subtract(const Duration(days: 100)),
+                  lastDate: selectedDateTime.millisecondsSinceEpoch >
+                          DateTime.now().millisecondsSinceEpoch
+                      ? selectedDateTime
+                      : DateTime.now(),
+                );
+                if (selected != null) {
+                  final selectedTime = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.now(),
+                  );
+                  if (selectedTime != null) {
+                    setState(() {
+                      selectedDateTime = DateTime(
+                        selected.year,
+                        selected.month,
+                        selected.day,
+                        selectedTime.hour,
+                        selectedTime.minute,
                       );
-                      if (selected != null) {
-                        final selectedTime = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (selectedTime != null) {
-                          setState(() {
-                            selectedDateTime = DateTime(
-                              selected.year,
-                              selected.month,
-                              selected.day,
-                              selectedTime.hour,
-                              selectedTime.minute,
-                            );
-                          });
-                        }
-                      }
-                    },
+                    });
+                  }
+                }
+              },
+              child: Container(
+                margin:
+                    EdgeInsets.only(top: height * 0.01, bottom: height * 0.02),
+                child: Card(
+                  elevation: 10,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
                     child: Container(
                       padding: EdgeInsets.symmetric(
                           horizontal: width * 0.02, vertical: height * 0.02),
@@ -186,7 +330,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
                 ),
               ),
             ),
-
             Flexible(
               child: ListView.builder(
                 controller: scrollController,
@@ -345,38 +488,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                               Container(
                                 margin: EdgeInsets.only(bottom: height * 0.02),
                                 child: ElevatedButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      autoValidate = true;
-                                    });
-                                    debugPrint('productSku: $productSku');
-                                    if (_formKey.currentState!.validate()) {
-                                      if (allProducts[productSku]['name']
-                                              .toLowerCase() ==
-                                          productNameController.text
-                                              .trim()
-                                              .toLowerCase()) {
-                                        setState(() {
-                                          productMap[productSku] = int.parse(
-                                              productQuantityController.text);
-                                          isFabEnabled = true;
-                                          debugPrint('productMap: $productMap');
-                                          autoValidate = false;
-                                          scrollController.animateTo(
-                                            0.0,
-                                            curve: Curves.easeOut,
-                                            duration: const Duration(
-                                                milliseconds: 300),
-                                          );
-                                        });
-                                      }
-                                      setState(() {
-                                        productSku = '';
-                                      });
-                                      productNameController.clear();
-                                      productQuantityController.clear();
-                                    }
-                                  },
+                                  onPressed: addProduct,
                                   child: const Text('Add new product'),
                                 ),
                               ),
@@ -405,15 +517,18 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                           color: Colors.red, size: 20),
                                       onPressed: () {
                                         // show dialog if product is not empty
-
+                                        final String prodKey = productMap.keys
+                                            .elementAt(index - 1);
+                                        final String prodName =
+                                            allProducts[prodKey]['name'];
                                         showDialog(
                                           context: context,
                                           builder: (context) {
                                             return AlertDialog(
                                               title:
                                                   const Text('Delete product?'),
-                                              content: const Text(
-                                                  'Are you sure you want to delete this product?'),
+                                              content: Text(
+                                                  'Are you sure you want to delete $prodName ?'),
                                               actions: [
                                                 TextButton(
                                                   onPressed: () {
@@ -424,10 +539,8 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                 TextButton(
                                                   onPressed: () {
                                                     setState(() {
-                                                      productMap.remove(
-                                                          productMap.keys
-                                                              .elementAt(
-                                                                  index - 1));
+                                                      productMap
+                                                          .remove(prodKey);
                                                       if (productMap.isEmpty) {
                                                         isFabEnabled = false;
                                                       }
@@ -445,7 +558,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                   ),
                                   Expanded(
                                     flex: 3,
-                                    child: TextFormField(
+                                    child: TextField(
                                       decoration: const InputDecoration(
                                         labelText: 'Product Name',
                                         enabledBorder: UnderlineInputBorder(
@@ -459,8 +572,9 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                           ),
                                         ),
                                       ),
-                                      initialValue: allProducts[productMap.keys
-                                          .elementAt(index - 1)]['name'],
+                                      controller: TextEditingController()
+                                        ..text = allProducts[productMap.keys
+                                            .elementAt(index - 1)]['name'],
                                       readOnly: true,
                                     ),
                                   ),
@@ -501,29 +615,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
           ],
         ),
       ),
-      floatingActionButton: (isFabEnabled) || widget.index != null
+      floatingActionButton: isFabEnabled || widget.index != null
           ? FloatingActionButton(
               onPressed: () async {
-                if (!isFabEnabled) {
-                  return; // Do nothing if the FAB is already disabled
-                }
-
-                setState(() {
-                  isFabEnabled = false;
-                });
+                addProduct();
 
                 if (productMap.isNotEmpty) {
-                  // debugPrint("products.toString()");
-                  // return;
-                  if (!await Method.checkInternetConnection(context)) {
-                    setState(() {
-                      isFabEnabled = true;
-                    });
-                    return;
-                  }
-                  setState(() {
-                    isFabEnabled = true;
-                  });
                   DiscountModes? mode = DiscountModes.manual;
                   TextEditingController discountController =
                       TextEditingController();
@@ -536,13 +633,14 @@ class _CustOrderFormState extends State<CustOrderForm> {
                       GlobalKey<FormState>();
                   final int tQuantity =
                       productMap.values.reduce((a, b) => a + b);
-                  final tCost = productMap.keys
+                  final int tCost = productMap.keys
                       .map((e) => allProducts[e]['price'] * productMap[e])
                       .reduce((a, b) => a + b);
                   final bool isShakeMate = productMap.containsKey('183K');
                   int shakemateDiscount = 0;
                   int discount = 0;
                   String initalAutoMode = '15%';
+                  String initalMode = 'Cash';
                   TextEditingController customPriceController =
                       TextEditingController(text: tCost.toString());
                   TextEditingController paidController =
@@ -560,42 +658,122 @@ class _CustOrderFormState extends State<CustOrderForm> {
                     });
                   }
 
-                  // sample text widget
-                  Widget paidWidget() {
-                    return Expanded(
-                      child: TextFormField(
-                        controller: paidController,
-                        maxLength: 3,
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          labelText: 'Total Paid (₹)',
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          final int tempTotal =
-                              tCost - (discount + shakemateDiscount);
-
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a given amount';
-                          } else if (int.tryParse(value) == null) {
-                            return 'Please enter a valid number';
-                          }
-                          // no more than 50% discount
-                          else if (int.parse(value) > tempTotal) {
-                            return 'Please enter a valid number';
-                          } else if (int.parse(value) <= 0) {
-                            return 'Please enter a valid number';
-                          }
-                          return null;
-                        },
-                      ),
-                    );
+                  Map<String, dynamic> data = {};
+                  if (widget.existingData != null &&
+                      widget.existingData!.isNotEmpty) {
+                    data = widget.existingData!;
+                    mode = data['discountMode'] == 'DiscountModes.manual'
+                        ? DiscountModes.manual
+                        : data['discountMode'] == 'DiscountModes.auto'
+                            ? DiscountModes.auto
+                            : DiscountModes.custom;
+                    discount = data['discount'];
+                    if (mode == DiscountModes.manual) {
+                      discountController.text =
+                          data['discountManual'].toString();
+                      final shakemateDiscountx = data['shakemateDiscount'];
+                      if (productMap.containsKey('183K') &&
+                          shakemateDiscountx != null) {
+                        final int smprice = shakeMate['price'];
+                        final int smqty = productMap['183K']!;
+                        final int actShakeMateCost =
+                            (smprice - (shakemateDiscountx / smqty)).toInt();
+                        shakeMateController.text = actShakeMateCost.toString();
+                        shakemateDiscount = data['shakemateDiscount'];
+                      }
+                    } else if (mode == DiscountModes.auto) {
+                      initalAutoMode = data['initalAutoMode'];
+                      calcAutoPrice();
+                    } else if (mode == DiscountModes.custom) {
+                      customPriceController.text =
+                          data['customPrice'].toString();
+                    }
+                    paidController.text = data['paid'].toString();
+                    initalMode = data['mode'];
                   }
+                  bool handleEdit = false;
 
                   return showDialog(
                       context: _scaffoldKey.currentContext!,
                       builder: (context) => StatefulBuilder(
                               builder: (contextx, StateSetter setState) {
+                            int subTotal =
+                                (tCost - (discount + shakemateDiscount));
+                            int paid = int.tryParse(paidController.text) ?? 0;
+                            int discManual =
+                                int.tryParse(discountController.text) ?? 0;
+                            int balance = subTotal - paid;
+                            int tDiscount = discount + shakemateDiscount;
+                            Widget paidWidget() {
+                              return Expanded(
+                                child: TextFormField(
+                                  controller: paidController,
+                                  maxLength: tCost.toString().length,
+                                  decoration: const InputDecoration(
+                                    counterText: '',
+                                    labelText: 'Total Paid (₹)',
+                                  ),
+                                  onChanged: (value) {
+                                    if (value.isEmpty ||
+                                        int.tryParse(value) == null) {
+                                      setState(() {
+                                        balance = 0;
+                                      });
+                                      return;
+                                    }
+                                    setState(() {
+                                      balance = (tCost -
+                                              (discount + shakemateDiscount)) -
+                                          int.parse(value);
+                                    });
+                                  },
+                                  keyboardType: TextInputType.number,
+                                  validator: (value) {
+                                    final int tempTotal =
+                                        tCost - (discount + shakemateDiscount);
+
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter a given amount';
+                                    } else if (int.tryParse(value) == null) {
+                                      return 'Please enter a valid number';
+                                    }
+                                    // no more than 50% discount
+                                    else if (int.parse(value) > tempTotal) {
+                                      return 'Please enter a valid number';
+                                    } else if (int.parse(value) != 0 &&
+                                        int.parse(value) < 100) {
+                                      return 'Please enter a valid number';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              );
+                            }
+
+                            Widget getMode() {
+                              return DropdownButtonFormField<String>(
+                                decoration: const InputDecoration(
+                                  labelText: 'Mode',
+                                ),
+                                value: initalMode,
+                                items: [
+                                  'Cash',
+                                  'Online',
+                                  'Cheque',
+                                ].map((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    initalMode = newValue ?? '';
+                                  });
+                                },
+                              );
+                            }
+
                             final dialogWidth =
                                 MediaQuery.of(contextx).size.width * 0.9;
 
@@ -741,6 +919,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                       .text =
                                                                   tCost
                                                                       .toString();
+                                                              balance = 0;
                                                               mode = value;
                                                             });
                                                           },
@@ -811,6 +990,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                       .text =
                                                                   tCost
                                                                       .toString();
+                                                              balance = 0;
                                                               mode = value;
                                                             });
                                                           },
@@ -884,6 +1064,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                           (discount +
                                                                               shakemateDiscount))
                                                                       .toString();
+                                                                  balance = 0;
                                                                 });
                                                               },
                                                               decoration:
@@ -994,14 +1175,28 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                     ),
                                                                   )
                                                                 else
-                                                                  paidWidget()
+                                                                  paidWidget(),
                                                               ],
                                                             ),
                                                           )
                                                         ],
                                                       ),
                                                       if (isShakeMate)
-                                                        paidWidget()
+                                                        Row(
+                                                          children: [
+                                                            paidWidget(),
+                                                            SizedBox(
+                                                              width:
+                                                                  dialogWidth *
+                                                                      .05,
+                                                            ),
+                                                            Expanded(
+                                                                child:
+                                                                    getMode())
+                                                          ],
+                                                        )
+                                                      else
+                                                        getMode()
                                                     ],
                                                   ),
                                                 ),
@@ -1018,7 +1213,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                 String>(
                                                           decoration:
                                                               const InputDecoration(
-                                                            labelText: 'Mode',
+                                                            labelText: 'Level',
                                                           ),
                                                           value: initalAutoMode,
                                                           items: [
@@ -1087,9 +1282,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                   cusPrice;
                                                               paidController
                                                                   .text = (tCost -
-                                                                      (discount +
-                                                                          shakemateDiscount))
+                                                                      discount)
                                                                   .toString();
+                                                              balance = int.parse(
+                                                                      value) -
+                                                                  (tCost -
+                                                                      discount);
                                                             });
                                                           },
                                                           decoration:
@@ -1138,6 +1336,14 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                     ],
                                                   ),
                                                 ),
+                                              if (mode != DiscountModes.manual)
+                                                Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                      horizontal:
+                                                          dialogWidth * .05),
+                                                  child: getMode(),
+                                                ),
+
                                               Padding(
                                                 padding: EdgeInsets.all(
                                                     dialogWidth * .05),
@@ -1194,7 +1400,7 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                                 ),
                                                                 TextSpan(
                                                                   text:
-                                                                      '-₹${discount + shakemateDiscount}',
+                                                                      '-₹$tDiscount',
                                                                   style: GoogleFonts
                                                                       .montserrat(
                                                                     color: Colors
@@ -1208,12 +1414,42 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                                             ),
                                                           ),
                                                           Text(
-                                                            'Total:  ₹${tCost - (discount + shakemateDiscount)}',
+                                                            'Total:  ₹$subTotal',
                                                             style: GoogleFonts
                                                                 .montserrat(
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600),
+                                                          ),
+                                                          Text.rich(
+                                                            TextSpan(
+                                                              children: [
+                                                                TextSpan(
+                                                                  text:
+                                                                      'Balance: ',
+                                                                  style: GoogleFonts
+                                                                      .montserrat(
+                                                                    color: Colors
+                                                                        .black, // Normal color for the text
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                  ),
+                                                                ),
+                                                                TextSpan(
+                                                                  text:
+                                                                      '₹$balance',
+                                                                  style: GoogleFonts
+                                                                      .montserrat(
+                                                                    color: Colors
+                                                                        .red, // Red color for the discount value
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
                                                           ),
                                                         ]),
                                                   ),
@@ -1228,179 +1464,161 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                   onPressed: () {
                                     Navigator.pop(context);
                                   },
-                                  child: const Text('No'),
+                                  child: const Text('Back'),
                                 ),
                                 TextButton(
-                                  onPressed: () {},
-                                  child: const Text('Yes'),
-                                ),
+                                    onPressed: () async {
+                                      if (widget.index != null) {
+                                        setState(() {
+                                          isFabEnabled = true;
+                                        });
+                                      }
+                                      if (handleEdit ||
+                                          !isFabEnabled ||
+                                          !formkeydiscount.currentState!
+                                              .validate()) {
+                                        return;
+                                      }
+                                      if (!await Method.checkInternetConnection(
+                                          context)) {
+                                        return setState(() {
+                                          isFabEnabled = true;
+                                          handleEdit = false;
+                                        });
+                                      }
+                                      setState(() {
+                                        isFabEnabled = false;
+                                        handleEdit = true;
+                                      });
+                                      debugPrint('isFabEnabled: $isFabEnabled');
+                                      final int timestamp = selectedDateTime
+                                          .millisecondsSinceEpoch;
+                                      final String formattedDate =
+                                          DateFormat('yyyy-MM-dd')
+                                              .format(selectedDateTime);
+                                      Map<String, dynamic> newOrder = {
+                                        'date': formattedDate,
+                                        'chosenDate': timestamp,
+                                        'products': productMap,
+                                        'total': tCost,
+                                        'discountMode': mode.toString(),
+                                        'discountManual':
+                                            mode == DiscountModes.manual
+                                                ? discManual
+                                                : null,
+                                        'initalAutoMode':
+                                            mode == DiscountModes.auto
+                                                ? initalAutoMode
+                                                : null,
+                                        'customPrice':
+                                            mode == DiscountModes.custom
+                                                ? int.parse(
+                                                    customPriceController.text)
+                                                : null,
+                                        'discount': discount,
+                                        'shakemateDiscount':
+                                            mode == DiscountModes.manual
+                                                ? shakemateDiscount
+                                                : null,
+                                        'paid': paid,
+                                        'balance': balance,
+                                        'mode': initalMode,
+                                      };
+                                      try {
+                                        final String msg = widget.index != null
+                                            ? 'Order updated successfully'
+                                            : 'Order added successfully';
+                                        String newKey = '';
+
+                                        if (widget.index != null) {
+                                          newKey = widget.index!;
+                                          newOrder['timestamp'] =
+                                              data['timestamp'];
+                                          newOrder['updated'] =
+                                              ServerValue.timestamp;
+                                        } else {
+                                          newKey = FirebaseDatabase.instance
+                                              .ref()
+                                              .push()
+                                              .key!;
+                                          newOrder['timestamp'] =
+                                              ServerValue.timestamp;
+                                        }
+
+                                        Map<String, dynamic> updates = {
+                                          'users/${widget.uid}/productsHistory/$newKey':
+                                              newOrder,
+                                          'attendance/$formattedDate/productsHistory/$newKey':
+                                              widget.uid
+                                        };
+                                        if (widget.formattedDate != null &&
+                                            formattedDate !=
+                                                widget.formattedDate) {
+                                          updates['attendance/${widget.formattedDate}/productsHistory/${widget.index}'] =
+                                              null;
+                                        }
+
+                                        await FirebaseDatabase.instance
+                                            .ref()
+                                            .child('Coaches')
+                                            .child(FirebaseAuth
+                                                .instance.currentUser!.uid)
+                                            .update(updates);
+
+                                        for (int i = 0;
+                                            i < widget.popIndex;
+                                            i++) {
+                                          Navigator.pop(context);
+                                        }
+                                        Flushbar(
+                                          margin: const EdgeInsets.all(7),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
+                                          flushbarStyle: FlushbarStyle.FLOATING,
+                                          flushbarPosition:
+                                              FlushbarPosition.BOTTOM,
+                                          message: msg,
+                                          icon: Icon(
+                                            Icons.check_circle_outline_rounded,
+                                            size: 28.0,
+                                            color: Colors.green[300],
+                                          ),
+                                          duration: const Duration(
+                                              milliseconds: 1500),
+                                          leftBarIndicatorColor:
+                                              Colors.green[300],
+                                        ).show(context);
+                                      } catch (e) {
+                                        await Flushbar(
+                                          margin: const EdgeInsets.all(7),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
+                                          flushbarStyle: FlushbarStyle.FLOATING,
+                                          flushbarPosition:
+                                              FlushbarPosition.BOTTOM,
+                                          message: "Error updating user data",
+                                          icon: Icon(
+                                            Icons.error_outline_rounded,
+                                            size: 28.0,
+                                            color: Colors.red[300],
+                                          ),
+                                          duration: const Duration(
+                                              milliseconds: 1500),
+                                          leftBarIndicatorColor:
+                                              Colors.red[300],
+                                        ).show(context);
+                                        setState(() {
+                                          isFabEnabled = true;
+                                          handleEdit = false;
+                                        });
+                                      }
+                                    },
+                                    child: Text(widget.index != null
+                                        ? 'Update'
+                                        : 'Done')),
                               ],
                             );
                           }));
-
-                  // try {
-                  //   if (total == 0 && tempList.isNotEmpty) {
-                  //     Flushbar(
-                  //       margin: const EdgeInsets.all(7),
-                  //       borderRadius: BorderRadius.circular(15),
-                  //       flushbarStyle: FlushbarStyle.FLOATING,
-                  //       flushbarPosition: FlushbarPosition.BOTTOM,
-                  //       message: "Please enter valid products",
-                  //       icon: Icon(
-                  //         Icons.error_outline_rounded,
-                  //         size: 28.0,
-                  //         color: Colors.red[300],
-                  //       ),
-                  //       duration: const Duration(milliseconds: 1500),
-                  //       leftBarIndicatorColor: Colors.red[300],
-                  //     ).show(context);
-                  //     setState(() {
-                  //       isFabEnabled = true;
-                  //     });
-                  //     return;
-                  //   }
-                  //   // if ((given > total) || (given < total / 2)) {
-                  //   //   Flushbar(
-                  //   //     margin: const EdgeInsets.all(7),
-                  //   //     borderRadius: BorderRadius.circular(15),
-                  //   //     flushbarStyle: FlushbarStyle.FLOATING,
-                  //   //     flushbarPosition: FlushbarPosition.BOTTOM,
-                  //   //     message: "Given amount Invalid",
-                  //   //     icon: Icon(
-                  //   //       Icons.error_outline_rounded,
-                  //   //       size: 28.0,
-                  //   //       color: Colors.red[300],
-                  //   //     ),
-                  //   //     duration: const Duration(milliseconds: 1500),
-                  //   //     leftBarIndicatorColor: Colors.red[300],
-                  //   //   ).show(context);
-                  //   //   setState(() {
-                  //   //     isFabEnabled = true;
-                  //   //   });
-                  //   //   return;
-                  //   // }
-
-                  //   Map<String, dynamic> products = {};
-                  //   for (var i = 0; i < tempList.length; i++) {
-                  //     if (int.tryParse(
-                  //             productQuantityControllers[i].text.trim()) !=
-                  //         null) {
-                  //       products[productNameControllers[i].text.trim()] =
-                  //           int.parse(
-                  //               productQuantityControllers[i].text.trim());
-                  //     } else {
-                  //       showDialog(
-                  //         context: context,
-                  //         builder: (context) {
-                  //           return AlertDialog(
-                  //             title: const Text('Invalid quantity'),
-                  //             content: const Text(
-                  //                 'Please enter a valid quantity for all products'),
-                  //             actions: [
-                  //               TextButton(
-                  //                 onPressed: () {
-                  //                   Navigator.pop(context);
-                  //                 },
-                  //                 child: const Text('Ok'),
-                  //               ),
-                  //             ],
-                  //           );
-                  //         },
-                  //       );
-                  //       setState(() {
-                  //         isFabEnabled = true;
-                  //       });
-                  //       return;
-                  //     }
-                  //   }
-                  //   final timestamp = selectedDateTime.millisecondsSinceEpoch;
-                  //   final newOrder = {
-                  //     'date': timestamp,
-                  //     'products': products,
-                  //     'total': total,
-                  //     // 'given': given,
-                  //   };
-                  //   String msg = "Order added successfully";
-                  //   List newProductsHistory = [...widget.productsHistory];
-                  //   if (widget.index == null) {
-                  //     newProductsHistory.add(newOrder);
-                  //   } else {
-                  //     if (newOrder[products] == null && tempList.isEmpty) {
-                  //       newProductsHistory.removeAt(widget.index!);
-                  //       msg = "Order deleted successfully";
-                  //     } else {
-                  //       newProductsHistory[widget.index!] = newOrder;
-                  //       msg = "Order updated successfully";
-                  //     }
-                  //   }
-
-                  //   try {
-                  //     await FirebaseDatabase.instance
-                  //         .ref()
-                  //         .child('Coaches')
-                  //         .child(FirebaseAuth.instance.currentUser!.uid)
-                  //         .child('users')
-                  //         .child(widget.uid)
-                  //         .update({
-                  //       'productsHistory': newProductsHistory,
-                  //     });
-
-                  //     for (int i = 0; i < widget.popIndex; i++) {
-                  //       Navigator.pop(context);
-                  //     }
-
-                  //     Flushbar(
-                  //       margin: const EdgeInsets.all(7),
-                  //       borderRadius: BorderRadius.circular(15),
-                  //       flushbarStyle: FlushbarStyle.FLOATING,
-                  //       flushbarPosition: FlushbarPosition.BOTTOM,
-                  //       message: msg,
-                  //       icon: Icon(
-                  //         Icons.check_circle_outline_rounded,
-                  //         size: 28.0,
-                  //         color: Colors.green[300],
-                  //       ),
-                  //       duration: const Duration(milliseconds: 1500),
-                  //       leftBarIndicatorColor: Colors.green[300],
-                  //     ).show(context);
-                  //   } catch (e) {
-                  //     debugPrint(e.toString());
-                  //     Flushbar(
-                  //       margin: const EdgeInsets.all(7),
-                  //       borderRadius: BorderRadius.circular(15),
-                  //       flushbarStyle: FlushbarStyle.FLOATING,
-                  //       flushbarPosition: FlushbarPosition.BOTTOM,
-                  //       message: "Error updating user data",
-                  //       icon: Icon(
-                  //         Icons.error_outline_rounded,
-                  //         size: 28.0,
-                  //         color: Colors.red[300],
-                  //       ),
-                  //       duration: const Duration(milliseconds: 1500),
-                  //       leftBarIndicatorColor: Colors.red[300],
-                  //     ).show(context);
-                  //   }
-                  // } catch (e) {
-                  //   debugPrint(e.toString());
-                  //   Flushbar(
-                  //     margin: const EdgeInsets.all(7),
-                  //     borderRadius: BorderRadius.circular(15),
-                  //     flushbarStyle: FlushbarStyle.FLOATING,
-                  //     flushbarPosition: FlushbarPosition.BOTTOM,
-                  //     message: "Error updating user data",
-                  //     icon: Icon(
-                  //       Icons.error_outline_rounded,
-                  //       size: 28.0,
-                  //       color: Colors.red[300],
-                  //     ),
-                  //     duration: const Duration(milliseconds: 1500),
-                  //     leftBarIndicatorColor: Colors.red[300],
-                  //   ).show(context);
-                  // }
-
-                  // setState(() {
-                  //   isFabEnabled = true;
-                  // });
                 } else {
                   setState(() {
                     isFabEnabled = true;
@@ -1408,499 +1626,10 @@ class _CustOrderFormState extends State<CustOrderForm> {
                 }
               },
               child: widget.index != null
-                  ? const Icon(Icons.delete_rounded)
+                  ? const Icon(Icons.save_as_rounded)
                   : const Icon(Icons.save_rounded),
             )
           : null,
     );
   }
 }
-
-enum DiscountModes { manual, auto, custom }
-
-const Map<String, dynamic> allProducts = {
-  '1247': {
-    'id': 0,
-    'name': 'F1-Vanilla',
-    'sku': '1247',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '1248': {
-    'id': 1,
-    'name': 'F1-Chocolate',
-    'sku': '1248',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '1249': {
-    'id': 2,
-    'name': 'F1-Mango',
-    'sku': '1249',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '1269': {
-    'id': 3,
-    'name': 'F1-Orange',
-    'sku': '1269',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '1239': {
-    'id': 4,
-    'name': 'F1-Strawberry',
-    'sku': '1239',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '4114': {
-    'id': 5,
-    'name': 'F1-Kulfi',
-    'sku': '4114',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '082K': {
-    'id': 6,
-    'name': 'F1-Banana',
-    'sku': '082K',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '154K': {
-    'id': 7,
-    'name': 'F1-Rose',
-    'sku': '154K',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '287K': {
-    'id': 8,
-    'name': 'F1-Paan',
-    'sku': '287K',
-    'price': 2378,
-    '15%': 2015,
-    '25%': 1857,
-    '35%': 1649,
-    '42%': 1503,
-    '50%': 1337
-  },
-  '1233': {
-    'id': 9,
-    'name': 'PPP-200',
-    'sku': '1233',
-    'price': 1413,
-    '15%': 1197,
-    '25%': 1103,
-    '35%': 980,
-    '42%': 893,
-    '50%': 794
-  },
-  '1569': {
-    'id': 10,
-    'name': 'PPP-400',
-    'sku': '1569',
-    'price': 2711,
-    '15%': 2297,
-    '25%': 2118,
-    '35%': 1880,
-    '42%': 1714,
-    '50%': 1525
-  },
-  '183K': {
-    'id': 11,
-    'name': 'ShakeMate',
-    'sku': '183K',
-    'price': 712,
-    '15%': 603,
-    '25%': 624,
-    '35%': 589,
-    '42%': 564,
-    '50%': 536
-  },
-  '175K': {
-    'id': 12,
-    'name': 'Male Factor',
-    'sku': '175K',
-    'price': 3720,
-    '15%': 3152,
-    '25%': 2906,
-    '35%': 2580,
-    '42%': 2352,
-    '50%': 2092
-  },
-  '127K': {
-    'id': 13,
-    'name': "Woman's Choice",
-    'sku': '127K',
-    'price': 1357,
-    '15%': 1150,
-    '25%': 1060,
-    '35%': 941,
-    '42%': 858,
-    '50%': 763
-  },
-  '109K': {
-    'id': 14,
-    'name': 'Brain Health',
-    'sku': '109K',
-    'price': 1597,
-    '15%': 1353,
-    '25%': 1247,
-    '35%': 1108,
-    '42%': 1010,
-    '50%': 898
-  },
-  '115K': {
-    'id': 15,
-    'name': 'Immune Health',
-    'sku': '115K',
-    'price': 1668,
-    '15%': 1413,
-    '25%': 1302,
-    '35%': 1156,
-    '42%': 1054,
-    '50%': 938
-  },
-  '1291': {
-    'id': 16,
-    'name': 'Afresh-Ginger',
-    'sku': '1291',
-    'price': 885,
-    '15%': 750,
-    '25%': 691,
-    '35%': 614,
-    '42%': 559,
-    '50%': 497
-  },
-  '1294': {
-    'id': 17,
-    'name': 'Afresh-Elaichi',
-    'sku': '1294',
-    'price': 885,
-    '15%': 750,
-    '25%': 691,
-    '35%': 614,
-    '42%': 559,
-    '50%': 497
-  },
-  '1295': {
-    'id': 18,
-    'name': 'Afresh-Lemon',
-    'sku': '1295',
-    'price': 885,
-    '15%': 750,
-    '25%': 691,
-    '35%': 614,
-    '42%': 559,
-    '50%': 497
-  },
-  '1296': {
-    'id': 19,
-    'name': 'Afresh-Peach',
-    'sku': '1296',
-    'price': 885,
-    '15%': 750,
-    '25%': 691,
-    '35%': 614,
-    '42%': 559,
-    '50%': 497
-  },
-  '1238': {
-    'id': 20,
-    'name': 'Afresh-Cinnamon',
-    'sku': '1238',
-    'price': 885,
-    '15%': 750,
-    '25%': 691,
-    '35%': 614,
-    '42%': 559,
-    '50%': 497
-  },
-  '230K': {
-    'id': 21,
-    'name': 'Afresh-Kashmiri-Kahwa',
-    'sku': '230K',
-    'price': 885,
-    '15%': 750,
-    '25%': 691,
-    '35%': 614,
-    '42%': 559,
-    '50%': 497
-  },
-  '080K': {
-    'id': 22,
-    'name': 'Afresh-Tulsi',
-    'sku': '080K',
-    'price': 885,
-    '15%': 750,
-    '25%': 704,
-    '35%': 632,
-    '42%': 582,
-    '50%': 524
-  },
-  '1458': {
-    'id': 23,
-    'name': 'H24-Hydrate',
-    'sku': '1458',
-    'price': 1786,
-    '15%': 1513,
-    '25%': 1461,
-    '35%': 1331,
-    '42%': 1240,
-    '50%': 1136
-  },
-  '031K': {
-    'id': 24,
-    'name': 'H24-Rebuild',
-    'sku': '031K',
-    'price': 2854,
-    '15%': 2418,
-    '25%': 2270,
-    '35%': 2037,
-    '42%': 1874,
-    '50%': 1687
-  },
-  '046K': {
-    'id': 25,
-    'name': 'Skin Booster',
-    'sku': '046K',
-    'price': 4266,
-    '15%': 3615,
-    '25%': 3478,
-    '35%': 3163,
-    '42%': 2943,
-    '50%': 2691
-  },
-  '1279': {
-    'id': 26,
-    'name': 'Dino-Choco',
-    'sku': '1279',
-    'price': 1216,
-    '15%': 1030,
-    '25%': 949,
-    '35%': 843,
-    '42%': 768,
-    '50%': 683
-  },
-  '1236': {
-    'id': 27,
-    'name': 'Dino-Strawberry',
-    'sku': '1236',
-    'price': 1216,
-    '15%': 1030,
-    '25%': 949,
-    '35%': 843,
-    '42%': 768,
-    '50%': 683
-  },
-  '1278': {
-    'id': 28,
-    'name': 'Active Fiber Tablets',
-    'sku': '1278',
-    'price': 1786,
-    '15%': 1513,
-    '25%': 1395,
-    '35%': 1239,
-    '42%': 1129,
-    '50%': 1004
-  },
-  '2865': {
-    'id': 29,
-    'name': 'Active Fiber Complex',
-    'sku': '2865',
-    'price': 2792,
-    '15%': 2366,
-    '25%': 2181,
-    '35%': 1937,
-    '42%': 1765,
-    '50%': 1570
-  },
-  '1293': {
-    'id': 30,
-    'name': 'Aloe Plus',
-    'sku': '1293',
-    'price': 1156,
-    '15%': 979,
-    '25%': 902,
-    '35%': 801,
-    '42%': 730,
-    '50%': 650
-  },
-  '0006': {
-    'id': 31,
-    'name': 'Aloe Concentrate',
-    'sku': '0006',
-    'price': 2941,
-    '15%': 2492,
-    '25%': 2297,
-    '35%': 2040,
-    '42%': 1860,
-    '50%': 1654
-  },
-  '025K': {
-    'id': 32,
-    'name': 'Probiotic',
-    'sku': '025K',
-    'price': 2410,
-    '15%': 2042,
-    '25%': 1882,
-    '35%': 1672,
-    '42%': 1524,
-    '50%': 1355
-  },
-  '186K': {
-    'id': 33,
-    'name': 'Triphala',
-    'sku': '186K',
-    'price': 1189,
-    '15%': 1007,
-    '25%': 928,
-    '35%': 824,
-    '42%': 751,
-    '50%': 668
-  },
-  '0020': {
-    'id': 34,
-    'name': 'Calcium',
-    'sku': '0020',
-    'price': 1313,
-    '15%': 1112,
-    '25%': 1025,
-    '35%': 910,
-    '42%': 830,
-    '50%': 738
-  },
-  '0555': {
-    'id': 35,
-    'name': 'Joint Support',
-    'sku': '0555',
-    'price': 2679,
-    '15%': 2270,
-    '25%': 2092,
-    '35%': 1858,
-    '42%': 1694,
-    '50%': 1506
-  },
-  '2637': {
-    'id': 36,
-    'name': 'Niteworks',
-    'sku': '2637',
-    'price': 7777,
-    '15%': 6590,
-    '25%': 6075,
-    '35%': 5394,
-    '42%': 4918,
-    '50%': 4374
-  },
-  '0065': {
-    'id': 37,
-    'name': 'Herbalifeline',
-    'sku': '0065',
-    'price': 2910,
-    '15%': 2466,
-    '25%': 2273,
-    '35%': 2019,
-    '42%': 1840,
-    '50%': 1637
-  },
-  '051K': {
-    'id': 38,
-    'name': 'Beta Heart',
-    'sku': '051K',
-    'price': 2447,
-    '15%': 2073,
-    '25%': 1995,
-    '35%': 1814,
-    '42%': 1688,
-    '50%': 1543
-  },
-  '1232': {
-    'id': 39,
-    'name': 'Multivitamin',
-    'sku': '1232',
-    'price': 2186,
-    '15%': 1852,
-    '25%': 1707,
-    '35%': 1516,
-    '42%': 1382,
-    '50%': 1229
-  },
-  '3123': {
-    'id': 40,
-    'name': 'Cell Activator',
-    'sku': '3123',
-    'price': 2417,
-    '15%': 2048,
-    '25%': 1888,
-    '35%': 1677,
-    '42%': 1529,
-    '50%': 1359
-  },
-  '0111': {
-    'id': 41,
-    'name': 'Cell U Loss',
-    'sku': '0111',
-    'price': 1860,
-    '15%': 1576,
-    '25%': 1453,
-    '35%': 1290,
-    '42%': 1176,
-    '50%': 1046
-  },
-  '0077': {
-    'id': 42,
-    'name': 'Herbal Control',
-    'sku': '0077',
-    'price': 3746,
-    '15%': 3174,
-    '25%': 2926,
-    '35%': 2598,
-    '42%': 2369,
-    '50%': 2106
-  },
-  '0064': {
-    'id': 43,
-    'name': 'Ocular Defense',
-    'sku': '0064',
-    'price': 2103,
-    '15%': 1782,
-    '25%': 1643,
-    '35%': 1458,
-    '42%': 1330,
-    '50%': 1182
-  }
-};

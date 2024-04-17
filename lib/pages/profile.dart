@@ -2,7 +2,7 @@ import 'dart:io';
 // import '../ui/app_ui.dart';
 // import 'package:angelwellness/pages/login.dart';
 import 'package:another_flushbar/flushbar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -65,8 +65,8 @@ class _ProfilePgState extends State<ProfilePg> {
     return formatted;
   }
 
-  CollectionReference<Map<String, dynamic>> coaches =
-      FirebaseFirestore.instance.collection('Coaches');
+  // CollectionReference<Map<String, dynamic>> coaches =
+  //     FirebaseFirestore.instance.collection('Coaches');
   String uImage = FirebaseAuth.instance.currentUser?.photoURL ?? '';
   User? user = FirebaseAuth.instance.currentUser;
   Color backG = const Color.fromARGB(255, 100, 176, 238);
@@ -103,9 +103,9 @@ class _ProfilePgState extends State<ProfilePg> {
       await ref.putFile(File(image.path));
       String url = await ref.getDownloadURL();
 
-      await coaches.doc(user!.uid).update({
-        'image': url,
-      });
+      // await coaches.doc(user!.uid).update({
+      //   'image': url,
+      // });
 
       await user!.updatePhotoURL(url);
 

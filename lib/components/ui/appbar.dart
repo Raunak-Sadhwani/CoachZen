@@ -2,7 +2,8 @@ import 'package:animations/animations.dart';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
+  final screenHeight =
+      WidgetsBinding.instance.platformDispatcher.views.last.physicalSize.height;
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leftIcon;
   final List<Widget>? rightIcons;
