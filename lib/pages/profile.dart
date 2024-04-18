@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:another_flushbar/flushbar.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,8 +16,7 @@ import '../components/ui/appbar.dart';
 import 'login.dart';
 
 class ProfilePg extends StatefulWidget {
-  final Map<String, dynamic> userData;
-  const ProfilePg({Key? key, required this.userData}) : super(key: key);
+  const ProfilePg({Key? key}) : super(key: key);
 
   @override
   State<ProfilePg> createState() => _ProfilePgState();
@@ -24,7 +24,9 @@ class ProfilePg extends StatefulWidget {
 
 class _ProfilePgState extends State<ProfilePg> {
   bool _hasInternet = true;
-
+  Map<String, dynamic> coachData = {};
+  final DatabaseReference coachDb =
+      FirebaseDatabase.instance.ref().child('Coaches');
   @override
   void initState() {
     super.initState();
@@ -49,6 +51,15 @@ class _ProfilePgState extends State<ProfilePg> {
         setState(() {
           _hasInternet = true;
         });
+        // get coach data
+        coachDb.child(FirebaseAuth.instance.currentUser!.uid).once().then(
+          (DatabaseEvent event) {
+            setState(() {
+              coachData = Map<String, dynamic>.from(
+                  event.snapshot.value as Map<dynamic, dynamic>);
+            });
+          },
+        );
       }
     } on SocketException catch (_) {
       setState(() {
@@ -65,8 +76,6 @@ class _ProfilePgState extends State<ProfilePg> {
     return formatted;
   }
 
-  // CollectionReference<Map<String, dynamic>> coaches =
-  //     FirebaseFirestore.instance.collection('Coaches');
   String uImage = FirebaseAuth.instance.currentUser?.photoURL ?? '';
   User? user = FirebaseAuth.instance.currentUser;
   Color backG = const Color.fromARGB(255, 100, 176, 238);
@@ -102,13 +111,11 @@ class _ProfilePgState extends State<ProfilePg> {
       Reference ref = FirebaseStorage.instance.ref().child('${user!.uid}.jpg');
       await ref.putFile(File(image.path));
       String url = await ref.getDownloadURL();
-
-      // await coaches.doc(user!.uid).update({
-      //   'image': url,
-      // });
-
       await user!.updatePhotoURL(url);
 
+      await coachDb.child(user!.uid).update({
+        'image': url,
+      });
       setState(() {
         uImage = url;
       });
@@ -175,7 +182,7 @@ class _ProfilePgState extends State<ProfilePg> {
         actions: [
           IconButton(
             icon: const Icon(
-              Icons.logout,
+              Icons.more_vert_outlined,
               color: Colors.white,
               // size: 34,
             ),
@@ -213,25 +220,20 @@ class _ProfilePgState extends State<ProfilePg> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     textfield(
-                      hintText: user!.displayName ??
-                          widget.userData['name'] ??
-                          '- - -',
-                    ),
-                    textfield(
-                      hintText: user!.phoneNumber != null &&
-                              user!.phoneNumber!.isNotEmpty
-                          ? user!.phoneNumber
-                          : (widget.userData['phone'].toString().isNotEmpty)
-                              ? widget.userData['phone'].toString()
-                              : '- - -',
+                      hintText:
+                          user!.displayName ?? coachData['name'] ?? '- - -',
                     ),
                     textfield(
                       hintText:
-                          user!.email ?? widget.userData['email'] ?? '- - -',
+                          user!.phoneNumber ?? coachData['phone'] ?? '- - -',
+                    ),
+                    textfield(
+                      hintText: user!.email ?? coachData['email'] ?? '- - -',
                     ),
                     textfield(
                       hintText: user!.metadata.creationTime == null
-                          ? '- - -'
+                          ? formatDate(DateTime.fromMillisecondsSinceEpoch(
+                              coachData['created'] ?? 0))
                           : formatDate(user!.metadata.creationTime!),
                     ),
                   ],

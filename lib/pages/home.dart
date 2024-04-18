@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:auto_size_text/auto_size_text.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:coach_zen/pages/daily_attendance.dart';
@@ -19,10 +18,10 @@ import 'package:coach_zen/pages/profile.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
-// import '../components/services/notifi_service.dart';
 import '../components/ui/appbar.dart';
+import 'package:path_provider/path_provider.dart';
 import 'login.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -70,15 +69,39 @@ class _HomePageState extends State<HomePage> {
           return;
         }
         await getVersion();
+        Directory appDocDir = await getApplicationDocumentsDirectory();
+        Directory? appExtDir = await getExternalStorageDirectory();
+        final String appDocPath = appDocDir.path;
+        final String appExtPath = appExtDir!.path;
+
+        final File file = File('$appDocPath/new_sample.txt');
+        await file.writeAsString('Hello, World! $appDocPath');
+        await file.readAsString().then((String value) {
+          debugPrint(value);
+        });
+
+        final File file2 = File('$appExtPath/old_sample.txt');
+        await file2.writeAsString('Hello, World2! $appExtPath');
+        await file2.readAsString().then((String value) {
+          debugPrint(value);
+        });
+
         if (correctVersion) {
           requestNotificationPermission();
           updateText();
+          final deviceInfoPlugin = DeviceInfoPlugin();
+          final deviceInfo = await deviceInfoPlugin.deviceInfo;
+          final allInfo = deviceInfo.data;
         }
       });
     }
   }
 
   Future<void> requestNotificationPermission() async {
+    if (!await Permission.storage.isGranted) {
+      await Permission.storage.request();
+    }
+
     if (!await Permission.notification.isGranted) {
       await Permission.notification.request();
       // await NotificationManager().initNotification();
@@ -98,10 +121,22 @@ class _HomePageState extends State<HomePage> {
     final String version = packageInfo.version;
 
     // get 'version' node from firebase
-    final DatabaseReference versionDb =
-        FirebaseDatabase.instance.ref().child('Version');
+    final DatabaseReference versionDb = FirebaseDatabase.instance.ref();
     await versionDb.once().then((DatabaseEvent event) {
-      final String fVerision = event.snapshot.value as String;
+      final Map<String, dynamic> data =
+          event.snapshot.value as Map<String, dynamic>;
+      debugPrint(data.toString());
+      if (data['Coaches'][user!.uid]['password'] == null) {
+        // save preference
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('isPassword', false);
+        });
+      } else {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('isPassword', true);
+        });
+      }
+      final String fVerision = data['Version'] as String;
       if (fVerision != version) {
         setState(() {
           correctVersion = false;
@@ -471,7 +506,6 @@ class _HomePageState extends State<HomePage> {
     checkInternetAndAuth();
   }
 
-  Map<String, dynamic> coachData = {};
   // get userdata from firestore
 
   @override
@@ -533,7 +567,7 @@ class _HomePageState extends State<HomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ProfilePg(userData: coachData),
+                          builder: (context) => const ProfilePg(),
                         ),
                       );
                     },
@@ -556,7 +590,7 @@ class _HomePageState extends State<HomePage> {
                                 )
                               : Image.asset(
                                   fit: BoxFit.cover,
-                                  'lib/assets/female.png',
+                                  'lib/assets/male.png',
                                 ),
                         )),
                   )
@@ -581,7 +615,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                           TextSpan(
-                            text: capitalize('${user!.displayName}!'),
+                            text: capitalize(user!.displayName!.split(' ')[0]),
                             style: GoogleFonts.raleway(
                               color: Colors.black,
                               fontSize: 24,

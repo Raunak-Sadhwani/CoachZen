@@ -310,10 +310,11 @@ class _FormPageState extends State<FormPage> {
             // if it fails, then user already exists
             await FirebaseDatabase.instance
                 .ref()
-                .child('Phones')
+                .child('Coaches')
+                .child(coach!.uid)
+                .child('phones')
                 .child(data['phone'].trim())
                 .set({
-              'cid': coach!.uid,
               'uid': newUserUid,
               'user': true,
               'created': timestamp
@@ -347,7 +348,6 @@ class _FormPageState extends State<FormPage> {
           data['measurements'] = measurements;
           data['medicalHistory'] = medicalHistory;
           data['reg'] = 'false';
-          data['cid'] = coach.uid;
           // convert age to date of birth
           int age = data['age'];
           DateTime currentDate = DateTime.now();

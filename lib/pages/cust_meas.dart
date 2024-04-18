@@ -141,6 +141,7 @@ class _MeasState extends State<Meas> {
                   // twice pop to go back to home page
                   Navigator.pop(_scaffoldKey.currentContext!);
                   Navigator.pop(_scaffoldKey.currentContext!);
+                  Navigator.pop(_scaffoldKey.currentContext!);
                   return Flushbar(
                     margin: const EdgeInsets.all(7),
                     borderRadius: BorderRadius.circular(15),

@@ -17,10 +17,10 @@ final String uid = FirebaseAuth.instance.currentUser!.uid;
 
 class BodyFormCustomerWrap extends StatefulWidget {
   final String uid;
-  final VoidCallback callback;
+  final Future<void> Function()? callback;
   final bool? attendance;
   const BodyFormCustomerWrap(
-      {Key? key, required this.uid, required this.callback, this.attendance})
+      {Key? key, required this.uid, this.callback, this.attendance})
       : super(key: key);
 
   @override
@@ -137,7 +137,6 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             Map<dynamic, dynamic> userData = {};
             // remove any list dataytype from filteredData and any exceptionList keys, add to userData
             List exceptionList = [
-              "cid",
               "reg",
               "cname",
               "image",
@@ -209,7 +208,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             }
             measurements.sort((a, b) => a['date'].compareTo(b['date']));
             return BodyFormCustomer(
-                callback: widget.callback,
+                callback: widget.callback ?? () async {},
                 userData: userData,
                 measurements: measurements,
                 products: products,
@@ -220,15 +219,20 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
                 uid: widget.uid,
                 image: image);
           } else {
-            // Handle loading or empty state...
-            return const CircularProgressIndicator();
+            return const Center(
+                child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+              ],
+            ));
           }
         });
   }
 }
 
 class BodyFormCustomer extends StatefulWidget {
-  final VoidCallback callback;
+  final Future<void> Function() callback;
   final Map<dynamic, dynamic> userData;
   final List<Map<dynamic, dynamic>> measurements;
   final Map<dynamic, dynamic> products;
@@ -317,7 +321,6 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
             icon: const Icon(Icons.arrow_back_rounded),
             color: Colors.black26,
             onPressed: () {
-              widget.callback();
               Navigator.pop(context);
             },
           ),
@@ -404,6 +407,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       children: [
                         // 2 gradient buttons
                         CustButton(
+                            openColor: const Color.fromRGBO(36, 38, 155, 1),
                             height: height,
                             width: width,
                             onPressed: () {},
@@ -416,6 +420,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                               callback: widget.callback,
                             )),
                         CustButton(
+                            openColor: const Color.fromRGBO(230, 253, 68, .6),
                             height: height,
                             width: width,
                             onPressed: () {},
@@ -721,17 +726,20 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       try {
                         //  try putting number in phone collection
                         // if it fails, then user already exists
-
+                        debugPrint('updateFields: ${updateFields['phone']}');
                         final Map<String, dynamic> updates = {
-                          'Phones/${updateFields['phone'].toString()}': {
-                            'cid': uid,
+                          'phones/${updateFields['phone'].toString()}': {
                             'uid': widget.uid,
                             'user': true,
                             'created': ServerValue.timestamp,
                           },
-                          'Phones/${originalData['phone']}': null,
+                          'phones/${originalData['phone']}': null,
                         };
-                        await FirebaseDatabase.instance.ref().set(updates);
+                        await FirebaseDatabase.instance
+                            .ref()
+                            .child('Coaches')
+                            .child(uid)
+                            .update(updates);
                       } catch (e) {
                         setState(() {
                           isFabVisible = true;
@@ -762,8 +770,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       originalData = Map.from(editedData);
                       updateFields.clear();
                     });
-                    widget.callback();
-
+                    await widget.callback();
                     return Flushbar(
                       margin: const EdgeInsets.all(7),
                       borderRadius: BorderRadius.circular(15),

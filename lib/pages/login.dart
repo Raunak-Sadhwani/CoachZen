@@ -311,30 +311,6 @@ class _LoginPageState extends State<LoginPage> {
         builder: (context) => const Center(
               child: CircularProgressIndicator(),
             ));
-
-    // Check if the email belongs to a coach
-    // var coachSnapshot = await FirebaseFirestore.instance
-    //     .collection('Coaches')
-    //     .where('email', isEqualTo: emailT)
-    //     .limit(1)
-    //     .get();
-
-    // if (coachSnapshot.docs.isEmpty) {
-    //   Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
-    //       .pop('dialog');
-    //   return Flushbar(
-    //     message:
-    //         'Unauthorized User or User not found. Please check your credentials',
-    //     icon: Icon(
-    //       Icons.info_outline,
-    //       size: 28.0,
-    //       color: Colors.blue[300],
-    //     ),
-    //     duration: const Duration(milliseconds: 3000),
-    //     leftBarIndicatorColor: Colors.blue[300],
-    //   )..show(_scaffoldKey.currentContext!);
-    // }
-
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: emailT, password: password.text.trim());

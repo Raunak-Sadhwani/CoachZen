@@ -292,7 +292,6 @@ class _CustNewFormState extends State<CustNewForm> {
                   'city': _cityController.text.trim(),
                   'email': _emailController.text.trim(),
                   'created': realtime,
-                  'cid': cid,
                 };
                 if (existingCustomer) {
                   data['existed'] = true;
@@ -367,10 +366,11 @@ class _CustNewFormState extends State<CustNewForm> {
                   // if it fails, then user already exists
                   await FirebaseDatabase.instance
                       .ref()
-                      .child('Phones')
+                      .child('Coaches')
+                      .child(FirebaseAuth.instance.currentUser!.uid)
+                      .child('phones')
                       .child(_phoneController.text.trim())
                       .set({
-                    'cid': cid,
                     'uid': newUserUid,
                     'user': true,
                     'created': realtime

@@ -1,13 +1,15 @@
 import 'package:another_flushbar/flushbar.dart';
+import 'package:coach_zen/pages/home.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl_phone_field/countries.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:flutter/gestures.dart';
 import 'get_start.dart';
-import 'home.dart';
 import 'login.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -169,6 +171,7 @@ class _RegisterState extends State<Register> {
                             autovalidateMode: _autoValidate
                                 ? AutovalidateMode.always
                                 : AutovalidateMode.disabled,
+                            // only india
                             controller: phone,
                             decoration: InputDecoration(
                               counter: const Offstage(),
@@ -430,90 +433,82 @@ class _RegisterState extends State<Register> {
         leftBarIndicatorColor: Colors.blue[300],
       )..show(scaffoldKey.currentContext!);
     }
-    var emailT = email.text.trim();
-    List lists = [];
-  
-    if ((lists.any((element) =>
-            (element['email'] == emailT) ||
-            (element['phone'] == phone.text.trim()))) ==
-        true) {
+
+    showDialog(
+        context: scaffoldKey.currentContext!,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ));
+
+    try {
+      String emailT = email.text.trim();
+      await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+              email: emailT, password: password.text)
+          .then((user) async {
+        User? user = FirebaseAuth.instance.currentUser;
+        // updateDisplayName
+        await user?.updateDisplayName(name.text.trim());
+        const serverTimestamp = ServerValue.timestamp;
+        try {
+          final Map<String, dynamic> updates = {
+            'Phones/${phone.text}': {
+              "cid": user!.uid,
+              'coach': true,
+              'created': serverTimestamp,
+            },
+            'Coaches/${user.uid}': {
+              'name': name.text.trim(),
+              'phone': phone.text.trim(),
+              'email': email.text.trim(),
+              'created': serverTimestamp,
+            },
+          };
+          await FirebaseDatabase.instance.ref().update(updates);
+        } catch (e) {
+          await user!.delete();
+          Navigator.of(scaffoldKey.currentContext!, rootNavigator: true)
+              .pop('dialog');
+          return Flushbar(
+            margin: const EdgeInsets.all(7),
+            borderRadius: BorderRadius.circular(15),
+            flushbarStyle: FlushbarStyle.FLOATING,
+            flushbarPosition: FlushbarPosition.BOTTOM,
+            message: "User with this phone number already exists!",
+            icon: Icon(
+              Icons.error_outline,
+              size: 28.0,
+              color: Colors.red[300],
+            ),
+            duration: const Duration(milliseconds: 4000),
+            leftBarIndicatorColor: Colors.red[300],
+          ).show(scaffoldKey.currentContext!);
+        }
+
+        Navigator.of(scaffoldKey.currentContext!, rootNavigator: true)
+            .pop('dialog');
+        Navigator.pushAndRemoveUntil(
+          scaffoldKey.currentContext!,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (Route<dynamic> route) => false,
+        );
+      });
+    } on FirebaseAuthException catch (e) {
+      Navigator.of(scaffoldKey.currentContext!, rootNavigator: true)
+          .pop('dialog');
       return Flushbar(
-        message: 'Unauthorized User',
+        message: '${e.message}',
         icon: Icon(
-          Icons.person_add_disabled,
+          Icons.info_outline,
           size: 28.0,
           color: Colors.blue[300],
         ),
         duration: const Duration(milliseconds: 1500),
         leftBarIndicatorColor: Colors.blue[300],
       )..show(scaffoldKey.currentContext!);
+    } catch (e) {
+      debugPrint(e.toString());
     }
-    if (phone.text.isNotEmpty) {
-      if (true) {
-        return Flushbar(
-          margin: const EdgeInsets.all(7),
-          borderRadius: BorderRadius.circular(15),
-          flushbarStyle: FlushbarStyle.FLOATING,
-          flushbarPosition: FlushbarPosition.BOTTOM,
-          message: "User with this phone number already exists!",
-          icon: Icon(
-            Icons.error_outline,
-            size: 28.0,
-            color: Colors.red[300],
-          ),
-          duration: const Duration(milliseconds: 4000),
-          leftBarIndicatorColor: Colors.red[300],
-        ).show(scaffoldKey.currentContext!);
-      }
-    }
-    showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-              child: CircularProgressIndicator(),
-            ));
-   
-   
-    // try {
-    //   await FirebaseAuth.instance
-    //       .createUserWithEmailAndPassword(
-    //           email: emailT, password: password.text.trim())
-    //       .then((user) async {
-    //     User? user = FirebaseAuth.instance.currentUser;
-    //     // updateDisplayName
-    //     await user?.updateDisplayName(name.text.trim());
-    //     FieldValue serverTimestamp = FieldValue.serverTimestamp();
-    //     // update phoneNumber
-    //     await FirebaseFirestore.instance
-    //         .collection('Coaches')
-    //         .doc(user!.uid)
-    //         .set({
-    //       'name': name.text.trim(),
-    //       'phone': phone.text.trim(),
-    //       'email': email.text.trim(),
-    //       'created': serverTimestamp,
-    //     });
-    //     Navigator.of(context, rootNavigator: true).pop('dialog');
-    //     Navigator.pushAndRemoveUntil(
-    //       context,
-    //       MaterialPageRoute(builder: (context) => const HomePage()),
-    //       (Route<dynamic> route) => false,
-    //     );
-    //   });
-    // } on FirebaseAuthException catch (e) {
-    //   Navigator.of(context, rootNavigator: true).pop('dialog');
-    //   return Flushbar(
-    //     message: '${e.message}',
-    //     icon: Icon(
-    //       Icons.info_outline,
-    //       size: 28.0,
-    //       color: Colors.blue[300],
-    //     ),
-    //     duration: const Duration(milliseconds: 1500),
-    //     leftBarIndicatorColor: Colors.blue[300],
-    //   )..show(scaffoldKey.currentContext!);
-    // } catch (e) {
-    //   debugPrint(e.toString());
-    // }
   }
 }

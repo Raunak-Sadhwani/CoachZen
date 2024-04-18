@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:another_flushbar/flushbar.dart';
 import 'package:coach_zen/pages/body_form_cust.dart';
 import 'package:coach_zen/pages/cust_order_form.dart';
@@ -16,6 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../components/ui/appbar.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../components/products.dart';
+import '../components/ui/passwordcheck.dart';
+import 'package:excel/excel.dart';
 
 final DateFormat format = DateFormat('dd MMM yyyy');
 final DateTime today = DateTime.now();
@@ -50,6 +51,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   List<Map<dynamic, dynamic>> clubFees = [];
   List<Map<dynamic, dynamic>> homeProgram = [];
   Map<dynamic, dynamic> allUsers = {};
+  Map<dynamic, dynamic> allAttendanceData = {};
   Map<dynamic, dynamic> productsHistory = {};
   Map<dynamic, dynamic> presentStudentsUID = {};
   Map<dynamic, dynamic> reminderList = {};
@@ -489,6 +491,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             presentStudentsUID = presentStudents;
             sortedPresentStudents = sortedPresentStudentsx;
             allUsers = usersData;
+            allAttendanceData = eventData['attendance'] ?? {};
             zdays = presentStudents.keys
                 .where((student) =>
                     users.firstWhere(
@@ -625,22 +628,264 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   color: Colors.grey,
                 ),
                 onPressed: () {
+                  final List allAttendanceDates =
+                      allAttendanceData.keys.toList();
+                  allAttendanceDates.sort((a, b) => a.compareTo(b));
+                  final DateTime firstDate =
+                      DateTime.parse(allAttendanceDates.first);
+                  final DateTime lastDate =
+                      DateTime.parse(allAttendanceDates.last);
                   //  export to excel
-                  Flushbar(
-                    margin: const EdgeInsets.all(7),
-                    borderRadius: BorderRadius.circular(15),
-                    flushbarStyle: FlushbarStyle.FLOATING,
-                    flushbarPosition: FlushbarPosition.TOP,
-                    message:
-                        "${format.format(selectedDate)} data exported to excel",
-                    icon: Icon(
-                      Icons.check_circle_outline,
-                      size: 28.0,
-                      color: Colors.green[300],
-                    ),
-                    duration: const Duration(milliseconds: 2000),
-                    leftBarIndicatorColor: Colors.green[300],
-                  ).show(context);
+                  // get dates from and when to export
+                  DateTime from = selectedDate;
+                  DateTime? to;
+                  showDialog(
+                      context: context,
+                      builder: (context) => StatefulBuilder(
+                            builder: (contextx, StateSetter setState) {
+                              return AlertDialog(
+                                title: const Text('Export to Excel'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () {
+                                        showDatePicker(
+                                          context: context,
+                                          initialDate: from,
+                                          firstDate: firstDate,
+                                          lastDate: to ?? lastDate,
+                                        ).then((date) {
+                                          if (date != null) {
+                                            setState(() {
+                                              from = date;
+                                            });
+                                          }
+                                        });
+                                      },
+                                      child: Text(
+                                        'From: ${format.format(from)}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        showDatePicker(
+                                          context: context,
+                                          initialDate: from,
+                                          firstDate: from,
+                                          lastDate: lastDate,
+                                        ).then((date) {
+                                          if (date != null) {
+                                            setState(() {
+                                              to = date;
+                                            });
+                                          }
+                                        });
+                                      },
+                                      child: Text(
+                                        'To: ${to != null ? format.format(to!) : 'Not Selected'}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      height: 10,
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            // int totalDays = 1;
+                                            // if (to != null) {
+                                            //   totalDays =
+                                            //       from.difference(to!).inDays;
+                                            // }
+
+                                            // // export to excel
+                                            // final Excel excel =
+                                            //     Excel.createExcel();
+                                            // final Sheet sheet = excel['Sheet1'];
+                                            // int row = 1;
+                                            // for (int i = 0;
+                                            //     i < totalDays;
+                                            //     i++) {
+                                            //   final DateTime date =
+                                            //       from.add(Duration(days: i));
+                                            //   final int year = date.year;
+                                            //   final int month = date.month;
+                                            //   final int day = date.day;
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'A$row'))
+                                            //           .value =
+                                            //       TextCellValue(
+                                            //           DateFormat('yyyy-MM-dd')
+                                            //               .format(date));
+                                            //   row++;
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'A$row'))
+                                            //           .value =
+                                            //       DateCellValue(
+                                            //           year: year,
+                                            //           month: month,
+                                            //           day: day);
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'A$row'))
+                                            //           .value =
+                                            //       const TextCellValue('Name');
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'B$row'))
+                                            //           .value =
+                                            //       const TextCellValue('Phone');
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'C$row'))
+                                            //           .value =
+                                            //       const TextCellValue('Plan');
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'D$row'))
+                                            //           .value =
+                                            //       const TextCellValue('Days');
+                                            //   sheet
+                                            //           .cell(
+                                            //               CellIndex
+                                            //                   .indexByString(
+                                            //                       'E$row'))
+                                            //           .value =
+                                            //       const TextCellValue(
+                                            //           'Balance');
+
+                                            //   row++;
+
+                                            //   for (final user in users) {
+                                            //     // final String id = user['id'];
+                                            //     final String name =
+                                            //         user['name'];
+                                            //     final String phone =
+                                            //         user['phone'];
+                                            //     // final int day = user['day'];
+                                            //     final int realBalance =
+                                            //         user['realBalance'] ?? 0;
+                                            //     final String planName =
+                                            //         user['planName'] ?? 0;
+                                            //     final String days =
+                                            //         user['daysString'] ?? 0;
+                                            //     sheet
+                                            //             .cell(
+                                            //                 CellIndex
+                                            //                     .indexByString(
+                                            //                         'A$row'))
+                                            //             .value =
+                                            //         TextCellValue(name);
+                                            //     sheet
+                                            //             .cell(
+                                            //                 CellIndex
+                                            //                     .indexByString(
+                                            //                         'B$row'))
+                                            //             .value =
+                                            //         TextCellValue(phone);
+                                            //     sheet
+                                            //             .cell(
+                                            //                 CellIndex
+                                            //                     .indexByString(
+                                            //                         'C$row'))
+                                            //             .value =
+                                            //         TextCellValue(planName);
+                                            //     sheet
+                                            //             .cell(
+                                            //                 CellIndex
+                                            //                     .indexByString(
+                                            //                         'D$row'))
+                                            //             .value =
+                                            //         TextCellValue(days);
+                                            //     sheet
+                                            //             .cell(
+                                            //                 CellIndex
+                                            //                     .indexByString(
+                                            //                         'E$row'))
+                                            //             .value =
+                                            //         IntCellValue(
+                                            //             realBalance.toInt());
+
+                                            //     row++;
+                                            //   }
+                                            //   row++;
+                                            //   // export excel
+                                            //   final Directory? directory =
+                                            //       await getExternalStorageDirectory();
+                                            //   debugPrint(
+                                            //       'Directory: $directory');
+                                            //   if (directory != null) {
+                                            //     final String path =
+                                            //         '${directory.path}/$cid-$year-$month-$day.xlsx';
+                                            //     final File file = File(path);
+                                            //     file.writeAsBytes(
+                                            //         excel.encode()!);
+                                            //     Flushbar(
+                                            //       margin:
+                                            //           const EdgeInsets.all(7),
+                                            //       borderRadius:
+                                            //           BorderRadius.circular(15),
+                                            //       flushbarStyle:
+                                            //           FlushbarStyle.FLOATING,
+                                            //       flushbarPosition:
+                                            //           FlushbarPosition.TOP,
+                                            //       message:
+                                            //           'Excel file exported to $path',
+                                            //       icon: Icon(
+                                            //         Icons
+                                            //             .check_circle_outline_rounded,
+                                            //         size: 28.0,
+                                            //         color: Colors.green[300],
+                                            //       ),
+                                            //       duration: const Duration(
+                                            //           milliseconds: 3000),
+                                            //       leftBarIndicatorColor:
+                                            //           Colors.green[300],
+                                            //     ).show(scaffoldKey
+                                            //         .currentContext!);
+                                            //   }
+                                            // }
+                                          },
+                                          child: const Text('Export'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ));
                 },
               ),
               IconButton(
@@ -1926,7 +2171,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     builder: (context) =>
                                                         BodyFormCustomerWrap(
                                                       uid: id,
-                                                      callback: () {},
                                                       attendance: true,
                                                     ),
                                                   ),
@@ -1989,7 +2233,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           DataCell(
                             IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
+                              onPressed: () async {
+                                if (!await checkPassword(
+                                    scaffoldKey.currentContext!, cid)) {
+                                  return;
+                                }
                                 // ask for confirmation
                                 String confirmMsg =
                                     'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?';
@@ -2001,7 +2249,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                       'It will delete the second shake of "${name.split(' ')[0]}" from the attendance list';
                                 }
                                 showDialog(
-                                  context: context,
+                                  context: scaffoldKey.currentContext!,
                                   builder: (BuildContext context) {
                                     return AlertDialog(
                                       title: const Text('Confirmation'),
@@ -2372,24 +2620,7 @@ class _DailyDetailsState extends State<DailyDetails> {
               Icons.file_download_outlined,
               color: Colors.grey,
             ),
-            onPressed: () {
-              //  export to excel
-              Flushbar(
-                margin: const EdgeInsets.all(7),
-                borderRadius: BorderRadius.circular(15),
-                flushbarStyle: FlushbarStyle.FLOATING,
-                flushbarPosition: FlushbarPosition.TOP,
-                message:
-                    "${format.format(selectedDate)} data exported to excel",
-                icon: Icon(
-                  Icons.check_circle_outline,
-                  size: 28.0,
-                  color: Colors.green[300],
-                ),
-                duration: const Duration(milliseconds: 2000),
-                leftBarIndicatorColor: Colors.green[300],
-              ).show(context);
-            },
+            onPressed: () {},
           ),
 
           // edit button
@@ -2603,10 +2834,14 @@ class _DailyDetailsState extends State<DailyDetails> {
                               IconButton(
                                 icon:
                                     const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
+                                onPressed: () async {
+                                  if (!await checkPassword(
+                                      scaffoldKey.currentContext!, cid)) {
+                                    return;
+                                  }
                                   // ask for confirmation
                                   showDialog(
-                                    context: context,
+                                    context: scaffoldKey.currentContext!,
                                     builder: (BuildContext context) {
                                       return AlertDialog(
                                         title: const Text('Confirmation'),
@@ -3008,7 +3243,11 @@ class _DailyDetailsState extends State<DailyDetails> {
                                           color: Colors.blue)
                                       : const Icon(Icons.delete_forever_rounded,
                                           color: Colors.red),
-                                  onPressed: () {
+                                  onPressed: () async {
+                                    if (!await checkPassword(
+                                        scaffoldKey.currentContext!, cid)) {
+                                      return;
+                                    }
                                     if (!isCustom) {
                                       Navigator.push(
                                         context,
@@ -3046,7 +3285,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                       );
                                     } else {
                                       showDialog(
-                                        context: context,
+                                        context: scaffoldKey.currentContext!,
                                         builder: (BuildContext context) {
                                           return AlertDialog(
                                             title: const Text('Confirmation'),
@@ -3112,7 +3351,9 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                         .currentContext!);
                                                     changeSubmitted(false);
                                                   } catch (e) {
-                                                    Navigator.of(context).pop();
+                                                    Navigator.of(scaffoldKey
+                                                            .currentContext!)
+                                                        .pop();
                                                     Flushbar(
                                                       margin:
                                                           const EdgeInsets.all(
@@ -3236,10 +3477,14 @@ class _DailyDetailsState extends State<DailyDetails> {
                               IconButton(
                                 icon:
                                     const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
+                                onPressed: () async {
+                                  if (!await checkPassword(
+                                      scaffoldKey.currentContext!, cid)) {
+                                    return;
+                                  }
                                   // ask for confirmation
                                   showDialog(
-                                    context: context,
+                                    context: scaffoldKey.currentContext!,
                                     builder: (BuildContext context) {
                                       return AlertDialog(
                                         title: const Text('Confirmation'),

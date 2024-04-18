@@ -130,8 +130,13 @@ class _BodyFormListState extends State<BodyFormList>
   }
 
   Future<void> setupDataListener() async {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ));
     _streamSubscription?.cancel();
-
     setState(() {
       userData = {};
     });
@@ -145,7 +150,7 @@ class _BodyFormListState extends State<BodyFormList>
           .child('users')
           .onValue;
       final event = await mystream.first;
-      userData = event.snapshot.value as Map<dynamic, dynamic>;
+      userData = (event.snapshot.value ?? {}) as Map<dynamic, dynamic>;
       filteredData = userData.entries.toList();
       getFilteredData();
       if (!completer.isCompleted) {
@@ -167,6 +172,9 @@ class _BodyFormListState extends State<BodyFormList>
       }
     }
     await completer.future;
+    await Future.delayed(const Duration(milliseconds: 500));
+    Navigator.of(_scaffoldKey.currentContext!, rootNavigator: true)
+        .pop('dialog');
   }
 
   @override
@@ -629,7 +637,7 @@ class _BodyFormListState extends State<BodyFormList>
                   child: OpenContainerWrapper(
                     page: BodyFormCustomerWrap(
                         uid: uid,
-                        callback: () => handleRefresh(fromPage: true)),
+                        callback: () async => handleRefresh(fromPage: true)),
                     content: Container(
                         decoration: const BoxDecoration(
                           border: Border(
@@ -743,7 +751,7 @@ class _BodyFormListState extends State<BodyFormList>
     );
   }
 
-  void handleRefresh({bool? fromPage}) async {
+  Future<void> handleRefresh({bool? fromPage}) async {
     final bool fromPagex = fromPage ?? false;
     if (fromPagex ||
         (lastRefreshTime == null ||

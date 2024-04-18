@@ -1,30 +1,35 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.flatrap.slimtrap">
     <uses-permission
-        android:name="android.permission.VIBRATE"/>
+        android:name="android.permission.VIBRATE" />
     <uses-permission
-        android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+        android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        android:maxSdkVersion="34"/>
+        android:maxSdkVersion="34" />
     <uses-permission
-        android:name="android.permission.ACCESS_NETWORK_STATE"/>
+        android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission
-        android:name="android.permission.USE_EXACT_ALARM"/>
+        android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission
-        android:name="android.permission.FOREGROUND_SERVICE"/>
+        android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission
-        android:name="android.permission.WAKE_LOCK"/>
+        android:name="android.permission.WAKE_LOCK" />
     <uses-permission
-        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission
-        android:name="android.permission.POST_NOTIFICATIONS"/>
+        android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
     <queries>
         <package
-            android:name="com.whatsapp"/>
+            android:name="com.whatsapp" />
     </queries>
     <application
         android:label="CoachZen"
+        android:requestLegacyExternalStorage="true"
         android:enableOnBackInvokedCallback="true"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
@@ -42,16 +47,16 @@
                  to determine the Window background behind the Flutter UI. -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme"/>
+                android:resource="@style/NormalTheme" />
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
-            android:value="2"/>
+            android:value="2" />
     </application>
 </manifest>

@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../components/products.dart';
 import '../components/ui/appbar.dart';
+import '../components/ui/passwordcheck.dart';
 import 'cust_order_form.dart';
 
 String formatDate(DateTime timestamp) {
@@ -101,7 +102,11 @@ class ProductsHistory extends StatelessWidget {
                             entry.value['timestamp']),
                         mode: entry.value['mode'],
                         updatedTimestamp: entry.value['updated'],
-                        onLongPress: (index) {
+                        onLongPress: (index) async {
+                          if (!await checkPassword(context,
+                              FirebaseAuth.instance.currentUser!.uid)) {
+                            return;
+                          }
                           if (!isCustom) {
                             Navigator.push(
                               context,
@@ -140,7 +145,7 @@ class ProductsHistory extends StatelessWidget {
                             }
                             isSubmited = true;
                             showDialog(
-                              context: context,
+                              context: scaffoldKey.currentContext!,
                               builder: (context) {
                                 return AlertDialog(
                                   title: const Text('Delete Order'),
