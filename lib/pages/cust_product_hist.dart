@@ -1,4 +1,6 @@
 // import 'package:cloud_firestore/cloud_firestore.dart';
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:another_flushbar/flushbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -14,6 +16,8 @@ String formatDate(DateTime timestamp) {
   String formattedDate = DateFormat('dd MMM yyyy').format(timestamp);
   return formattedDate;
 }
+
+final String cid = FirebaseAuth.instance.currentUser!.uid;
 
 class ProductsHistory extends StatelessWidget {
   final Map<dynamic, dynamic> products;
@@ -81,6 +85,7 @@ class ProductsHistory extends StatelessWidget {
                     children: sortedEntries.map((entry) {
                       final isCustom = entry.value['custom'] ?? false;
                       return ProductExpansionTile(
+                        uid: uid,
                         index: entry.key,
                         custom: isCustom,
                         products: entry.value['products'],
@@ -101,10 +106,274 @@ class ProductsHistory extends StatelessWidget {
                         timestamp: DateTime.fromMillisecondsSinceEpoch(
                             entry.value['timestamp']),
                         mode: entry.value['mode'],
+                        payments: Map<String, dynamic>.from(
+                            entry.value['payments'] ?? {}),
                         updatedTimestamp: entry.value['updated'],
                         onLongPress: (index) async {
-                          if (!await checkPassword(context,
-                              FirebaseAuth.instance.currentUser!.uid)) {
+                          if (entry.value['balance'] > 0) {
+                            bool? selected = await showDialog(
+                              context: scaffoldKey.currentContext!,
+                              builder: (context) {
+                                return AlertDialog(
+                                  title: const Text('Select an option'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        title: const Text('Add Payment'),
+                                        onTap: () {
+                                          TextEditingController
+                                              amountController =
+                                              TextEditingController();
+                                          final GlobalKey<FormState> formKey =
+                                              GlobalKey<FormState>();
+                                          String initalMode = 'Cash';
+                                          showDialog(
+                                              context:
+                                                  scaffoldKey.currentContext!,
+                                              builder:
+                                                  (context) => StatefulBuilder(
+                                                          builder: (contextx,
+                                                              StateSetter
+                                                                  setState) {
+                                                        return AlertDialog(
+                                                          title: const Text(
+                                                              'Add Payment'),
+                                                          content: Form(
+                                                            key: formKey,
+                                                            autovalidateMode:
+                                                                AutovalidateMode
+                                                                    .onUserInteraction,
+                                                            child: Column(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                TextFormField(
+                                                                  decoration:
+                                                                      InputDecoration(
+                                                                    labelText:
+                                                                        'Amount',
+                                                                    hintText:
+                                                                        "Remaining - ${entry.value['balance']}",
+                                                                  ),
+                                                                  keyboardType:
+                                                                      TextInputType
+                                                                          .number,
+                                                                  controller:
+                                                                      amountController,
+                                                                  validator:
+                                                                      (value) {
+                                                                    if (value ==
+                                                                            null ||
+                                                                        int.tryParse(value) ==
+                                                                            null) {
+                                                                      return 'Enter a valid amount';
+                                                                    } else if (int.parse(
+                                                                            value) <=
+                                                                        0) {
+                                                                      return 'Amount should be greater than 0';
+                                                                    } else if (int.parse(
+                                                                            value) >
+                                                                        entry.value[
+                                                                            'balance']) {
+                                                                      return 'Amount should be less than balance';
+                                                                    }
+                                                                    return null;
+                                                                  },
+                                                                ),
+                                                                SizedBox(
+                                                                    height:
+                                                                        width *
+                                                                            0.02),
+                                                                DropdownButtonFormField<
+                                                                    String>(
+                                                                  decoration:
+                                                                      const InputDecoration(
+                                                                    contentPadding:
+                                                                        EdgeInsets
+                                                                            .zero, // Remove any content padding
+                                                                    isDense:
+                                                                        true,
+                                                                    labelText:
+                                                                        'Mode',
+                                                                  ),
+                                                                  value:
+                                                                      initalMode,
+                                                                  items: [
+                                                                    'Cash',
+                                                                    'Online',
+                                                                    'Cheque',
+                                                                  ].map((String
+                                                                      value) {
+                                                                    return DropdownMenuItem<
+                                                                        String>(
+                                                                      value:
+                                                                          value,
+                                                                      child: Text(
+                                                                          value),
+                                                                    );
+                                                                  }).toList(),
+                                                                  onChanged:
+                                                                      (String?
+                                                                          newValue) {
+                                                                    setState(
+                                                                        () {
+                                                                      initalMode =
+                                                                          newValue ??
+                                                                              '';
+                                                                    });
+                                                                  },
+                                                                ),
+                                                                SizedBox(
+                                                                    height:
+                                                                        width *
+                                                                            0.02),
+                                                                ElevatedButton(
+                                                                  onPressed:
+                                                                      () async {
+                                                                    if (!formKey
+                                                                        .currentState!
+                                                                        .validate()) {
+                                                                      return;
+                                                                    }
+                                                                    try {
+                                                                      String newKey = FirebaseDatabase
+                                                                          .instance
+                                                                          .ref()
+                                                                          .push()
+                                                                          .key!;
+                                                                      final int
+                                                                          amount =
+                                                                          int.parse(
+                                                                              amountController.text);
+                                                                      Map<String,
+                                                                              dynamic>
+                                                                          updates =
+                                                                          {
+                                                                        'balance':
+                                                                            ServerValue.increment(-amount),
+                                                                        'payments/$newKey':
+                                                                            {
+                                                                          'amount':
+                                                                              amount,
+                                                                          'mode':
+                                                                              initalMode,
+                                                                          'timestamp':
+                                                                              ServerValue.timestamp,
+                                                                        },
+                                                                      };
+                                                                      await FirebaseDatabase
+                                                                          .instance
+                                                                          .ref()
+                                                                          .child(
+                                                                              'Coaches')
+                                                                          .child(
+                                                                              cid)
+                                                                          .child(
+                                                                              'users')
+                                                                          .child(
+                                                                              uid)
+                                                                          .child(
+                                                                              'productsHistory')
+                                                                          .child(entry
+                                                                              .key)
+                                                                          .update(
+                                                                              updates);
+                                                                      Navigator.pop(
+                                                                          contextx);
+                                                                      Navigator.pop(
+                                                                          context);
+                                                                      Navigator.pop(
+                                                                          context);
+                                                                      Navigator.pop(
+                                                                          context);
+                                                                      Flushbar(
+                                                                        margin: const EdgeInsets
+                                                                            .all(
+                                                                            7),
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(15),
+                                                                        flushbarStyle:
+                                                                            FlushbarStyle.FLOATING,
+                                                                        flushbarPosition:
+                                                                            FlushbarPosition.TOP,
+                                                                        message:
+                                                                            'Payment added successfully',
+                                                                        icon:
+                                                                            Icon(
+                                                                          Icons
+                                                                              .check_circle_outline,
+                                                                          size:
+                                                                              28.0,
+                                                                          color:
+                                                                              Colors.green[300],
+                                                                        ),
+                                                                        duration:
+                                                                            const Duration(milliseconds: 2000),
+                                                                        leftBarIndicatorColor:
+                                                                            Colors.green[300],
+                                                                      ).show(
+                                                                          context);
+                                                                    } catch (e) {
+                                                                      Navigator.pop(
+                                                                          contextx);
+                                                                      Flushbar(
+                                                                        margin: const EdgeInsets
+                                                                            .all(
+                                                                            7),
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(15),
+                                                                        flushbarStyle:
+                                                                            FlushbarStyle.FLOATING,
+                                                                        flushbarPosition:
+                                                                            FlushbarPosition.TOP,
+                                                                        message:
+                                                                            'Error adding payment',
+                                                                        icon:
+                                                                            Icon(
+                                                                          Icons
+                                                                              .error_outline_rounded,
+                                                                          size:
+                                                                              28.0,
+                                                                          color:
+                                                                              Colors.red[300],
+                                                                        ),
+                                                                        duration:
+                                                                            const Duration(milliseconds: 3000),
+                                                                        leftBarIndicatorColor:
+                                                                            Colors.red[300],
+                                                                      ).show(
+                                                                          context);
+                                                                    }
+                                                                  },
+                                                                  child:
+                                                                      const Text(
+                                                                          'Add'),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }));
+                                        },
+                                      ),
+                                      ListTile(
+                                        title: const Text('Edit'),
+                                        onTap: () {
+                                          Navigator.pop(context, true);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                            if (selected == null || !selected) {
+                              return;
+                            }
+                          }
+                          if (!await checkPassword(context, cid)) {
                             return;
                           }
                           if (!isCustom) {
@@ -135,6 +404,8 @@ class ProductsHistory extends StatelessWidget {
                                     'chosenDate': entry.value['chosenDate'],
                                     'timestamp': entry.value['timestamp'],
                                     'mode': entry.value['mode'],
+                                    'payments': Map<String, dynamic>.from(
+                                        entry.value['payments'] ?? {}),
                                   },
                                 ),
                               ),
@@ -170,8 +441,7 @@ class ProductsHistory extends StatelessWidget {
                                           await FirebaseDatabase.instance
                                               .ref()
                                               .child('Coaches')
-                                              .child(FirebaseAuth
-                                                  .instance.currentUser!.uid)
+                                              .child(cid)
                                               .update(updates);
                                           Navigator.of(
                                                   scaffoldKey.currentContext!)
@@ -270,12 +540,14 @@ class ProductsHistory extends StatelessWidget {
 }
 
 class ProductExpansionTile extends StatefulWidget {
+  final String uid;
   final bool custom;
   final String formattedDate;
   final DateTime chosenDate;
   final DateTime timestamp;
   final int? updatedTimestamp;
   final Map<dynamic, dynamic> products;
+  final Map<String, dynamic> payments;
   final int total;
   final String discountMode;
   final int? discountManual;
@@ -291,12 +563,14 @@ class ProductExpansionTile extends StatefulWidget {
   final void Function(String) onLongPress;
 
   const ProductExpansionTile({
+    required this.uid,
     required this.custom,
     required this.formattedDate,
     required this.chosenDate,
     required this.timestamp,
     this.updatedTimestamp,
     required this.products,
+    required this.payments,
     required this.total,
     required this.discountMode,
     this.discountManual,
@@ -322,25 +596,38 @@ class _ProductExpansionTileState extends State<ProductExpansionTile> {
   late String timeAgo;
   String discText = 'Discount';
   int? actShakeMateCost;
+  bool isSubmited = false;
 
   // reusable text widget
-  Widget rowText(String text, String text2, double width, double height) {
+  Widget rowText(String text, String text2, double width, double height,
+      {bool isIcon = false, void Function()? onPressed}) {
     return Padding(
       padding: EdgeInsets.only(
-        left: width * 0.05,
+        left: isIcon ? width * 0.02 : width * 0.05,
         right: width * 0.05,
         top: width * 0.03,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            text,
-            style: GoogleFonts.poppins(
-              color: Colors.black38,
-              fontSize: width * 0.05,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              if (isIcon)
+                IconButton(
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onPressed,
+                    icon: Icon(Icons.delete,
+                        color: Colors.white, size: width * 0.04)),
+              Text(
+                text,
+                style: GoogleFonts.poppins(
+                  color: Colors.black38,
+                  fontSize: width * 0.05,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
           Text(
             text2,
@@ -592,6 +879,111 @@ class _ProductExpansionTileState extends State<ProductExpansionTile> {
                         width,
                         height),
                   rowText('Paid:', '₹${widget.paid}', width, height),
+                  ...widget.payments.entries.map((entry) {
+                    return rowText(
+                      '${DateFormat('dd/MM/yy').format(DateTime.fromMillisecondsSinceEpoch(entry.value['timestamp']))} (${entry.value['mode']}):',
+                      '₹${entry.value['amount']}',
+                      width,
+                      height,
+                      isIcon: true,
+                      onPressed: () async {
+                        showDialog(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: const Text('Delete Payment'),
+                                content: const Text(
+                                    'Are you sure you want to delete this payment?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      try {
+                                        if (!await checkPassword(
+                                            context, cid)) {
+                                          return;
+                                        }
+                                      } catch (e) {
+                                        return;
+                                      }
+                                      if (isSubmited) {
+                                        return;
+                                      }
+                                      isSubmited = true;
+                                      try {
+                                        Map<String, dynamic> updates = {
+                                          'balance': ServerValue.increment(
+                                              entry.value['amount']),
+                                          'payments/${entry.key}': null,
+                                        };
+
+                                        await FirebaseDatabase.instance
+                                            .ref()
+                                            .child('Coaches')
+                                            .child(cid)
+                                            .child('users')
+                                            .child(widget.uid)
+                                            .child('productsHistory')
+                                            .child(widget.index)
+                                            .update(updates);
+                                        Navigator.pop(context);
+                                        Navigator.pop(context);
+                                        Navigator.pop(context);
+                                        Flushbar(
+                                          margin: const EdgeInsets.all(7),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
+                                          flushbarStyle: FlushbarStyle.FLOATING,
+                                          flushbarPosition:
+                                              FlushbarPosition.TOP,
+                                          message:
+                                              'Payment deleted successfully',
+                                          icon: Icon(
+                                            Icons.check_circle_outline,
+                                            size: 28.0,
+                                            color: Colors.green[300],
+                                          ),
+                                          duration: const Duration(
+                                              milliseconds: 2000),
+                                          leftBarIndicatorColor:
+                                              Colors.green[300],
+                                        ).show(context);
+                                      } catch (e) {
+                                        Navigator.pop(context);
+                                        Flushbar(
+                                          margin: const EdgeInsets.all(7),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
+                                          flushbarStyle: FlushbarStyle.FLOATING,
+                                          flushbarPosition:
+                                              FlushbarPosition.TOP,
+                                          message: 'Error deleting payment',
+                                          icon: Icon(
+                                            Icons.error_outline_rounded,
+                                            size: 28.0,
+                                            color: Colors.red[300],
+                                          ),
+                                          duration: const Duration(
+                                              milliseconds: 3000),
+                                          leftBarIndicatorColor:
+                                              Colors.red[300],
+                                        ).show(context);
+                                          isSubmited = false;
+                                      }
+                                    },
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              );
+                            });
+                      },
+                    );
+                  }),
                   if (widget.balance > 0)
                     rowText('Balance:', '₹${widget.balance}', width, height),
                 ],

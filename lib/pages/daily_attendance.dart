@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:coach_zen/pages/body_form_cust.dart';
 import 'package:coach_zen/pages/cust_order_form.dart';
@@ -11,12 +12,15 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/ui/appbar.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../components/products.dart';
 import '../components/ui/passwordcheck.dart';
 import 'package:excel/excel.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 final DateFormat format = DateFormat('dd MMM yyyy');
 final DateTime today = DateTime.now();
@@ -65,6 +69,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   TextEditingController customPlanDays = TextEditingController();
   String initalMode = 'Cash';
   bool submitted = false;
+  late Map<dynamic, dynamic> alldata = {};
   Color studentBox = const Color.fromARGB(255, 189, 189, 189);
   List<Map<dynamic, dynamic>> sortedPresentStudents = [];
   late String formattedDate;
@@ -91,470 +96,502 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
   Future<void> initializeData() async {
     // Set up data listener and wait for initial data to be fetched
-    await setupDataListener(selectedDate);
+    _streamSubscription?.cancel();
+    mystream = coachDb.child(cid).onValue;
+    _streamSubscription = mystream.listen((event) async {
+      datas += 1;
+      debugPrint('got data - $datas');
+      setState(() {
+        alldata = event.snapshot.value;
+      });
+      await setupDataListener(selectedDate);
+    });
 
     // print('7 initialized');
   }
 
   Future<void> setupDataListener(DateTime selectedDate) async {
     // Close the previous listener if it exists
-    _streamSubscription?.cancel();
     formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
     setState(() {
       sortedPresentStudents = [];
     });
 
-    mystream = coachDb.child(cid).onValue;
     final completer = Completer<void>();
     // final event = await mystream.first;
     // Set up the new listener
-    _streamSubscription = mystream.listen((event) {
-      try {
-        if (mounted) {
-          datas += 1;
-          debugPrint('got data - $datas');
-          final eventData = event.snapshot.value;
-
+    try {
+      if (mounted) {
+        final eventData = alldata;
 // Process attendance data
-          final attendanceData = eventData['attendance'] != null
-              ? eventData['attendance'][formattedDate]
-              : null;
-          final presentStudents = attendanceData != null
-              ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
-              : {};
+        final attendanceData = eventData['attendance'] != null
+            ? eventData['attendance'][formattedDate]
+            : null;
+        final presentStudents = attendanceData != null
+            ? Map<dynamic, dynamic>.from(attendanceData['students'] ?? {})
+            : {};
 
-          List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
+        List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
 
-          // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
-          presentStudents.forEach((studentId, studentData) {
-            // Check if shakes > 1
-            if ((studentData['shakes'] as int) > 1) {
-              // Add student twice if shakes > 1
-              tempSortedPresentStudents.add({
-                'id': studentId,
-                'time': studentData['time'],
-                'home': true,
-              });
-              tempSortedPresentStudents.add({
-                'id': studentId,
-                'time': studentData['time'],
-                'second': true,
-              });
-            } else {
-              // Add student once if shakes <= 1
-              tempSortedPresentStudents.add({
-                'id': studentId,
-                'time': studentData['time'],
-              });
+        // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
+        presentStudents.forEach((studentId, studentData) {
+          // Check if shakes > 1
+          if ((studentData['shakes'] as int) > 1) {
+            // Add student twice if shakes > 1
+            tempSortedPresentStudents.add({
+              'id': studentId,
+              'time': studentData['time'],
+              'home': true,
+            });
+            tempSortedPresentStudents.add({
+              'id': studentId,
+              'time': studentData['time'],
+              'second': true,
+            });
+          } else {
+            // Add student once if shakes <= 1
+            tempSortedPresentStudents.add({
+              'id': studentId,
+              'time': studentData['time'],
+            });
+          }
+        });
+        final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
+            tempSortedPresentStudents;
+
+        // Process users data
+        final usersData = eventData['users'] ?? {};
+        final updatedUsers = usersData.entries.map((entry) {
+          final key = entry.key;
+          final userData = entry.value;
+          int totalDays = -1;
+
+          // Iterate through entries in 'days' map
+          (userData['days'] as Map?)?.forEach((key, value) {
+            // Convert key to date
+            final keyDate = DateTime.parse(key);
+
+            // Check if key date is before or at the same moment as selected date
+            if (keyDate.isBefore(selectedDate) ||
+                keyDate.isAtSameMomentAs(selectedDate)) {
+              totalDays += (value['shakes'] as int);
             }
           });
-          final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
-              tempSortedPresentStudents;
 
-          // Process users data
-          final usersData = eventData['users'] ?? {};
-          final updatedUsers = usersData.entries.map((entry) {
-            final key = entry.key;
-            final userData = entry.value;
-            int totalDays = -1;
-
-            // Iterate through entries in 'days' map
-            (userData['days'] as Map?)?.forEach((key, value) {
-              // Convert key to date
-              final keyDate = DateTime.parse(key);
-
-              // Check if key date is before or at the same moment as selected date
-              if (keyDate.isBefore(selectedDate) ||
-                  keyDate.isAtSameMomentAs(selectedDate)) {
-                totalDays += (value['shakes'] as int);
+          // final userPayments = Map.from(userData['payments'] ?? {});
+          // get all payments till selected date
+          int amountPaidTillNow = 0;
+          int day0PaidTillNow = 0;
+          int day3PaidTillNow = 0;
+          final Map<dynamic, dynamic> payments = userData['payments'] ?? {};
+          if (payments.isNotEmpty) {
+            payments.forEach((key, value) {
+              final paymentDate = DateTime.parse(key);
+              if (paymentDate.isBefore(selectedDate) ||
+                  paymentDate.isAtSameMomentAs(selectedDate)) {
+                amountPaidTillNow += value['totalAmount'] as int;
+                for (String planKey in value.keys) {
+                  if (planKey != 'totalAmount') {
+                    final planData = value[planKey];
+                    if (planData['program'] == '0 day') {
+                      day0PaidTillNow += planData['amount'] as int;
+                    } else if (planData['program'] == '3 day') {
+                      day3PaidTillNow += planData['amount'] as int;
+                    }
+                  }
+                }
               }
             });
+          }
+          final bool onHomeProgram = userData['homeProgram'] != null &&
+              userData['homeProgram'][formattedDate] != null;
 
-            // final userPayments = Map.from(userData['payments'] ?? {});
-            // get all payments till selected date
-            int amountPaidTillNow = 0;
-            int day0PaidTillNow = 0;
-            int day3PaidTillNow = 0;
-            final Map<dynamic, dynamic> payments = userData['payments'] ?? {};
-            if (payments.isNotEmpty) {
-              payments.forEach((key, value) {
-                final paymentDate = DateTime.parse(key);
-                if (paymentDate.isBefore(selectedDate) ||
-                    paymentDate.isAtSameMomentAs(selectedDate)) {
-                  amountPaidTillNow += value['totalAmount'] as int;
-                  for (String planKey in value.keys) {
-                    if (planKey != 'totalAmount') {
-                      final planData = value[planKey];
-                      if (planData['program'] == '0 day') {
-                        day0PaidTillNow += planData['amount'] as int;
-                      } else if (planData['program'] == '3 day') {
-                        day3PaidTillNow += planData['amount'] as int;
-                      }
-                    }
-                  }
-                }
-              });
-            }
-            final bool onHomeProgram = userData['homeProgram'] != null &&
-                userData['homeProgram'][formattedDate] != null;
+          final int day = totalDays;
+          bool rerun = false;
+          int? reRunIndex;
 
-            final int day = totalDays;
-
-            final gotPlan = getPlan(day);
-            int totalBalance = gotPlan['balance'];
-            int realBalance = totalBalance - amountPaidTillNow;
-            String days = gotPlan['day'];
-            String planName = gotPlan['plan'];
-            Map<String, int> allBalances = {};
-            Map<String, int> actualBalances = {};
-            Map<String, String> prevPlanBalances = {};
-            bool remindExistingPlan = false;
-            bool existingPlan = false;
-            String? planDate;
-            // int planDays = 0;
-            int reTempAllPlanDays = 4;
-            int tempAllPlanDays = 4;
-            int planDays = 0;
-            final bool advancedPaymentx =
-                userData['advancedPayments'] != null &&
-                    userData['advancedPayments']['pid'] != null;
-            // ----------------------
-
-            if (day0PaidTillNow < 200) {
-              int tempBal = 200 - (day0PaidTillNow);
-              allBalances['0 day'] = tempBal;
-            }
-            if (day > 1 && day3PaidTillNow < 720) {
-              int tempBal = 720 - (day3PaidTillNow);
-              allBalances['3 day'] = tempBal;
-            }
-
-            // ----------------------
-            if (day > 4) {
-              String rePlanName = '';
-              String planStatus = '';
-              String? image = userData['image'];
-              final String uid = key;
-              String gender = userData['gender'];
-              final int userDays = userData['days'].keys.length;
-
-              if (userData['existed'] != null) {
-                rePlanName = 'Not Started';
-                planStatus = 'No Plans';
+          if (presentStudents.containsKey(key)) {
+            for (Map<dynamic, dynamic> student in sortedPresentStudentsx) {
+              bool isHome = student['home'] != null;
+              bool isSecond = student['second'] != null;
+              if (student['id'] == key &&
+                  (isHome || onHomeProgram) &&
+                  !isSecond) {
+                rerun = true;
+                reRunIndex = sortedPresentStudentsx.indexOf(student);
               }
+            }
+          }
 
-              // ---------------------------------
+          final gotPlan = getPlan(day);
+          int totalBalance = gotPlan['balance'];
+          int realBalance = totalBalance - amountPaidTillNow;
+          String days = gotPlan['day'];
+          String planName = gotPlan['plan'];
+          Map<String, int> allBalances = {};
+          Map<String, int> actualBalances = {};
+          Map<String, String> prevPlanBalances = {};
+          bool remindExistingPlan = false;
+          bool existingPlan = false;
+          String? planDate;
+          // int planDays = 0;
+          int reTempAllPlanDays = 4;
+          int tempAllPlanDays = 4;
+          int planDays = 0;
+          final bool advancedPaymentx = userData['advancedPayments'] != null &&
+              userData['advancedPayments']['pid'] != null;
+          // ----------------------
 
-              final plansPaid = userData['plansPaid'];
-              if (plansPaid != null) {
-                final actDay0 = plansPaid['0 day'] ?? 0;
-                final actDay3 = plansPaid['3 day'] ?? 0;
-                if (actDay0 < 200) {
-                  int tempBal = 200 - (actDay0 as int);
-                  actualBalances['0 day'] = tempBal;
-                }
-                if (actDay3 < 720) {
-                  int tempBal = 720 - (actDay3 as int);
-                  actualBalances['3 day'] = tempBal;
-                }
-              } else {
-                actualBalances['0 day'] = 200;
-                actualBalances['3 day'] = 720;
+          if (day0PaidTillNow < 200) {
+            int tempBal = 200 - (day0PaidTillNow);
+            allBalances['0 day'] = tempBal;
+          }
+          if (day > 1 && day3PaidTillNow < 720) {
+            int tempBal = 720 - (day3PaidTillNow);
+            allBalances['3 day'] = tempBal;
+          }
+
+          // ----------------------
+          if (day > 4) {
+            String rePlanName = '';
+            String planStatus = '';
+            String? image = userData['image'];
+            final String uid = key;
+            String gender = userData['gender'];
+            final int userDays = userData['days'].keys.length;
+
+            if (userData['existed'] != null) {
+              rePlanName = 'Not Started';
+              planStatus = 'No Plans';
+            }
+
+            // ---------------------------------
+
+            final plansPaid = userData['plansPaid'];
+            if (plansPaid != null) {
+              final actDay0 = plansPaid['0 day'] ?? 0;
+              final actDay3 = plansPaid['3 day'] ?? 0;
+              if (actDay0 < 200) {
+                int tempBal = 200 - (actDay0 as int);
+                actualBalances['0 day'] = tempBal;
               }
-              final user = userData;
-              final String id = key;
-              final plans = user['plans'];
-              if (plans != null) {
-                List sortAllKeys = userData['plans'].keys.toList();
-                sortAllKeys.sort((a, b) => a.compareTo(b));
-                int allPlansCost = 0;
-                // final allDaysMap = user['days'];
-                // check if today's date comes in between any plan
-                for (String key in sortAllKeys) {
-                  final plan = userData['plans'][key];
+              if (actDay3 < 720) {
+                int tempBal = 720 - (actDay3 as int);
+                actualBalances['3 day'] = tempBal;
+              }
+            } else {
+              actualBalances['0 day'] = 200;
+              actualBalances['3 day'] = 720;
+            }
+            final user = userData;
+            final String id = key;
+            final plans = user['plans'];
+            if (plans != null) {
+              List sortAllKeys = userData['plans'].keys.toList();
+              sortAllKeys.sort((a, b) => a.compareTo(b));
+              int allPlansCost = 0;
+              // final allDaysMap = user['days'];
+              // check if today's date comes in between any plan
+              for (String key in sortAllKeys) {
+                final plan = userData['plans'][key];
 
-                  if (plansPaid != null) {
-                    int bal = plan['balance'] as int;
-                    String planName = plan['program'];
-                    if (bal != 0) {
-                      actualBalances[planName] = bal;
-                      prevPlanBalances[planName] = key;
-                    }
-                    int planPaid = 0;
-                    Map<dynamic, dynamic> planPaymentDates =
-                        plan['payments'] ?? {};
-                    // remove any date after today
-                    planPaymentDates.removeWhere((key, value) {
-                      final planPaymentDate = DateTime.parse(value);
-                      return planPaymentDate.isAfter(selectedDate);
-                    });
-                    if (planPaymentDates.isNotEmpty) {
-                      for (String key in planPaymentDates.keys) {
-                        final paymentId = key;
-                        final datex = planPaymentDates[key];
-                        planPaid +=
-                            user['payments'][datex][paymentId]['amount'] as int;
-                      }
-                    }
-                    int planCost =
-                        ((user['plans'][key]['days'] as int) * shakePrice);
-                    final int finBal = planCost - planPaid;
-                    if (finBal != 0) {
-                      allBalances[plans[key]['program']] = finBal;
+                if (plansPaid != null) {
+                  int bal = plan['balance'] as int;
+                  String planName = plan['program'];
+                  if (bal != 0) {
+                    actualBalances[planName] = bal;
+                    prevPlanBalances[planName] = key;
+                  }
+                  int planPaid = 0;
+                  Map<dynamic, dynamic> planPaymentDates =
+                      plan['payments'] ?? {};
+                  // remove any date after today
+                  planPaymentDates.removeWhere((key, value) {
+                    final planPaymentDate = DateTime.parse(value);
+                    return planPaymentDate.isAfter(selectedDate);
+                  });
+                  if (planPaymentDates.isNotEmpty) {
+                    for (String key in planPaymentDates.keys) {
+                      final paymentId = key;
+                      final datex = planPaymentDates[key];
+                      planPaid +=
+                          user['payments'][datex][paymentId]['amount'] as int;
                     }
                   }
-
-                  rePlanName = plan['program'];
-                  planDays = plan['days'] as int;
-                  if (!existingPlan) {
-                    tempAllPlanDays += planDays;
+                  int planCost =
+                      ((user['plans'][key]['days'] as int) * shakePrice);
+                  final int finBal = planCost - planPaid;
+                  if (finBal != 0) {
+                    allBalances[plans[key]['program']] = finBal;
                   }
-                  reTempAllPlanDays += planDays;
-                  allPlansCost += planDays * shakePrice;
+                }
 
+                rePlanName = plan['program'];
+                planDays = plan['days'] as int;
+                if (!existingPlan) {
+                  tempAllPlanDays += planDays;
+                }
+                reTempAllPlanDays += planDays;
+                allPlansCost += planDays * shakePrice;
+
+                if (rerun && reRunIndex != null) {
                   if (!existingPlan &&
                       presentStudents.containsKey(id) &&
-                      (day <= tempAllPlanDays)) {
+                      ((day - 1) <= tempAllPlanDays)) {
                     final program = plan['program'];
-                    existingPlan = true;
-                    planDate = key;
-                    int cDay = day - (tempAllPlanDays - planDays);
-                    final int planStartDay = (tempAllPlanDays - planDays) + 1;
-                    final List userDates = user['days'].keys.toList();
-                    userDates.sort((a, b) => a.compareTo(b));
-
-                    if (planDate != userDates[planStartDay]) {
-                      final String newDate = userDates[planStartDay];
-                      String paymentId = plan['payments'].keys.first;
-                      String paymentDate = plan['payments'][paymentId];
-                      final Map<String, dynamic> updates = {
-                        'users/$id/plans/$planDate': null,
-                        'users/$id/plans/$newDate': plan,
-                        'users/$id/plansPaid/$program/$planDate': null,
-                        'users/$id/plansPaid/$program/$newDate':
-                            user['plansPaid'][program][planDate],
-                        'attendance/$paymentDate/fees/$paymentId/planId':
-                            newDate,
-                        'users/$id/payments/$paymentDate/$paymentId/planId':
-                            newDate,
-                      };
-                      coachDb.child(cid).update(updates);
-                    }
-
+                    final int cDay = (day - 1) - (tempAllPlanDays - planDays);
                     final gotNewPlan = getPlan(cDay,
                         assignedPlanDays: planDays, planName: program);
-                    days = gotNewPlan['day'];
-                    planName = gotNewPlan['plan'];
-                    const int fiveDayCost = 920;
-                    realBalance =
-                        (allPlansCost + fiveDayCost) - amountPaidTillNow;
-                    debugPrint('$amountPaidTillNow sd');
-                    debugPrint('New Plan: $amountPaidTillNow');
-                  }
-
-                  if (userDays <= reTempAllPlanDays) {
-                    remindExistingPlan = true;
-                    final int daysLeft = reTempAllPlanDays - userDays;
-                    planStatus =
-                        daysLeft > 0 ? '$daysLeft days left' : 'Expires today';
-                    if (daysLeft < 7) {
-                      reminderList[uid] = {
-                        'name': userData['name'],
-                        'phone': '+91${userData['phone']}',
-                        'planName': rePlanName,
-                        'planColor': 'orange',
-                        'planStatus': planStatus,
-                        'gender': gender,
-                        'image': image,
-                      };
-                    }
+                    sortedPresentStudentsx[reRunIndex]['days'] =
+                        gotNewPlan['day'];
+                    sortedPresentStudentsx[reRunIndex]['plan'] =
+                        gotNewPlan['plan'];
                   }
                 }
 
-                if (!existingPlan) {
-                  final int currentDay = day - tempAllPlanDays;
-                  if (currentDay == 1 && advancedPaymentx) {
-                    // query to firebase to set plan
-                    final DatabaseReference dbRef = coachDb.child(cid);
-                    final Map<dynamic, dynamic> pid =
-                        user['advancedPayments']['pid'];
-                    final int pidAmount = pid['amount'] as int;
-                    // remove amount from advanced payments
-                    pid.remove('amount');
-                    final String program = pid['program'];
-                    final String paymentId = pid['payments'].keys.first;
-                    final String paymentDate = pid['payments'][paymentId];
+                if (!existingPlan &&
+                    presentStudents.containsKey(id) &&
+                    (day <= tempAllPlanDays)) {
+                  final program = plan['program'];
+                  existingPlan = true;
+                  planDate = key;
+                  int cDay = day - (tempAllPlanDays - planDays);
+                  final int planStartDay = (tempAllPlanDays - planDays) + 1;
+                  final List userDates = user['days'].keys.toList();
+                  userDates.sort((a, b) => a.compareTo(b));
 
+                  if (planDate != userDates[planStartDay]) {
+                    final String newDate = userDates[planStartDay];
+                    String paymentId = plan['payments'].keys.first;
+                    String paymentDate = plan['payments'][paymentId];
                     final Map<String, dynamic> updates = {
-                      'users/$id/plans/$formattedDate': pid,
-                      'users/$id/plansPaid/$program/$formattedDate': pidAmount,
-                      'users/$id/advancedPayments': null,
-                      'attendance/$paymentDate/fees/$paymentId/planId':
-                          formattedDate,
+                      'users/$id/plans/$planDate': null,
+                      'users/$id/plans/$newDate': plan,
+                      'users/$id/plansPaid/$program/$planDate': null,
+                      'users/$id/plansPaid/$program/$newDate': user['plansPaid']
+                          [program][planDate],
+                      'attendance/$paymentDate/fees/$paymentId/planId': newDate,
                       'users/$id/payments/$paymentDate/$paymentId/planId':
-                          formattedDate,
+                          newDate,
                     };
-                    dbRef.update(updates);
+                    coachDb.child(cid).update(updates);
                   }
-                  days = '$currentDay / $currentDay';
-                  // actualBalances['Paid'] = (currentDay * shakePrice);
-                  allBalances['Extra ${currentDay}days'] =
-                      currentDay * shakePrice;
+
+                  final gotNewPlan = getPlan(cDay,
+                      assignedPlanDays: planDays, planName: program);
+                  days = gotNewPlan['day'];
+                  planName = gotNewPlan['plan'];
+                  const int fiveDayCost = 920;
+                  realBalance =
+                      (allPlansCost + fiveDayCost) - amountPaidTillNow;
+                  debugPrint('$amountPaidTillNow sd');
+                  debugPrint('New Plan: $amountPaidTillNow');
                 }
 
-                if (!remindExistingPlan) {
-                  planStatus = 'Expired';
-                  reminderList[uid] = {
-                    'name': userData['name'],
-                    'phone': '+91${userData['phone']}',
-                    'planName': rePlanName,
-                    'planColor': 'red',
-                    'planStatus': planStatus,
-                    'gender': gender,
-                    'image': image,
-                  };
+                if (userDays <= reTempAllPlanDays) {
+                  remindExistingPlan = true;
+                  final int daysLeft = reTempAllPlanDays - userDays;
+                  planStatus =
+                      daysLeft > 0 ? '$daysLeft days left' : 'Expires today';
+                  if (daysLeft < 7) {
+                    reminderList[uid] = {
+                      'name': userData['name'],
+                      'phone': '+91${userData['phone']}',
+                      'planName': rePlanName,
+                      'planColor': 'orange',
+                      'planStatus': planStatus,
+                      'gender': gender,
+                      'image': image,
+                    };
+                  }
                 }
-              } else {
+              }
+
+              if (rerun && reRunIndex != null) {
+                final int currentDay = (day - 1) - tempAllPlanDays;
+                sortedPresentStudentsx[reRunIndex]['days'] =
+                    '$currentDay / $currentDay';
+              }
+
+              if (!existingPlan) {
                 final int currentDay = day - tempAllPlanDays;
+                if (currentDay == 1 && advancedPaymentx) {
+                  // query to firebase to set plan
+                  final DatabaseReference dbRef = coachDb.child(cid);
+                  final Map<dynamic, dynamic> pid =
+                      user['advancedPayments']['pid'];
+                  final int pidAmount = pid['amount'] as int;
+                  // remove amount from advanced payments
+                  pid.remove('amount');
+                  final String program = pid['program'];
+                  final String paymentId = pid['payments'].keys.first;
+                  final String paymentDate = pid['payments'][paymentId];
+
+                  final Map<String, dynamic> updates = {
+                    'users/$id/plans/$formattedDate': pid,
+                    'users/$id/plansPaid/$program/$formattedDate': pidAmount,
+                    'users/$id/advancedPayments': null,
+                    'attendance/$paymentDate/fees/$paymentId/planId':
+                        formattedDate,
+                    'users/$id/payments/$paymentDate/$paymentId/planId':
+                        formattedDate,
+                  };
+                  dbRef.update(updates);
+                }
                 days = '$currentDay / $currentDay';
                 // actualBalances['Paid'] = (currentDay * shakePrice);
                 allBalances['Extra ${currentDay}days'] =
                     currentDay * shakePrice;
               }
-              SharedPreferences.getInstance().then((prefs) {
-                final reminderListJSON = jsonEncode(reminderList);
-                prefs.setString('reminderList', reminderListJSON);
-              });
+
+              if (!remindExistingPlan) {
+                planStatus = 'Expired';
+                reminderList[uid] = {
+                  'name': userData['name'],
+                  'phone': '+91${userData['phone']}',
+                  'planName': rePlanName,
+                  'planColor': 'red',
+                  'planStatus': planStatus,
+                  'gender': gender,
+                  'image': image,
+                };
+              }
+            } else {
+              final int currentDay = day - tempAllPlanDays;
+              days = '$currentDay / $currentDay';
+              // actualBalances['Paid'] = (currentDay * shakePrice);
+              allBalances['Extra ${currentDay}days'] = currentDay * shakePrice;
             }
-
-            return {
-              'id': key,
-              'name': userData['name'],
-              'phone': userData['phone'],
-              'paid': userData['paid'],
-              'productsHistory': userData['productsHistory'],
-              'days': userData['days'],
-              'payments': userData['payments'],
-              'homeProgram': userData['homeProgram'],
-              'advancedPayments': userData['advancedPayments'],
-              'totalDays': totalDays,
-              'amountPaidTillNow': {
-                'total': amountPaidTillNow,
-                '0 day': day0PaidTillNow,
-                '3 day': day3PaidTillNow,
-              },
-              'plansPaid': userData['plansPaid'],
-              'plans': userData['plans'],
-              'onHomeProgram': onHomeProgram,
-              'gender': userData['gender'],
-              'image': userData['image'],
-              'advancedPaymentx': advancedPaymentx,
-              'tempAllPlanDays': tempAllPlanDays,
-              'planDays': planDays,
-              'planDate': planDate,
-              'existingPlan': existingPlan,
-              'allBalances': allBalances,
-              'actualBalances': actualBalances,
-              'prevPlanBalances': prevPlanBalances,
-              'realBalance': realBalance,
-              'planName': planName,
-              'daysString': days,
-              'day': day,
-            };
-          }).toList();
-
-          // process home program data
-          final homeProgramData = eventData['attendance'] != null
-              ? eventData['attendance'][formattedDate]
-              : null;
-
-          List<Map<dynamic, dynamic>> homeProgramx = [];
-          if (homeProgramData != null &&
-              homeProgramData['homeProgram'] != null) {
-            homeProgramx = List<Map<dynamic, dynamic>>.from(
-                homeProgramData['homeProgram'].values);
-          }
-
-          // Process products history data
-          final Map<dynamic, dynamic> productsHistoryData =
-              attendanceData != null
-                  ? attendanceData['productsHistory'] != null
-                      ? Map<dynamic, dynamic>.from(
-                          attendanceData['productsHistory'])
-                      : {}
-                  : {};
-
-          // Update state
-          setState(() {
-            users = updatedUsers;
-            homeProgram = homeProgramx;
-            presentStudentsUID = presentStudents;
-            sortedPresentStudents = sortedPresentStudentsx;
-            allUsers = usersData;
-            allAttendanceData = eventData['attendance'] ?? {};
-            zdays = presentStudents.keys
-                .where((student) =>
-                    users.firstWhere(
-                        (user) => user['id'] == student)['totalDays'] ==
-                    0)
-                .length;
-            productsHistory = productsHistoryData;
-            clubFees = [];
-            revenue = 0;
-          });
-
-          // sort the present students
-          sortedPresentStudents.sort((a, b) {
-            final int timeA = a['time'];
-            final int timeB = b['time'];
-            return timeB.compareTo(timeA);
-          });
-
-          // Process club fees data
-          final clubFeesData =
-              attendanceData != null ? attendanceData['fees'] : null;
-          if (clubFeesData != null) {
-            final clubFeesDataMap = Map<String, dynamic>.from(clubFeesData);
-            clubFeesDataMap.forEach((key, clubFeeData) {
-              setState(() {
-                clubFees.add({
-                  'uid': clubFeeData['uid'],
-                  'program': clubFeeData['program'],
-                  'mode': clubFeeData['mode'],
-                  'amount': clubFeeData['amount'],
-                  'balance': clubFeeData['balance'],
-                  'paymentId': key,
-                  'planId': clubFeeData['planId'],
-                  'advancedPayment': clubFeeData['advancedPayment'],
-                });
-                revenue += clubFeeData['amount'] as int;
-              });
+            SharedPreferences.getInstance().then((prefs) {
+              final reminderListJSON = jsonEncode(reminderList);
+              prefs.setString('reminderList', reminderListJSON);
             });
           }
 
-          if (!completer.isCompleted) {
-            completer
-                .complete(); // Resolve the Completer when the first event is received
-          }
+          return {
+            'id': key,
+            'name': userData['name'],
+            'phone': userData['phone'],
+            'paid': userData['paid'],
+            'productsHistory': userData['productsHistory'],
+            'days': userData['days'],
+            'payments': userData['payments'],
+            'homeProgram': userData['homeProgram'],
+            'advancedPayments': userData['advancedPayments'],
+            'totalDays': totalDays,
+            'amountPaidTillNow': {
+              'total': amountPaidTillNow,
+              '0 day': day0PaidTillNow,
+              '3 day': day3PaidTillNow,
+            },
+            'plansPaid': userData['plansPaid'],
+            'plans': userData['plans'],
+            'onHomeProgram': onHomeProgram,
+            'gender': userData['gender'],
+            'image': userData['image'],
+            'advancedPaymentx': advancedPaymentx,
+            'tempAllPlanDays': tempAllPlanDays,
+            'planDays': planDays,
+            'planDate': planDate,
+            'existingPlan': existingPlan,
+            'allBalances': allBalances,
+            'actualBalances': actualBalances,
+            'prevPlanBalances': prevPlanBalances,
+            'realBalance': realBalance,
+            'planName': planName,
+            'daysString': days,
+            'day': day,
+          };
+        }).toList();
+
+        // process home program data
+        final homeProgramData = eventData['attendance'] != null
+            ? eventData['attendance'][formattedDate]
+            : null;
+
+        List<Map<dynamic, dynamic>> homeProgramx = [];
+        if (homeProgramData != null && homeProgramData['homeProgram'] != null) {
+          homeProgramx = List<Map<dynamic, dynamic>>.from(
+              homeProgramData['homeProgram'].values);
         }
-      } catch (e) {
-        Flushbar(
-          margin: const EdgeInsets.all(7),
-          borderRadius: BorderRadius.circular(15),
-          flushbarStyle: FlushbarStyle.FLOATING,
-          flushbarPosition: FlushbarPosition.TOP,
-          message:
-              "$e Unable to get data. Please check your internet connection",
-          icon: Icon(
-            Icons.error_outline_rounded,
-            size: 28.0,
-            color: Colors.red[300],
-          ),
-          duration: const Duration(milliseconds: 3000),
-          leftBarIndicatorColor: Colors.red[300],
-        ).show(scaffoldKey.currentContext!);
+
+        // Process products history data
+        final Map<dynamic, dynamic> productsHistoryData = attendanceData != null
+            ? attendanceData['productsHistory'] != null
+                ? Map<dynamic, dynamic>.from(attendanceData['productsHistory'])
+                : {}
+            : {};
+
+        // Update state
+        setState(() {
+          users = updatedUsers;
+          homeProgram = homeProgramx;
+          presentStudentsUID = presentStudents;
+          sortedPresentStudents = sortedPresentStudentsx;
+          allUsers = usersData;
+          allAttendanceData = eventData['attendance'] ?? {};
+          zdays = presentStudents.keys
+              .where((student) =>
+                  users.firstWhere(
+                      (user) => user['id'] == student)['totalDays'] ==
+                  0)
+              .length;
+          productsHistory = productsHistoryData;
+          clubFees = [];
+          revenue = 0;
+        });
+
+        // sort the present students
+        sortedPresentStudents.sort((a, b) {
+          final int timeA = a['time'];
+          final int timeB = b['time'];
+          return timeB.compareTo(timeA);
+        });
+
+        // Process club fees data
+        final clubFeesData =
+            attendanceData != null ? attendanceData['fees'] : null;
+        if (clubFeesData != null) {
+          final clubFeesDataMap = Map<String, dynamic>.from(clubFeesData);
+          clubFeesDataMap.forEach((key, clubFeeData) {
+            setState(() {
+              clubFees.add({
+                'uid': clubFeeData['uid'],
+                'program': clubFeeData['program'],
+                'mode': clubFeeData['mode'],
+                'amount': clubFeeData['amount'],
+                'balance': clubFeeData['balance'],
+                'paymentId': key,
+                'planId': clubFeeData['planId'],
+                'advancedPayment': clubFeeData['advancedPayment'],
+              });
+              revenue += clubFeeData['amount'] as int;
+            });
+          });
+        }
+
+        if (!completer.isCompleted) {
+          completer
+              .complete(); // Resolve the Completer when the first event is received
+        }
       }
-    });
+    } catch (e) {
+      Flushbar(
+        margin: const EdgeInsets.all(7),
+        borderRadius: BorderRadius.circular(15),
+        flushbarStyle: FlushbarStyle.FLOATING,
+        flushbarPosition: FlushbarPosition.TOP,
+        message: "$e Unable to get data. Please check your internet connection",
+        icon: Icon(
+          Icons.error_outline_rounded,
+          size: 28.0,
+          color: Colors.red[300],
+        ),
+        duration: const Duration(milliseconds: 3000),
+        leftBarIndicatorColor: Colors.red[300],
+      ).show(scaffoldKey.currentContext!);
+    }
+
     await completer.future;
     debugPrint('Data listener initialized');
   }
@@ -709,173 +746,781 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                         ),
                                         TextButton(
                                           onPressed: () async {
-                                            // int totalDays = 1;
-                                            // if (to != null) {
-                                            //   totalDays =
-                                            //       from.difference(to!).inDays;
-                                            // }
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) =>
+                                                  const AlertDialog(
+                                                title:
+                                                    Text('Exporting to Excel'),
+                                                content:
+                                                    LinearProgressIndicator(),
+                                              ),
+                                            );
+                                            try {
+                                              final plugin = DeviceInfoPlugin();
+                                              final android =
+                                                  await plugin.androidInfo;
+                                              final storageStatus =
+                                                  android.version.sdkInt < 33
+                                                      ? await Permission.storage
+                                                          .request()
+                                                      : await Permission
+                                                          .manageExternalStorage
+                                                          .request();
+                                              if (!storageStatus.isGranted) {
+                                                throw "Please allow storage permission to download excel file";
+                                              }
 
-                                            // // export to excel
-                                            // final Excel excel =
-                                            //     Excel.createExcel();
-                                            // final Sheet sheet = excel['Sheet1'];
-                                            // int row = 1;
-                                            // for (int i = 0;
-                                            //     i < totalDays;
-                                            //     i++) {
-                                            //   final DateTime date =
-                                            //       from.add(Duration(days: i));
-                                            //   final int year = date.year;
-                                            //   final int month = date.month;
-                                            //   final int day = date.day;
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'A$row'))
-                                            //           .value =
-                                            //       TextCellValue(
-                                            //           DateFormat('yyyy-MM-dd')
-                                            //               .format(date));
-                                            //   row++;
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'A$row'))
-                                            //           .value =
-                                            //       DateCellValue(
-                                            //           year: year,
-                                            //           month: month,
-                                            //           day: day);
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'A$row'))
-                                            //           .value =
-                                            //       const TextCellValue('Name');
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'B$row'))
-                                            //           .value =
-                                            //       const TextCellValue('Phone');
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'C$row'))
-                                            //           .value =
-                                            //       const TextCellValue('Plan');
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'D$row'))
-                                            //           .value =
-                                            //       const TextCellValue('Days');
-                                            //   sheet
-                                            //           .cell(
-                                            //               CellIndex
-                                            //                   .indexByString(
-                                            //                       'E$row'))
-                                            //           .value =
-                                            //       const TextCellValue(
-                                            //           'Balance');
+                                              List<String> selectedDates = [];
 
-                                            //   row++;
+                                              if (to != null) {
+                                                // select all dates between from and to, which are present in allAttendanceData
+                                                // DateTime date = from;
+                                                int totalDays =
+                                                    to!.difference(from).inDays;
+                                                debugPrint('$totalDays');
+                                                for (int i = 0;
+                                                    i <= totalDays;
+                                                    i++) {
+                                                  final DateTime date = from
+                                                      .add(Duration(days: i));
+                                                  final String formattedDate =
+                                                      DateFormat('yyyy-MM-dd')
+                                                          .format(date);
+                                                  if (allAttendanceData
+                                                      .containsKey(
+                                                          formattedDate)) {
+                                                    selectedDates
+                                                        .add(formattedDate);
+                                                  }
+                                                }
+                                              } else {
+                                                selectedDates.add(
+                                                    DateFormat('yyyy-MM-dd')
+                                                        .format(from));
+                                              }
+                                              debugPrint(
+                                                  'Selected Dates: $selectedDates');
 
-                                            //   for (final user in users) {
-                                            //     // final String id = user['id'];
-                                            //     final String name =
-                                            //         user['name'];
-                                            //     final String phone =
-                                            //         user['phone'];
-                                            //     // final int day = user['day'];
-                                            //     final int realBalance =
-                                            //         user['realBalance'] ?? 0;
-                                            //     final String planName =
-                                            //         user['planName'] ?? 0;
-                                            //     final String days =
-                                            //         user['daysString'] ?? 0;
-                                            //     sheet
-                                            //             .cell(
-                                            //                 CellIndex
-                                            //                     .indexByString(
-                                            //                         'A$row'))
-                                            //             .value =
-                                            //         TextCellValue(name);
-                                            //     sheet
-                                            //             .cell(
-                                            //                 CellIndex
-                                            //                     .indexByString(
-                                            //                         'B$row'))
-                                            //             .value =
-                                            //         TextCellValue(phone);
-                                            //     sheet
-                                            //             .cell(
-                                            //                 CellIndex
-                                            //                     .indexByString(
-                                            //                         'C$row'))
-                                            //             .value =
-                                            //         TextCellValue(planName);
-                                            //     sheet
-                                            //             .cell(
-                                            //                 CellIndex
-                                            //                     .indexByString(
-                                            //                         'D$row'))
-                                            //             .value =
-                                            //         TextCellValue(days);
-                                            //     sheet
-                                            //             .cell(
-                                            //                 CellIndex
-                                            //                     .indexByString(
-                                            //                         'E$row'))
-                                            //             .value =
-                                            //         IntCellValue(
-                                            //             realBalance.toInt());
+                                              // // export to excel
+                                              final Excel excel =
+                                                  Excel.createExcel();
+                                              final Sheet sheet =
+                                                  excel['Sheet1'];
+                                              int row = 1;
 
-                                            //     row++;
-                                            //   }
-                                            //   row++;
-                                            //   // export excel
-                                            //   final Directory? directory =
-                                            //       await getExternalStorageDirectory();
-                                            //   debugPrint(
-                                            //       'Directory: $directory');
-                                            //   if (directory != null) {
-                                            //     final String path =
-                                            //         '${directory.path}/$cid-$year-$month-$day.xlsx';
-                                            //     final File file = File(path);
-                                            //     file.writeAsBytes(
-                                            //         excel.encode()!);
-                                            //     Flushbar(
-                                            //       margin:
-                                            //           const EdgeInsets.all(7),
-                                            //       borderRadius:
-                                            //           BorderRadius.circular(15),
-                                            //       flushbarStyle:
-                                            //           FlushbarStyle.FLOATING,
-                                            //       flushbarPosition:
-                                            //           FlushbarPosition.TOP,
-                                            //       message:
-                                            //           'Excel file exported to $path',
-                                            //       icon: Icon(
-                                            //         Icons
-                                            //             .check_circle_outline_rounded,
-                                            //         size: 28.0,
-                                            //         color: Colors.green[300],
-                                            //       ),
-                                            //       duration: const Duration(
-                                            //           milliseconds: 3000),
-                                            //       leftBarIndicatorColor:
-                                            //           Colors.green[300],
-                                            //     ).show(scaffoldKey
-                                            //         .currentContext!);
-                                            //   }
-                                            // }
+                                              for (int i = 0;
+                                                  i < selectedDates.length;
+                                                  i++) {
+                                                final DateTime date =
+                                                    DateTime.parse(
+                                                        selectedDates[i]);
+                                                // final int year = date.year;
+                                                // final int month = date.month;
+                                                // final int day = date.day;
+                                                await setupDataListener(date);
+                                                sheet
+                                                        .cell(
+                                                            CellIndex
+                                                                .indexByString(
+                                                                    'A$row'))
+                                                        .value =
+                                                    TextCellValue(
+                                                        selectedDates[i]);
+                                                sheet
+                                                    .cell(
+                                                        CellIndex.indexByString(
+                                                            'A$row'))
+                                                    .cellStyle = CellStyle(
+                                                  bold:
+                                                      true, // Apply bold formatting
+                                                  // You can also customize other style properties here
+                                                );
+                                                row++;
+
+                                                // attendance data
+                                                if (sortedPresentStudents
+                                                    .isNotEmpty) {
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Attendance');
+
+                                                  row++;
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'S No');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'B$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Name');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'C$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Phone');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'D$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Plan');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'E$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Days');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'F$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Balance');
+                                                  row++;
+
+                                                  for (int index = 0;
+                                                      index <
+                                                          sortedPresentStudents
+                                                              .length;
+                                                      index++) {
+                                                    final user = users
+                                                        .firstWhere((user) =>
+                                                            user['id'] ==
+                                                            sortedPresentStudents[
+                                                                index]['id']);
+                                                    final String name =
+                                                        user['name'] ?? '';
+                                                    bool onHomeProgram =
+                                                        user['onHomeProgram'];
+                                                    String sno =
+                                                        (index + 1).toString();
+
+                                                    String planName =
+                                                        user['planName'] ?? '';
+                                                    String days =
+                                                        user['daysString'] ??
+                                                            '';
+                                                    // check if 'home' is true
+                                                    bool isHome =
+                                                        sortedPresentStudents[
+                                                                    index]
+                                                                ['home'] !=
+                                                            null;
+                                                    bool isSecond =
+                                                        sortedPresentStudents[
+                                                                    index]
+                                                                ['second'] !=
+                                                            null;
+                                                    if ((isHome ||
+                                                            onHomeProgram) &&
+                                                        !isSecond) {
+                                                      sno += ' (H)';
+                                                      if (isHome) {
+                                                        days =
+                                                            sortedPresentStudents[
+                                                                        index]
+                                                                    ['days'] ??
+                                                                days;
+                                                        planName =
+                                                            sortedPresentStudents[
+                                                                        index]
+                                                                    ['plan'] ??
+                                                                planName;
+                                                      }
+                                                    }
+                                                    final int realBalance =
+                                                        user['realBalance'] ??
+                                                            0;
+                                                    // final String id = user['id'];
+
+                                                    final String phone =
+                                                        user['phone']
+                                                            .toString();
+
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'A$row'))
+                                                            .value =
+                                                        TextCellValue(sno);
+
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'B$row'))
+                                                            .value =
+                                                        TextCellValue(name);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'C$row'))
+                                                            .value =
+                                                        TextCellValue(phone);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'D$row'))
+                                                            .value =
+                                                        TextCellValue(planName);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'E$row'))
+                                                            .value =
+                                                        TextCellValue(days);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'F$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            realBalance
+                                                                .toString());
+
+                                                    row++;
+                                                  }
+                                                }
+                                                if (clubFees.isNotEmpty)
+                                                // club fees data
+                                                {
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Club Fees');
+                                                  row++;
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'S No');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'B$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Name');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'C$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Program');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'D$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Mode');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'E$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Amount');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'F$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Balance');
+                                                  row++;
+
+                                                  for (int index = 0;
+                                                      index < clubFees.length;
+                                                      index++) {
+                                                    final clubFee =
+                                                        clubFees[index];
+                                                    final String uid =
+                                                        clubFee['uid'];
+                                                    final user = users
+                                                        .firstWhere((user) =>
+                                                            user['id'] == uid);
+                                                    final String name =
+                                                        user['name'] ?? '';
+                                                    final String program =
+                                                        clubFee['program'] ??
+                                                            '';
+                                                    final String mode =
+                                                        clubFee['mode'] ?? '';
+                                                    final int amount =
+                                                        clubFee['amount'] ?? 0;
+                                                    final int balance =
+                                                        clubFee['balance'] ?? 0;
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'A$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            (index + 1)
+                                                                .toString());
+
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'B$row'))
+                                                            .value =
+                                                        TextCellValue(name);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'C$row'))
+                                                            .value =
+                                                        TextCellValue(program);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'D$row'))
+                                                            .value =
+                                                        TextCellValue(mode);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'E$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            amount.toString());
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'F$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            balance.toString());
+                                                    row++;
+                                                  }
+                                                }
+
+                                                // home program data
+                                                if (homeProgram.isNotEmpty) {
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Home Program');
+                                                  row++;
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'S No');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'B$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Name');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'C$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Phone');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'D$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Days');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'D$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Until');
+                                                  row++;
+
+                                                  for (int index = 0;
+                                                      index <
+                                                          homeProgram.length;
+                                                      index++) {
+                                                    final user = users
+                                                        .firstWhere((user) =>
+                                                            user['id'] ==
+                                                            homeProgram[index]
+                                                                ['uid']);
+                                                    final String name =
+                                                        user['name'] ?? '';
+                                                    final String phone =
+                                                        user['phone']
+                                                            .toString();
+                                                    final String days =
+                                                        homeProgram[index]
+                                                                ['days']
+                                                            .toString();
+                                                    final String until = DateFormat(
+                                                            'yyyy-MM-dd')
+                                                        .format(date.add(Duration(
+                                                            days: homeProgram[
+                                                                    index]
+                                                                ['days'])));
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'A$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            (index + 1)
+                                                                .toString());
+
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'B$row'))
+                                                            .value =
+                                                        TextCellValue(name);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'C$row'))
+                                                            .value =
+                                                        TextCellValue(phone);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'D$row'))
+                                                            .value =
+                                                        TextCellValue(days);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'D$row'))
+                                                            .value =
+                                                        TextCellValue(until);
+                                                    row++;
+                                                  }
+                                                }
+
+                                                // products history data
+                                                if (productsHistory
+                                                    .isNotEmpty) {
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Retail');
+                                                  row++;
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'A$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'S No');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'B$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Name');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'C$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Products');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'D$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Mode');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'E$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'MRP');
+
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'F$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Paid');
+                                                  sheet
+                                                          .cell(CellIndex
+                                                              .indexByString(
+                                                                  'G$row'))
+                                                          .value =
+                                                      const TextCellValue(
+                                                          'Balance');
+                                                  row++;
+
+                                                  for (int index = 0;
+                                                      index <
+                                                          productsHistory
+                                                              .length;
+                                                      index++) {
+                                                    // select key
+                                                    final String
+                                                        productPaymentId =
+                                                        productsHistory.keys
+                                                            .elementAt(index);
+                                                    final String uid =
+                                                        productsHistory[
+                                                            productPaymentId];
+                                                    final user = users
+                                                        .firstWhere((user) =>
+                                                            user['id'] == uid);
+                                                    final String name =
+                                                        user['name'] ?? '';
+                                                    final product =
+                                                        user['productsHistory']
+                                                            [productPaymentId];
+                                                    final bool isCustom =
+                                                        product['custom'] !=
+                                                                null &&
+                                                            product['custom'] ==
+                                                                true;
+                                                    final List allProds =
+                                                        product['products']
+                                                            .entries
+                                                            .map((e) {
+                                                      String name = '';
+                                                      if (isCustom) {
+                                                        name =
+                                                            '${e.key} - ₹${e.value}';
+                                                      } else {
+                                                        final String prodName =
+                                                            allProducts[e.key]
+                                                                ['name'];
+                                                        final String prodValue =
+                                                            product['products']
+                                                                    [e.key]
+                                                                .toString();
+                                                        final String prodPrice =
+                                                            allProducts[e.key]
+                                                                    ['price']
+                                                                .toString();
+                                                        int totalPrice =
+                                                            int.parse(
+                                                                    prodPrice) *
+                                                                int.parse(
+                                                                    prodValue);
+                                                        name =
+                                                            '$prodName ($prodPrice) x$prodValue = ₹$totalPrice';
+                                                      }
+                                                      return name;
+                                                    }).toList();
+                                                    final String
+                                                        allProdsString =
+                                                        allProds.join(' , ');
+                                                    final String mode =
+                                                        product['mode'] ?? '';
+                                                    final int mrp =
+                                                        product['total'] ?? 0;
+
+                                                    final int balance =
+                                                        product['balance'] ?? 0;
+                                                    if (product['payments'] !=
+                                                        null) {
+                                                      final Map<String, dynamic>
+                                                          productPayments = Map<
+                                                                  String,
+                                                                  dynamic>.from(
+                                                              product[
+                                                                  'payments']);
+                                                      final int totalPayments =
+                                                          // add every 'amount' in payments
+                                                          productPayments
+                                                              .entries
+                                                              .map((e) =>
+                                                                  e.value[
+                                                                      'amount'])
+                                                              .fold(
+                                                                  0,
+                                                                  (previousValue,
+                                                                          element) =>
+                                                                      (previousValue +
+                                                                              element)
+                                                                          as int);
+
+                                                      product['paid'] +=
+                                                          totalPayments;
+                                                    }
+                                                    final int amount =
+                                                        product['paid'] ?? 0;
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'A$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            (index + 1)
+                                                                .toString());
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'B$row'))
+                                                            .value =
+                                                        TextCellValue(name);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'C$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            allProdsString);
+
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'D$row'))
+                                                            .value =
+                                                        TextCellValue(mode);
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'E$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            mrp.toString());
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'F$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            amount.toString());
+                                                    sheet
+                                                            .cell(CellIndex
+                                                                .indexByString(
+                                                                    'G$row'))
+                                                            .value =
+                                                        TextCellValue(
+                                                            balance.toString());
+                                                    row++;
+                                                  }
+                                                }
+                                                row++;
+                                              }
+
+                                              // export excel
+                                              Directory? directory =
+                                                  await getExternalStorageDirectory();
+                                              // create directory if not exists
+                                              const String directoryx =
+                                                  '/storage/emulated/0/CoachZenExcel';
+                                              final Directory dir =
+                                                  Directory(directoryx);
+                                              if (!dir.existsSync()) {
+                                                dir.createSync();
+                                              }
+                                              String formatter(DateTime val) {
+                                                return DateFormat('dd MMM yy')
+                                                    .format(val);
+                                              }
+
+                                              final String filename =
+                                                  "${DateTime.now().millisecondsSinceEpoch} - ${formatter(from)} to ${formatter(to ?? from)}";
+
+                                              final String path =
+                                                  '$directoryx/$filename.xlsx';
+                                              debugPrint('Path: $path');
+                                              final File file = File(path);
+                                              file.writeAsBytes(
+                                                  excel.encode()!);
+                                              await Future.delayed(
+                                                  const Duration(
+                                                      milliseconds: 1500), () {
+                                                Navigator.of(
+                                                        scaffoldKey
+                                                            .currentContext!,
+                                                        rootNavigator: true)
+                                                    .pop();
+                                                Navigator.of(scaffoldKey
+                                                        .currentContext!)
+                                                    .pop();
+                                              });
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message:
+                                                    'Excel file exported to CoachZenExcel: $filename.xlsx',
+                                                icon: Icon(
+                                                  Icons
+                                                      .check_circle_outline_rounded,
+                                                  size: 28.0,
+                                                  color: Colors.green[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 5000),
+                                                leftBarIndicatorColor:
+                                                    Colors.green[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            } catch (e) {
+                                              Navigator.of(scaffoldKey
+                                                      .currentContext!)
+                                                  .pop();
+                                              Flushbar(
+                                                margin: const EdgeInsets.all(7),
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                flushbarStyle:
+                                                    FlushbarStyle.FLOATING,
+                                                flushbarPosition:
+                                                    FlushbarPosition.TOP,
+                                                message: "$e",
+                                                icon: Icon(
+                                                  Icons.error_outline_rounded,
+                                                  size: 28.0,
+                                                  color: Colors.red[300],
+                                                ),
+                                                duration: const Duration(
+                                                    milliseconds: 3000),
+                                                leftBarIndicatorColor:
+                                                    Colors.red[300],
+                                              ).show(
+                                                  scaffoldKey.currentContext!);
+                                            }
                                           },
                                           child: const Text('Export'),
                                         ),
@@ -1160,13 +1805,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   // check why sortedPresentStudents is regenerating
                   rows: List<DataRow>.generate(sortedPresentStudents.length,
                       (index) {
-                    debugPrint('Index init: $index');
-
-                    final user = users.firstWhere((user) =>
-                        user['id'] == sortedPresentStudents[index]['id']);
-                    final String id = user['id'];
+                    final String id = sortedPresentStudents[index]['id'];
+                    final user = users.firstWhere((user) => user['id'] == id);
                     final String name = user['name'];
                     int dayx = user['day'];
+                    String days = user['daysString'];
+                    String planName = user['planName'];
                     bool onHomeProgram = user['onHomeProgram'];
                     String sno = (index + 1).toString();
                     // check if 'home' is true
@@ -1177,13 +1821,15 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       sno += ' (H)';
                       if (isHome) {
                         dayx--;
+                        days = sortedPresentStudents[index]['days'] ?? days;
+                        planName =
+                            sortedPresentStudents[index]['plan'] ?? planName;
                       }
                     }
                     final int day = dayx;
                     final int realBalance = user['realBalance'];
                     final String balance = realBalance.toString();
-                    final String days = user['daysString'];
-                    final String planName = user['planName'];
+
                     final Map<String, int> allBalances = user['allBalances'];
                     final Map<String, int> actualBalances =
                         user['actualBalances'];

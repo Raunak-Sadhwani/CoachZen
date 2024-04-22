@@ -1531,6 +1531,47 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                         String newKey = '';
 
                                         if (widget.index != null) {
+                                          if (data['payments'].isNotEmpty) {
+                                            // show dialog
+                                            bool? delPayments =
+                                                await showDialog(
+                                              context: context,
+                                              builder: (context) {
+                                                return AlertDialog(
+                                                    title: const Text(
+                                                        'Delete payments?'),
+                                                    content: const Text(
+                                                        'Updating this order will also delete all extra payments associated with it. Are you sure you want to proceed?'),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(
+                                                              context, false);
+                                                          Navigator.pop(
+                                                              context);
+                                                        },
+                                                        child: const Text('No'),
+                                                      ),
+                                                      TextButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(
+                                                              context, true);
+                                                        },
+                                                        child:
+                                                            const Text('Yes'),
+                                                      ),
+                                                    ]);
+                                              },
+                                            );
+                                            if (delPayments == null ||
+                                                !delPayments) {
+                                              setState(() {
+                                                isFabEnabled = true;
+                                                handleEdit = false;
+                                              });
+                                              return Navigator.pop(context);
+                                            }
+                                          }
                                           newKey = widget.index!;
                                           newOrder['timestamp'] =
                                               data['timestamp'];

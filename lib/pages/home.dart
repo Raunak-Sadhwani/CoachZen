@@ -21,7 +21,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../components/ui/appbar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'login.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -89,9 +88,6 @@ class _HomePageState extends State<HomePage> {
         if (correctVersion) {
           requestNotificationPermission();
           updateText();
-          final deviceInfoPlugin = DeviceInfoPlugin();
-          final deviceInfo = await deviceInfoPlugin.deviceInfo;
-          final allInfo = deviceInfo.data;
         }
       });
     }
@@ -116,27 +112,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  User? user = FirebaseAuth.instance.currentUser;
+
   Future<void> getVersion() async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
     final String version = packageInfo.version;
 
     // get 'version' node from firebase
-    final DatabaseReference versionDb = FirebaseDatabase.instance.ref();
-    await versionDb.once().then((DatabaseEvent event) {
-      final Map<String, dynamic> data =
-          event.snapshot.value as Map<String, dynamic>;
-      debugPrint(data.toString());
-      if (data['Coaches'][user!.uid]['password'] == null) {
-        // save preference
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setBool('isPassword', false);
-        });
-      } else {
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setBool('isPassword', true);
-        });
-      }
-      final String fVerision = data['Version'] as String;
+    final DatabaseReference db = FirebaseDatabase.instance.ref();
+    await db.child('Version').once().then((DatabaseEvent event) {
+      final String fVerision = event.snapshot.value.toString();
       if (fVerision != version) {
         setState(() {
           correctVersion = false;
@@ -181,6 +166,24 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         );
+      }
+    });
+    await db
+        .child('Coaches')
+        .child(user!.uid)
+        .child('password')
+        .once()
+        .then((DatabaseEvent event) {
+      final bool isPassword = event.snapshot.value != null;
+      if (isPassword) {
+        // save preference
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('isPassword', true);
+        });
+      } else {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('isPassword', false);
+        });
       }
     });
   }
@@ -233,7 +236,6 @@ class _HomePageState extends State<HomePage> {
 
   String day = '';
 
-  User? user = FirebaseAuth.instance.currentUser;
   String capitalize(String value) {
     return value
         .split(' ')
