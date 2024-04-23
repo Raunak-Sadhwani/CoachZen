@@ -40,8 +40,8 @@ class _BodyFormListState extends State<BodyFormList>
   late AnimationController controller;
   late Stream mystream;
   bool _hasInternet = true;
-  bool _sortAscending = false; 
-  bool _showExpiredPlans = true; 
+  bool _sortAscending = false;
+  bool _showExpiredPlans = true;
   bool isSearching = false;
   String searchQuery = '';
   FocusNode searchFocusNode = FocusNode();
@@ -273,9 +273,7 @@ class _BodyFormListState extends State<BodyFormList>
 
   @override
   Widget build(BuildContext context) {
-    
     if (!_hasInternet) {
-      
       return Scaffold(
         body: Center(
           child: Column(
@@ -361,8 +359,6 @@ class _BodyFormListState extends State<BodyFormList>
                   opacity = 1.0;
 
                   if (isSearching) {
-                    
-
                     return searchFocusNode.requestFocus();
                   }
                   searchQuery = '';
@@ -408,12 +404,11 @@ class _BodyFormListState extends State<BodyFormList>
               physics: const BouncingScrollPhysics(),
               itemCount: filteredData.length,
               itemBuilder: (context, index) {
-                
                 final userInfo = filteredData[index].value;
                 final phone = "+91${userInfo['phone']}";
                 final DateTime timeStamp =
                     DateTime.fromMillisecondsSinceEpoch(userInfo['created']);
-                
+
                 final time = DateFormat('h:mm a').format(timeStamp);
                 final name = userInfo['name'];
                 DateTime selectedDate =
@@ -434,7 +429,6 @@ class _BodyFormListState extends State<BodyFormList>
                           .cast<Map<dynamic, dynamic>>();
                 }
 
-                
                 String planName = '';
                 String planStatus = '';
                 Color planColor = Colors.grey;
@@ -442,7 +436,7 @@ class _BodyFormListState extends State<BodyFormList>
                 final String uid = filteredData[index].key;
                 String gender = userInfo['gender'];
 
-                final int userDays = userInfo['days'].keys.length;
+                final int userDays = (userInfo['days'] ?? {}).keys.length;
 
                 if (userInfo['existed'] != null) {
                   planName = 'Not Started';
@@ -455,15 +449,14 @@ class _BodyFormListState extends State<BodyFormList>
                   int tempAllPlanDays = 4;
                   List sortAllKeys = userInfo['plans'].keys.toList();
                   sortAllKeys.sort((a, b) => a.compareTo(b));
-                  
-                  
+
                   for (String key in sortAllKeys) {
                     final plan = userInfo['plans'][key];
                     planName = plan['program'];
-                    
+
                     final int planDays = plan['days'] as int;
                     tempAllPlanDays += planDays;
-                    
+
                     if (userDays <= tempAllPlanDays) {
                       existingPlan = true;
                       final int daysLeft = tempAllPlanDays - userDays;
@@ -502,7 +495,7 @@ class _BodyFormListState extends State<BodyFormList>
                   }
                 }
                 debugPrint('reminderList: $reminderList');
-                
+
                 if (index == filteredData.length - 1) {
                   SharedPreferences.getInstance().then((prefs) {
                     final reminderListJSON = jsonEncode(reminderList);
@@ -513,7 +506,6 @@ class _BodyFormListState extends State<BodyFormList>
                 return Slidable(
                   startActionPane: ActionPane(
                     motion: const BehindMotion(),
-                    
                     children: [
                       SlidableAction(
                         backgroundColor: const Color(0xFF0392CF),
@@ -529,14 +521,12 @@ class _BodyFormListState extends State<BodyFormList>
                             await launchUrl(launchUri);
                           }
 
-                          
                           await makePhoneCall(phone);
                         },
                       ),
                       SlidableAction(
                         backgroundColor: const Color(0xFF7BC043),
                         foregroundColor: Colors.white,
-                        
                         icon: FontAwesomeIcons.whatsapp,
                         label: 'WhatsApp',
                         onPressed: (context) {
@@ -561,6 +551,7 @@ class _BodyFormListState extends State<BodyFormList>
                                   "https://play.google.com/store/apps/details?id=com.whatsapp"));
                             }
                           }
+
                           // whatsapp
                           launchWhatsApp(phone: phone);
                         },
@@ -569,7 +560,6 @@ class _BodyFormListState extends State<BodyFormList>
                   ),
                   endActionPane: ActionPane(
                     motion: const BehindMotion(),
-                    
                     children: [
                       SlidableAction(
                         backgroundColor: const Color.fromARGB(255, 125, 3, 207),

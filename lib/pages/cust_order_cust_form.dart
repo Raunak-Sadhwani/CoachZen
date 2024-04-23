@@ -12,11 +12,13 @@ class CustOrderCustForm extends StatefulWidget {
   final String name;
   final String uid;
   final int popIndex;
+  final DateTime selectedDateTime;
   const CustOrderCustForm(
       {super.key,
       required this.name,
       required this.uid,
-      required this.popIndex});
+      required this.popIndex,
+      required this.selectedDateTime});
   @override
   State<CustOrderCustForm> createState() => _CustOrderCustFormState();
 }
@@ -29,7 +31,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
   Map<String, int> productMap = {};
   bool isFabEnabled = false;
   bool autoValidate = false;
-  DateTime selectedDateTime = DateTime.now();
+  late DateTime selectedDateTime = widget.selectedDateTime;
   TextEditingController productNameController = TextEditingController();
   TextEditingController productQuantityController = TextEditingController();
 
@@ -265,7 +267,6 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      
                                       Container(
                                         padding:
                                             EdgeInsets.only(top: height * 0.01),
@@ -273,7 +274,6 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                           icon: const Icon(Icons.close,
                                               color: Colors.red, size: 20),
                                           onPressed: () {
-                                            
                                             final String prodName = productMap
                                                 .keys
                                                 .elementAt(index - 1);
@@ -378,7 +378,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
             ? FloatingActionButton(
                 onPressed: () async {
                   addProduct();
-                  
+
                   if (!isFabEnabled) {
                     return;
                   }
@@ -413,9 +413,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                             }
 
                             return AlertDialog(
-                                
                                 contentPadding: EdgeInsets.zero,
-                                
                                 insetPadding: EdgeInsets.zero,
                                 actionsPadding: EdgeInsets.symmetric(
                                     vertical: dialogWidth * .02),
@@ -538,9 +536,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                                                       value) ==
                                                               null) {
                                                             return 'Please enter a valid number';
-                                                          }
-                                                          
-                                                          else if (int.parse(
+                                                          } else if (int.parse(
                                                                   value) >
                                                               tCost) {
                                                             return 'Please enter a valid number';
@@ -635,7 +631,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                                                   style: GoogleFonts
                                                                       .montserrat(
                                                                     color: Colors
-                                                                        .black, 
+                                                                        .black,
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600,
@@ -647,7 +643,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                                                   style: GoogleFonts
                                                                       .montserrat(
                                                                     color: Colors
-                                                                        .red, 
+                                                                        .red,
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600,
@@ -779,29 +775,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                       },
                                       child: const Text('Done')),
                                 ]);
-                          })
-
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      
-                      );
+                          }));
                 },
                 child: const Icon(Icons.save),
               )

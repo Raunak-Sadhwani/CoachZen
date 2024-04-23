@@ -7,13 +7,12 @@ import 'gender_switch.dart';
 import 'dart:math' as math;
 
 class BodyForm extends StatefulWidget {
-  
   final ValueChanged<bool> pageChange;
   final PageController? controller;
   final String? age;
   final double? heightParam;
   final bool? gender;
-  
+
   const BodyForm({
     Key? key,
     this.controller,
@@ -21,19 +20,15 @@ class BodyForm extends StatefulWidget {
     this.age,
     this.heightParam,
     this.gender,
-    
-    
   }) : super(key: key);
 
   @override
   State<BodyForm> createState() => _BodyFormState();
 
-  
   static TextEditingController ageController =
       TextEditingController(text: '25');
   static TextEditingController weightController =
       TextEditingController(text: '60.0');
-  
 
   static double height = 170;
   static bool isMale = true;
@@ -76,20 +71,15 @@ class _BodyFormState extends State<BodyForm> {
 
   @override
   void dispose() {
-    
-    
-    
     super.dispose();
   }
 
-  final double minValue = 130; 
-  final double maxValue = 200; 
-  final double step = 1; 
+  final double minValue = 130;
+  final double maxValue = 200;
+  final double step = 1;
   TextEditingController ageController = BodyForm.ageController;
   TextEditingController weightController = BodyForm.weightController;
   bool isInteractingWithPicker = false;
-
-  
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +155,6 @@ class _BodyFormState extends State<BodyForm> {
           leftBarIndicatorColor: Colors.red[300],
         ).show(context);
       }
-      
     }
 
     void tappedOutside() {
@@ -196,7 +185,6 @@ class _BodyFormState extends State<BodyForm> {
       });
     }
 
-    
     return GestureDetector(
       onTap: () {
         tappedOutside();
@@ -271,12 +259,11 @@ class _BodyFormState extends State<BodyForm> {
                           String weightText = weightController.text.trim();
                           {
                             if ((oper == 'add' || oper == 'sub') &&
-                                !(double.parse(weightText) < 31 ||
-                                    double.parse(weightText) > 300)) {
+                                !(double.parse(weightText) < 35 ||
+                                    double.parse(weightText) > 150)) {
                               calc(oper, 'weight');
                             } else {
                               setState(() {
-                                
                                 try {
                                   if (!RegExp(r'^\d{0,3}(\.\d{0,1})?$')
                                           .hasMatch(weightText) ||
@@ -329,8 +316,6 @@ class _BodyFormState extends State<BodyForm> {
                       ).show(context);
                     }
                   },
-                  
-                  
                   onTapDown: (TapDownDetails details) {
                     tappedOutside();
                   },
@@ -356,14 +341,11 @@ class _BodyFormState extends State<BodyForm> {
                     }
                   },
                   child: HeightPicker(
-                    
                     value: BodyForm.height.toStringAsFixed(0),
                     minValue: minValue,
                     step: step,
                     maxValue: maxValue,
                   ),
-                  
-                  
                 ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                 GenderSwitch(

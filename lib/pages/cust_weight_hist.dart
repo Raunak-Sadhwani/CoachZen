@@ -83,8 +83,8 @@ class _WHistoryState extends State<WHistory> {
                   return 'Please enter a valid weight';
                 } else if (double.tryParse(value) == null) {
                   return 'Please enter a valid weight';
-                } else if (double.parse(value) <= 20 ||
-                    double.parse(value) >= 200) {
+                } else if (double.parse(value) <= 35 ||
+                    double.parse(value) >= 150) {
                   return 'Please enter a valid weight';
                 }
                 return null;

@@ -78,7 +78,6 @@ class _CustNewFormState extends State<CustNewForm> {
                       lastDate: DateTime.now(),
                     ).then((date) {
                       if (date != null) {
-                        
                         showTimePicker(
                           context: context,
                           initialTime: TimeOfDay.now(),
@@ -161,7 +160,7 @@ class _CustNewFormState extends State<CustNewForm> {
                 CustomTextFormField(
                   controller: _weightController,
                   labelText: 'Weight',
-                  maxLength: 3,
+                  maxLength: 5,
                   suffixText: 'kg',
                   keyboardType: TextInputType.number,
                   validator: (value) {
@@ -170,8 +169,8 @@ class _CustNewFormState extends State<CustNewForm> {
                     }
                     final weightValue = double.tryParse(value);
                     if (weightValue == null ||
-                        weightValue < 30 ||
-                        weightValue > 200) {
+                        weightValue < 35 ||
+                        weightValue > 150) {
                       return 'Please enter a valid weight between 30 and 200';
                     }
                     return null;
@@ -182,7 +181,6 @@ class _CustNewFormState extends State<CustNewForm> {
                   labelText: 'Height',
                   suffixText: 'cm',
                   keyboardType: TextInputType.number,
-                  
                   maxLength: 3,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -190,7 +188,7 @@ class _CustNewFormState extends State<CustNewForm> {
                     }
                     final weightValue = int.tryParse(value);
                     if (weightValue == null ||
-                        weightValue < 30 ||
+                        weightValue < 130 ||
                         weightValue > 200) {
                       return 'Please enter a valid weight between 30 and 200';
                     }
@@ -256,16 +254,15 @@ class _CustNewFormState extends State<CustNewForm> {
         child: FloatingActionButton(
           onPressed: () async {
             if (!isFabEnabled) {
-              return; 
+              return;
             }
 
             setState(() {
               autoValidate = true;
-              isFabEnabled = false; 
+              isFabEnabled = false;
             });
 
             if (_formKey.currentState!.validate()) {
-              
               try {
                 final DateFormat format = DateFormat('dd-MM-yyyy - hh:mm a');
                 DateTime created = format.parse(_dateController.text);
@@ -307,7 +304,7 @@ class _CustNewFormState extends State<CustNewForm> {
                     "1970-01-04": {"shakes": 1, "time": 259200000},
                     "1970-01-05": {"shakes": 1, "time": 345600000},
                   };
-                  
+
                   final String payId =
                       FirebaseDatabase.instance.ref().push().key!;
                   final String payId2 =
@@ -360,10 +357,8 @@ class _CustNewFormState extends State<CustNewForm> {
                   });
                   return;
                 }
-                
+
                 try {
-                  
-                  
                   await FirebaseDatabase.instance
                       .ref()
                       .child('Coaches')
@@ -469,7 +464,6 @@ class _CustNewFormState extends State<CustNewForm> {
                 return;
               }
             } else {
-              
               setState(() {
                 isFabEnabled = true;
               });
@@ -539,7 +533,6 @@ class CustomTextFormField extends StatelessWidget {
             keyboardType: keyboardType,
             maxLength: maxLength,
             onTap: onTap,
-            
             style: GoogleFonts.raleway(
               fontSize: height * 0.02,
               fontWeight: FontWeight.w500,
@@ -553,7 +546,6 @@ class CustomTextFormField extends StatelessWidget {
                 horizontal: height * 0.007,
                 vertical: height * 0.01,
               ),
-              
             ),
             validator: validator,
           ),

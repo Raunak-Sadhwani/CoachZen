@@ -240,8 +240,8 @@ class _AddWeightState extends State<AddWeight> {
                   }
                   final weightValue = double.tryParse(value);
                   if (weightValue == null ||
-                      weightValue < 30 ||
-                      weightValue > 200) {
+                      weightValue < 35 ||
+                      weightValue > 150) {
                     return 'Please enter a valid weight between 30 and 200';
                   }
                   return null;

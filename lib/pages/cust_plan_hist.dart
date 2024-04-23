@@ -4,8 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../components/ui/appbar.dart';
 
-int dayx = 0;
-
 class CustPlanHist extends StatelessWidget {
   final String name;
   final Map<dynamic, dynamic> plans;
@@ -27,7 +25,6 @@ class CustPlanHist extends StatelessWidget {
     // check if any dates are in 1970
     // if so remove them
     if (days.containsKey('1970-01-01')) {
-      dayx = 1;
       plans.removeWhere((key, value) => key == '1970-01-01');
       days.removeWhere((key, value) => key == '1970-01-01');
       days.removeWhere((key, value) => key == '1970-01-02');
@@ -37,10 +34,11 @@ class CustPlanHist extends StatelessWidget {
       plans.removeWhere((key, value) => key == '1970-01-05');
     }
 
-    List sortedKeys = Set<dynamic>.from({...days.keys, ...plans.keys}).toList()
+    List dateKeys = days.keys.toList()..sort();
+
+    List sortedKeys = Set<dynamic>.from({...dateKeys, ...plans.keys}).toList()
       ..sort((a, b) => b.compareTo(a));
     // also add plans to the sorted keys, which are not in days
-    int currentDay = 0;
 
     return Scaffold(
         appBar: MyAppBar(
@@ -62,8 +60,7 @@ class CustPlanHist extends StatelessWidget {
                     String joined = 'Absent';
 
                     if (days[key] != null) {
-                      String actualDay =
-                          "Day ${(sortedKeys.length - ++currentDay - 1) + dayx},";
+                      String actualDay = "Day ${(dateKeys.indexOf(key) + 1)}";
                       // dynamic values = days.values.elementAt(index);
                       DateTime joinedTime = DateTime.fromMillisecondsSinceEpoch(
                           days[key]['time'] ?? 0);
