@@ -23,7 +23,6 @@ class CustPlanHist extends StatelessWidget {
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
-    debugPrint('days: $days');
     double joinedFontSize = width * 0.035;
     // check if any dates are in 1970
     // if so remove them

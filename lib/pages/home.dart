@@ -19,7 +19,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../components/ui/appbar.dart';
-import 'package:path_provider/path_provider.dart';
 import 'login.dart';
 
 class HomePage extends StatefulWidget {
@@ -68,23 +67,6 @@ class _HomePageState extends State<HomePage> {
           return;
         }
         await getVersion();
-        Directory appDocDir = await getApplicationDocumentsDirectory();
-        Directory? appExtDir = await getExternalStorageDirectory();
-        final String appDocPath = appDocDir.path;
-        final String appExtPath = appExtDir!.path;
-
-        final File file = File('$appDocPath/new_sample.txt');
-        await file.writeAsString('Hello, World! $appDocPath');
-        await file.readAsString().then((String value) {
-          debugPrint(value);
-        });
-
-        final File file2 = File('$appExtPath/old_sample.txt');
-        await file2.writeAsString('Hello, World2! $appExtPath');
-        await file2.readAsString().then((String value) {
-          debugPrint(value);
-        });
-
         if (correctVersion) {
           requestNotificationPermission();
           updateText();

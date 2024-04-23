@@ -7,13 +7,13 @@ import 'gender_switch.dart';
 import 'dart:math' as math;
 
 class BodyForm extends StatefulWidget {
-  // final VoidCallback detailsSubmitted;
+  
   final ValueChanged<bool> pageChange;
   final PageController? controller;
   final String? age;
   final double? heightParam;
   final bool? gender;
-  // final Function(List<Map<String, dynamic>>) onSubmit;
+  
   const BodyForm({
     Key? key,
     this.controller,
@@ -21,19 +21,19 @@ class BodyForm extends StatefulWidget {
     this.age,
     this.heightParam,
     this.gender,
-    // required this.onSubmit,
-    // required this.detailsSubmitted,
+    
+    
   }) : super(key: key);
 
   @override
   State<BodyForm> createState() => _BodyFormState();
 
-  // List<Map<String, dynamic>> get fields => sendDetails();
+  
   static TextEditingController ageController =
       TextEditingController(text: '25');
   static TextEditingController weightController =
       TextEditingController(text: '60.0');
-  // void init
+  
 
   static double height = 170;
   static bool isMale = true;
@@ -76,20 +76,20 @@ class _BodyFormState extends State<BodyForm> {
 
   @override
   void dispose() {
-    // BodyForm.ageController.text = '25';
-    // BodyForm.height = 170;
-    // BodyForm.isMale = true;
+    
+    
+    
     super.dispose();
   }
 
-  final double minValue = 100; // minimum height value in cms
-  final double maxValue = 220; // maximum height value in cms
-  final double step = 1; // step value for the height picker
+  final double minValue = 130; 
+  final double maxValue = 200; 
+  final double step = 1; 
   TextEditingController ageController = BodyForm.ageController;
   TextEditingController weightController = BodyForm.weightController;
   bool isInteractingWithPicker = false;
 
-  // make sendDetails() a getter
+  
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +165,7 @@ class _BodyFormState extends State<BodyForm> {
           leftBarIndicatorColor: Colors.red[300],
         ).show(context);
       }
-      // BodyForm.height = height;
+      
     }
 
     void tappedOutside() {
@@ -196,7 +196,7 @@ class _BodyFormState extends State<BodyForm> {
       });
     }
 
-    // String previousValue = '';
+    
     return GestureDetector(
       onTap: () {
         tappedOutside();
@@ -276,7 +276,7 @@ class _BodyFormState extends State<BodyForm> {
                               calc(oper, 'weight');
                             } else {
                               setState(() {
-                                // proper regex for weight
+                                
                                 try {
                                   if (!RegExp(r'^\d{0,3}(\.\d{0,1})?$')
                                           .hasMatch(weightText) ||
@@ -329,8 +329,8 @@ class _BodyFormState extends State<BodyForm> {
                       ).show(context);
                     }
                   },
-                  // when the user starts touching the height picker or drags it
-                  // we set the isInteractingWithPicker to true
+                  
+                  
                   onTapDown: (TapDownDetails details) {
                     tappedOutside();
                   },
@@ -356,14 +356,14 @@ class _BodyFormState extends State<BodyForm> {
                     }
                   },
                   child: HeightPicker(
-                    // setHeight: (DragUpdateDetails details) => setHeight(details),
+                    
                     value: BodyForm.height.toStringAsFixed(0),
                     minValue: minValue,
                     step: step,
                     maxValue: maxValue,
                   ),
-                  // when the user stops touching the height picker or drags it
-                  // we set the isInteractingWithPicker to false
+                  
+                  
                 ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                 GenderSwitch(

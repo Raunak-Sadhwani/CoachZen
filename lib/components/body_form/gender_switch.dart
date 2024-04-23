@@ -9,7 +9,7 @@ class GenderSwitch extends StatefulWidget {
   final String secondOpt;
   const GenderSwitch(
       {Key? key,
-      required this.onGenderChanged, // non-nullable and required
+      required this.onGenderChanged, 
       required this.isMale,
       this.title = 'Gender',
       this.firstOpt = 'Male',
@@ -29,7 +29,7 @@ class _GenderSwitchState extends State<GenderSwitch> {
       width: cardWidth,
       children: [
         Column(
-          // crossAxisAlignment: CrossAxisAlignment.start,
+          
           children: [
             Text(
               widget.title,

@@ -194,7 +194,7 @@ class _FormPageState extends State<FormPage> {
           setState(() {
             onSubmitted = false;
           });
-          return debugPrint('BodyForm2 validation failed');
+          return;
         }
 
         List<Map<String, dynamic>> allFields = [

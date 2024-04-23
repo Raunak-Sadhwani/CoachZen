@@ -108,14 +108,12 @@ class _CustOrderFormState extends State<CustOrderForm> {
     setState(() {
       autoValidate = true;
     });
-    debugPrint('productSku: $productSku');
     if (_formKey.currentState!.validate()) {
       if (allProducts[productSku]['name'].toLowerCase() ==
           productNameController.text.trim().toLowerCase()) {
         setState(() {
           productMap[productSku] = int.parse(productQuantityController.text);
           isFabEnabled = true;
-          debugPrint('productMap: $productMap');
           autoValidate = false;
           scrollController.animateTo(
             0.0,
@@ -173,7 +171,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
                         ),
                         TextButton(
                           onPressed: () async {
-                            debugPrint('isFabEnabled: $isFabEnabled');
                             if (isFabEnabled) {
                               return;
                             }
@@ -338,8 +335,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: productMap.length + 1,
                 itemBuilder: (context, index) {
-                  debugPrint('productMap: $productMap');
-
                   return Column(
                     children: [
                       if (index == 0)
@@ -1490,7 +1485,6 @@ class _CustOrderFormState extends State<CustOrderForm> {
                                         isFabEnabled = false;
                                         handleEdit = true;
                                       });
-                                      debugPrint('isFabEnabled: $isFabEnabled');
                                       final int timestamp = selectedDateTime
                                           .millisecondsSinceEpoch;
                                       final String formattedDate =

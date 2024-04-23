@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl_phone_field/countries.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:flutter/gestures.dart';
 import 'get_start.dart';
@@ -507,8 +506,6 @@ class _RegisterState extends State<Register> {
         duration: const Duration(milliseconds: 1500),
         leftBarIndicatorColor: Colors.blue[300],
       )..show(scaffoldKey.currentContext!);
-    } catch (e) {
-      debugPrint(e.toString());
     }
   }
 }

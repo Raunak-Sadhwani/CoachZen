@@ -95,7 +95,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
   @override
   Widget build(BuildContext context) {
     if (!_hasInternet) {
-      // Show appropriate UI or display an error message
+      
       return Scaffold(
         body: Center(
           child: Column(
@@ -135,7 +135,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
             }
 
             Map<dynamic, dynamic> userData = {};
-            // remove any list dataytype from filteredData and any exceptionList keys, add to userData
+            
             List exceptionList = [
               "reg",
               "cname",
@@ -155,7 +155,7 @@ class _BodyFormCustomerWrapState extends State<BodyFormCustomerWrap> {
               if (value.runtimeType != List && !exceptionList.contains(key)) {
                 userData[key] = value;
               }
-              // if its last key, add id
+              
               if (key == user.keys.last && userData[key] != 'created') {
                 DateTime cr =
                     DateTime.fromMillisecondsSinceEpoch(userData['created']);
@@ -266,7 +266,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
   final _formKey = GlobalKey<FormState>();
   DateFormat formatter = DateFormat('dd MMM yyyy');
 
-  // capitalize first letter of each word
+  
   String capitalize(String value) {
     return value
         .split(' ')
@@ -350,7 +350,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                             'lib/assets/${widget.userData["gender"]}.png'),
                                         image: NetworkImage(widget.image ?? ''),
                                         fit: BoxFit
-                                            .cover, // Adjust the fit as per your requirement
+                                            .cover, 
                                       )
                                     : Image.asset(
                                         fit: BoxFit.cover,
@@ -358,7 +358,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 2 gradient buttons
+                            
                             CustButton(
                               height: height,
                               width: width,
@@ -379,7 +379,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                   const Color(0xffff4d62),
                                 ],
                                 measurements: widget.measurements,
-                                // measurements: [],
+                                
                                 idealweight: idealweight,
                                 uid: widget.uid,
                               ),
@@ -402,10 +402,10 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       ],
                     ),
                     Row(
-                      // crossAxisAlignment: CrossAxisAlignment.start,
+                      
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // 2 gradient buttons
+                        
                         CustButton(
                             openColor: const Color.fromRGBO(36, 38, 155, 1),
                             height: height,
@@ -429,7 +429,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                             page: CustPlanHist(
                               name: widget.userData['name'],
                               days: widget.days,
-                              // uid: widget.uid,
+                              
                               homeProgram: widget.homeProgram,
                               plans: widget.plans,
                             )),
@@ -440,9 +440,9 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
               ),
               ...editedData.entries.map(
                 (entry) {
-                  // var key = entry.key;
-                  // var value = entry.value;
-                  // if (key == 'dob') {}
+                  
+                  
+                  
 
                   return GestureDetector(
                     child: Card(
@@ -495,7 +495,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                     ),
                     onLongPress: () {
                       if (entry.key == 'phone') {
-                        // copy phone number to clipboard
+                        
                         Clipboard.setData(
                             ClipboardData(text: entry.value.toString()));
                         Flushbar(
@@ -552,7 +552,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                           showDatePicker(
                                                   context: context,
                                                   initialDate:
-                                                      dob, // Refer step 1
+                                                      dob, 
                                                   firstDate: DateTime(1930),
                                                   lastDate: lastDate)
                                               .then((selectedDate) {
@@ -618,7 +618,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                                     .hasMatch(value!)) {
                                                   return 'Please enter a valid Indian phone number';
                                                 }
-                                                // You can add additional phone number validation logic here
+                                                
                                               } else if (entry.key == 'city') {
                                                 if (value!.trim().length < 3 ||
                                                     !RegExp(r'^[a-zA-Z\s]+$')
@@ -638,12 +638,12 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                                     null) {
                                                   return 'Please enter a valid height';
                                                 } else if (int.parse(value) <
-                                                        50 ||
-                                                    int.parse(value) > 250) {
+                                                        120 ||
+                                                    int.parse(value) > 200) {
                                                   return 'Please enter a valid height';
                                                 }
                                               }
-                                              // Return null if there are no validation errors
+                                              
                                               return null;
                                             },
                                           ),
@@ -654,7 +654,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                                   onPressed: () {
                                     if (_formKey.currentState!.validate()) {
                                       if (entry.key == 'dob') {
-                                        // convert to Timestamp
+                                        
                                         DateTime selectedDateTime =
                                             DateFormat('dd MMM yyyy')
                                                 .parse(dialogTempValue);
@@ -722,10 +722,10 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                     final userRef = users.child(widget.uid);
 
                     if (updateFields.containsKey('phone')) {
-                      // check if phone number already exists
+                      
                       try {
-                        //  try putting number in phone collection
-                        // if it fails, then user already exists
+                        
+                        
                         debugPrint('updateFields: ${updateFields['phone']}');
                         final Map<String, dynamic> updates = {
                           'phones/${updateFields['phone'].toString()}': {
@@ -762,7 +762,7 @@ class _BodyFormCustomerState extends State<BodyFormCustomer> {
                       }
                     }
 
-                    // throw '$updateFields';
+                    
 
                     await userRef
                         .update(Map<String, Object?>.from(updateFields));

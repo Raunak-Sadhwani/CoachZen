@@ -1,7 +1,7 @@
 import 'package:another_flushbar/flushbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -50,7 +50,7 @@ class _MeasState extends State<Meas> {
   @override
   void initState() {
     super.initState();
-    // remove date from measurements
+    
     updatedMeasurements = Map.from(widget.measurements);
     ogMeasurements = Map.from(widget.measurements);
   }
@@ -110,11 +110,11 @@ class _MeasState extends State<Meas> {
 
   @override
   Widget build(BuildContext context) {
-    // Rest of the code...
+    
 
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
-    // Map all measurements in containers
+    
     return Scaffold(
       key: _scaffoldKey,
       floatingActionButton: ogMeasurements.toString() !=
@@ -138,7 +138,7 @@ class _MeasState extends State<Meas> {
                   await userRef.update({
                     'measurements': widget.allmeasurements,
                   });
-                  // twice pop to go back to home page
+                  
                   Navigator.pop(_scaffoldKey.currentContext!);
                   Navigator.pop(_scaffoldKey.currentContext!);
                   Navigator.pop(_scaffoldKey.currentContext!);
@@ -194,7 +194,7 @@ class _MeasState extends State<Meas> {
           padding: EdgeInsets.all(width * 0.04),
           child: Column(
             children: updatedMeasurements.entries.map((e) {
-              // if date, return nothing
+              
               if (e.key.toLowerCase().contains('date')) {
                 return const SizedBox();
               }
@@ -230,12 +230,12 @@ class _MeasState extends State<Meas> {
                                 fontWeight: FontWeight.bold,
                               ),
                               maxLines:
-                                  2, // Set maxLines to 2 for text wrapping
+                                  2, 
                             ),
                           ),
                           const SizedBox(
                               width:
-                                  10), // Add some spacing between the two Text widgets
+                                  10), 
                           Text(
                             e.key == 'date'
                                 ? formatDate(

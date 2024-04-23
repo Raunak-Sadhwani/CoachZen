@@ -43,7 +43,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
-// ignore: unused_element
+
 class OpenContainerWrapper extends StatelessWidget {
   const OpenContainerWrapper({
     super.key,
@@ -51,10 +51,10 @@ class OpenContainerWrapper extends StatelessWidget {
     required this.content,
     this.openColor,
     this.onClosed,
-    // required this.onClosed,
+    
   });
 
-  // final ClosedCallback<bool?> onClosed;
+  
   final Widget page;
   final Widget content;
   final Color? openColor;

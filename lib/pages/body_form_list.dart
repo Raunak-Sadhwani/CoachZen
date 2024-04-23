@@ -12,7 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:coach_zen/pages/body_form_cust.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
-// shared preferences
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/ui/appbar.dart';
 import 'body_form.dart';
@@ -40,8 +40,8 @@ class _BodyFormListState extends State<BodyFormList>
   late AnimationController controller;
   late Stream mystream;
   bool _hasInternet = true;
-  bool _sortAscending = false; // Flag to track the sort order
-  bool _showExpiredPlans = true; // Flag to track whether to show expired plans
+  bool _sortAscending = false; 
+  bool _showExpiredPlans = true; 
   bool isSearching = false;
   String searchQuery = '';
   FocusNode searchFocusNode = FocusNode();
@@ -103,24 +103,6 @@ class _BodyFormListState extends State<BodyFormList>
 
       return _sortAscending ? compareResult : -compareResult;
     });
-
-    // show only active plans
-    // if (!_showExpiredPlans) {
-    //   filteredData.removeWhere((doc) {
-    //     final plans = doc.value['plans'];
-    //     if (plans == null) {
-    //       return true;
-    //     }
-    //     final activePlans = plans.where((plan) {
-    //       final daysSinceStarted = DateTime.now()
-    //               .difference(
-    //                   DateTime.fromMillisecondsSinceEpoch(plan['started']))
-    //               .inDays +
-    //           1;
-    //       return daysSinceStarted <= plan['days'];
-    //     }).toList();
-    //     return activePlans.isEmpty;
-    //   });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
@@ -291,9 +273,9 @@ class _BodyFormListState extends State<BodyFormList>
 
   @override
   Widget build(BuildContext context) {
-    // double height = MediaQuery.of(context).size.height;
+    
     if (!_hasInternet) {
-      // Show appropriate UI or display an error message
+      
       return Scaffold(
         body: Center(
           child: Column(
@@ -379,7 +361,7 @@ class _BodyFormListState extends State<BodyFormList>
                   opacity = 1.0;
 
                   if (isSearching) {
-                    // set interval to wait for animation to complete
+                    
 
                     return searchFocusNode.requestFocus();
                   }
@@ -426,12 +408,12 @@ class _BodyFormListState extends State<BodyFormList>
               physics: const BouncingScrollPhysics(),
               itemCount: filteredData.length,
               itemBuilder: (context, index) {
-                // final userInfo = _filteredData[index].data();
+                
                 final userInfo = filteredData[index].value;
                 final phone = "+91${userInfo['phone']}";
                 final DateTime timeStamp =
                     DateTime.fromMillisecondsSinceEpoch(userInfo['created']);
-                // final timeStamp = userInfo['created'].toDate();
+                
                 final time = DateFormat('h:mm a').format(timeStamp);
                 final name = userInfo['name'];
                 DateTime selectedDate =
@@ -452,7 +434,7 @@ class _BodyFormListState extends State<BodyFormList>
                           .cast<Map<dynamic, dynamic>>();
                 }
 
-                // List<Map<dynamic, dynamic>> plans = [];
+                
                 String planName = '';
                 String planStatus = '';
                 Color planColor = Colors.grey;
@@ -473,15 +455,15 @@ class _BodyFormListState extends State<BodyFormList>
                   int tempAllPlanDays = 4;
                   List sortAllKeys = userInfo['plans'].keys.toList();
                   sortAllKeys.sort((a, b) => a.compareTo(b));
-                  // final allDaysMap = user['days'];
-                  // check if today's date comes in between any plan
+                  
+                  
                   for (String key in sortAllKeys) {
                     final plan = userInfo['plans'][key];
                     planName = plan['program'];
-                    // final planDate = DateTime.parse(key);
+                    
                     final int planDays = plan['days'] as int;
                     tempAllPlanDays += planDays;
-                    // debugPrint('Existing Plan: $existingPlan');
+                    
                     if (userDays <= tempAllPlanDays) {
                       existingPlan = true;
                       final int daysLeft = tempAllPlanDays - userDays;
@@ -520,7 +502,7 @@ class _BodyFormListState extends State<BodyFormList>
                   }
                 }
                 debugPrint('reminderList: $reminderList');
-                // if last index save reminderList to shared preferences
+                
                 if (index == filteredData.length - 1) {
                   SharedPreferences.getInstance().then((prefs) {
                     final reminderListJSON = jsonEncode(reminderList);
@@ -531,7 +513,7 @@ class _BodyFormListState extends State<BodyFormList>
                 return Slidable(
                   startActionPane: ActionPane(
                     motion: const BehindMotion(),
-                    // key: const ValueKey(2),
+                    
                     children: [
                       SlidableAction(
                         backgroundColor: const Color(0xFF0392CF),
@@ -547,14 +529,14 @@ class _BodyFormListState extends State<BodyFormList>
                             await launchUrl(launchUri);
                           }
 
-                          // call
+                          
                           await makePhoneCall(phone);
                         },
                       ),
                       SlidableAction(
                         backgroundColor: const Color(0xFF7BC043),
                         foregroundColor: Colors.white,
-                        // whatsapp
+                        
                         icon: FontAwesomeIcons.whatsapp,
                         label: 'WhatsApp',
                         onPressed: (context) {
@@ -579,7 +561,6 @@ class _BodyFormListState extends State<BodyFormList>
                                   "https://play.google.com/store/apps/details?id=com.whatsapp"));
                             }
                           }
-
                           // whatsapp
                           launchWhatsApp(phone: phone);
                         },
@@ -588,7 +569,7 @@ class _BodyFormListState extends State<BodyFormList>
                   ),
                   endActionPane: ActionPane(
                     motion: const BehindMotion(),
-                    // key: const ValueKey(1),
+                    
                     children: [
                       SlidableAction(
                         backgroundColor: const Color.fromARGB(255, 125, 3, 207),

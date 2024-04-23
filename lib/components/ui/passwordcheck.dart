@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+
 
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ Future<bool> checkPassword(context, String cid) async {
   TextEditingController password = TextEditingController();
   bool isSubmitted = false;
   bool isCorrect = false;
-  // show dialog
+  
   await showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -31,7 +31,7 @@ Future<bool> checkPassword(context, String cid) async {
             onPressed: () async {
               if (!isSubmitted && (password.text.length > 6)) {
                 isSubmitted = true;
-                // check password
+                
                 try {
                   final dbRef =
                       FirebaseDatabase.instance.ref().child('Coaches');
@@ -44,7 +44,7 @@ Future<bool> checkPassword(context, String cid) async {
                       isCorrect = true;
                     }
                   });
-                  // ignore: empty_catches
+                  
                 } catch (e) {}
               }
               Navigator.of(context).pop();

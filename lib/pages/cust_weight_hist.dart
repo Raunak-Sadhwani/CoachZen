@@ -132,7 +132,6 @@ class _WHistoryState extends State<WHistory> {
                       ).show(_scaffoldKey.currentContext!);
                     }
                   } catch (e) {
-                    debugPrint('Error updating user properties: $e');
                     return Flushbar(
                       margin: const EdgeInsets.all(7),
                       borderRadius: BorderRadius.circular(15),
@@ -396,7 +395,6 @@ class _WHistoryState extends State<WHistory> {
                               leftBarIndicatorColor: Colors.green[300],
                             ).show(_scaffoldKey.currentContext!);
                           } catch (e) {
-                            debugPrint('Error updating user properties: $e');
                             return Flushbar(
                               margin: const EdgeInsets.all(7),
                               borderRadius: BorderRadius.circular(15),

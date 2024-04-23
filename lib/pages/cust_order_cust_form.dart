@@ -265,7 +265,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      // x icon
+                                      
                                       Container(
                                         padding:
                                             EdgeInsets.only(top: height * 0.01),
@@ -273,7 +273,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                           icon: const Icon(Icons.close,
                                               color: Colors.red, size: 20),
                                           onPressed: () {
-                                            // show dialog if product is not empty
+                                            
                                             final String prodName = productMap
                                                 .keys
                                                 .elementAt(index - 1);
@@ -378,7 +378,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
             ? FloatingActionButton(
                 onPressed: () async {
                   addProduct();
-                  // save order
+                  
                   if (!isFabEnabled) {
                     return;
                   }
@@ -413,9 +413,9 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                             }
 
                             return AlertDialog(
-                                // remove all padding
+                                
                                 contentPadding: EdgeInsets.zero,
-                                // dialog width to 95% of screen
+                                
                                 insetPadding: EdgeInsets.zero,
                                 actionsPadding: EdgeInsets.symmetric(
                                     vertical: dialogWidth * .02),
@@ -539,7 +539,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                                               null) {
                                                             return 'Please enter a valid number';
                                                           }
-                                                          // no more than 50% discount
+                                                          
                                                           else if (int.parse(
                                                                   value) >
                                                               tCost) {
@@ -635,7 +635,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                                                   style: GoogleFonts
                                                                       .montserrat(
                                                                     color: Colors
-                                                                        .black, // Normal color for the text
+                                                                        .black, 
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600,
@@ -647,7 +647,7 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                                                   style: GoogleFonts
                                                                       .montserrat(
                                                                     color: Colors
-                                                                        .red, // Red color for the discount value
+                                                                        .red, 
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600,
@@ -781,26 +781,26 @@ class _CustOrderCustFormState extends State<CustOrderCustForm> {
                                 ]);
                           })
 
-                      // final Map<String, dynamic> newOrder = {
-                      //   'date': formattedDate,
-                      //   'chosenDate': timestamp,
-                      //   'products': productMap,
-                      //   'total': tCost,
-                      //   'discountMode': mode.toString(),
-                      //   'discountManual':
-                      //       mode == DiscountModes.manual ? discManual : null,
-                      //   'initalAutoMode':
-                      //       mode == DiscountModes.auto ? initalAutoMode : null,
-                      //   'customPrice': mode == DiscountModes.custom
-                      //       ? int.parse(customPriceController.text)
-                      //       : null,
-                      //   'discount': discount,
-                      //   'shakemateDiscount':
-                      //       mode == DiscountModes.manual ? shakemateDiscount : null,
-                      //   'paid': paid,
-                      //   'balance': balance,
-                      //   'mode': initalMode,
-                      // };
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
                       );
                 },
                 child: const Icon(Icons.save),

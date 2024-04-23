@@ -26,7 +26,7 @@ final DateFormat format = DateFormat('dd MMM yyyy');
 final DateTime today = DateTime.now();
 const int shakePrice = 240;
 
-// capitalize first letter of a string
+
 String capitalize(String value) {
   return value
       .split(' ')
@@ -44,7 +44,7 @@ class DailyAttendance extends StatefulWidget {
 class _DailyAttendanceState extends State<DailyAttendance> {
   StreamSubscription? _streamSubscription;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  // scaffold key
+  
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   final String cid = FirebaseAuth.instance.currentUser!.uid;
   final DatabaseReference coachDb =
@@ -62,7 +62,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   bool isEdit = false;
   int zdays = 0;
   int revenue = 0;
-  int datas = 0;
   String initalPlan = '0 day';
   TextEditingController amount = TextEditingController();
   TextEditingController customPlan = TextEditingController();
@@ -86,7 +85,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   @override
   void initState() {
     super.initState();
-    // Force landscape orientation
+    
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -95,35 +94,33 @@ class _DailyAttendanceState extends State<DailyAttendance> {
   }
 
   Future<void> initializeData() async {
-    // Set up data listener and wait for initial data to be fetched
+    
     _streamSubscription?.cancel();
     mystream = coachDb.child(cid).onValue;
     _streamSubscription = mystream.listen((event) async {
-      datas += 1;
-      debugPrint('got data - $datas');
       setState(() {
         alldata = event.snapshot.value;
       });
       await setupDataListener(selectedDate);
     });
 
-    // print('7 initialized');
+    
   }
 
   Future<void> setupDataListener(DateTime selectedDate) async {
-    // Close the previous listener if it exists
+    
     formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
     setState(() {
       sortedPresentStudents = [];
     });
 
     final completer = Completer<void>();
-    // final event = await mystream.first;
-    // Set up the new listener
+    
+    
     try {
       if (mounted) {
         final eventData = alldata;
-// Process attendance data
+
         final attendanceData = eventData['attendance'] != null
             ? eventData['attendance'][formattedDate]
             : null;
@@ -133,11 +130,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
         List<Map<dynamic, dynamic>> tempSortedPresentStudents = [];
 
-        // if any presentStudents has value['shake'] more than 1, again add to the sortedPresentStudents
+        
         presentStudents.forEach((studentId, studentData) {
-          // Check if shakes > 1
+          
           if ((studentData['shakes'] as int) > 1) {
-            // Add student twice if shakes > 1
+            
             tempSortedPresentStudents.add({
               'id': studentId,
               'time': studentData['time'],
@@ -149,7 +146,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               'second': true,
             });
           } else {
-            // Add student once if shakes <= 1
+            
             tempSortedPresentStudents.add({
               'id': studentId,
               'time': studentData['time'],
@@ -159,27 +156,27 @@ class _DailyAttendanceState extends State<DailyAttendance> {
         final List<Map<dynamic, dynamic>> sortedPresentStudentsx =
             tempSortedPresentStudents;
 
-        // Process users data
+        
         final usersData = eventData['users'] ?? {};
         final updatedUsers = usersData.entries.map((entry) {
           final key = entry.key;
           final userData = entry.value;
           int totalDays = -1;
 
-          // Iterate through entries in 'days' map
+          
           (userData['days'] as Map?)?.forEach((key, value) {
-            // Convert key to date
+            
             final keyDate = DateTime.parse(key);
 
-            // Check if key date is before or at the same moment as selected date
+            
             if (keyDate.isBefore(selectedDate) ||
                 keyDate.isAtSameMomentAs(selectedDate)) {
               totalDays += (value['shakes'] as int);
             }
           });
 
-          // final userPayments = Map.from(userData['payments'] ?? {});
-          // get all payments till selected date
+          
+          
           int amountPaidTillNow = 0;
           int day0PaidTillNow = 0;
           int day3PaidTillNow = 0;
@@ -234,13 +231,13 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           bool remindExistingPlan = false;
           bool existingPlan = false;
           String? planDate;
-          // int planDays = 0;
+          
           int reTempAllPlanDays = 4;
           int tempAllPlanDays = 4;
           int planDays = 0;
           final bool advancedPaymentx = userData['advancedPayments'] != null &&
               userData['advancedPayments']['pid'] != null;
-          // ----------------------
+          
 
           if (day0PaidTillNow < 200) {
             int tempBal = 200 - (day0PaidTillNow);
@@ -251,7 +248,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             allBalances['3 day'] = tempBal;
           }
 
-          // ----------------------
+          
           if (day > 4) {
             String rePlanName = '';
             String planStatus = '';
@@ -265,7 +262,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               planStatus = 'No Plans';
             }
 
-            // ---------------------------------
+            
 
             final plansPaid = userData['plansPaid'];
             if (plansPaid != null) {
@@ -290,8 +287,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               List sortAllKeys = userData['plans'].keys.toList();
               sortAllKeys.sort((a, b) => a.compareTo(b));
               int allPlansCost = 0;
-              // final allDaysMap = user['days'];
-              // check if today's date comes in between any plan
+              
+              
               for (String key in sortAllKeys) {
                 final plan = userData['plans'][key];
 
@@ -305,7 +302,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   int planPaid = 0;
                   Map<dynamic, dynamic> planPaymentDates =
                       plan['payments'] ?? {};
-                  // remove any date after today
+                  
                   planPaymentDates.removeWhere((key, value) {
                     final planPaymentDate = DateTime.parse(value);
                     return planPaymentDate.isAfter(selectedDate);
@@ -384,8 +381,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   const int fiveDayCost = 920;
                   realBalance =
                       (allPlansCost + fiveDayCost) - amountPaidTillNow;
-                  debugPrint('$amountPaidTillNow sd');
-                  debugPrint('New Plan: $amountPaidTillNow');
                 }
 
                 if (userDays <= reTempAllPlanDays) {
@@ -416,12 +411,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               if (!existingPlan) {
                 final int currentDay = day - tempAllPlanDays;
                 if (currentDay == 1 && advancedPaymentx) {
-                  // query to firebase to set plan
+                  
                   final DatabaseReference dbRef = coachDb.child(cid);
                   final Map<dynamic, dynamic> pid =
                       user['advancedPayments']['pid'];
                   final int pidAmount = pid['amount'] as int;
-                  // remove amount from advanced payments
+                  
                   pid.remove('amount');
                   final String program = pid['program'];
                   final String paymentId = pid['payments'].keys.first;
@@ -439,7 +434,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   dbRef.update(updates);
                 }
                 days = '$currentDay / $currentDay';
-                // actualBalances['Paid'] = (currentDay * shakePrice);
+                
                 allBalances['Extra ${currentDay}days'] =
                     currentDay * shakePrice;
               }
@@ -459,7 +454,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             } else {
               final int currentDay = day - tempAllPlanDays;
               days = '$currentDay / $currentDay';
-              // actualBalances['Paid'] = (currentDay * shakePrice);
+              
               allBalances['Extra ${currentDay}days'] = currentDay * shakePrice;
             }
             SharedPreferences.getInstance().then((prefs) {
@@ -504,7 +499,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           };
         }).toList();
 
-        // process home program data
+        
         final homeProgramData = eventData['attendance'] != null
             ? eventData['attendance'][formattedDate]
             : null;
@@ -515,14 +510,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
               homeProgramData['homeProgram'].values);
         }
 
-        // Process products history data
+        
         final Map<dynamic, dynamic> productsHistoryData = attendanceData != null
             ? attendanceData['productsHistory'] != null
                 ? Map<dynamic, dynamic>.from(attendanceData['productsHistory'])
                 : {}
             : {};
 
-        // Update state
+        
         setState(() {
           users = updatedUsers;
           homeProgram = homeProgramx;
@@ -541,14 +536,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           revenue = 0;
         });
 
-        // sort the present students
+        
         sortedPresentStudents.sort((a, b) {
           final int timeA = a['time'];
           final int timeB = b['time'];
           return timeB.compareTo(timeA);
         });
 
-        // Process club fees data
+        
         final clubFeesData =
             attendanceData != null ? attendanceData['fees'] : null;
         if (clubFeesData != null) {
@@ -572,7 +567,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
         if (!completer.isCompleted) {
           completer
-              .complete(); // Resolve the Completer when the first event is received
+              .complete(); 
         }
       }
     } catch (e) {
@@ -593,7 +588,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
     }
 
     await completer.future;
-    debugPrint('Data listener initialized');
   }
 
   @override
@@ -608,7 +602,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
   @override
   Widget build(BuildContext context) {
-    // final ScreenHeight = MediaQuery.of(context).size.height;
+    
     return OrientationBuilder(
       builder: (context, orientation) {
         return Scaffold(
@@ -623,10 +617,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 ),
                 onPressed: () {
                   Navigator.pop(context);
-                  // Navigator.pushAndRemoveUntil(
-                  //     context,
-                  //     MaterialPageRoute(builder: (context) => const HomePage()),
-                  //     (Route<dynamic> route) => false);
+                  
+                  
+                  
+                  
                 },
               ),
             ),
@@ -640,12 +634,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 ),
               ),
               onPressed: () {
-                //  open date picker
+                
                 showDatePicker(
                         context: context,
                         initialDate: selectedDate,
                         firstDate: DateTime(2023),
-                        // one month ahead
+                        
                         lastDate: today.add(const Duration(days: 50)))
                     .then((date) async {
                   if (date != null) {
@@ -653,7 +647,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       selectedDate = date;
                     });
                     await setupDataListener(selectedDate);
-                    debugPrint('Date changed to $selectedDate');
                   }
                 });
               },
@@ -664,7 +657,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   Icons.file_download_outlined,
                   color: Colors.grey,
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  if (!await checkPassword(context, cid)) {
+                    return;
+                  }
                   final List allAttendanceDates =
                       allAttendanceData.keys.toList();
                   allAttendanceDates.sort((a, b) => a.compareTo(b));
@@ -672,12 +668,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                       DateTime.parse(allAttendanceDates.first);
                   final DateTime lastDate =
                       DateTime.parse(allAttendanceDates.last);
-                  //  export to excel
-                  // get dates from and when to export
+                  
+                  
                   DateTime from = selectedDate;
                   DateTime? to;
                   showDialog(
-                      context: context,
+                      context: scaffoldKey.currentContext!,
                       builder: (context) => StatefulBuilder(
                             builder: (contextx, StateSetter setState) {
                               return AlertDialog(
@@ -774,11 +770,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                               List<String> selectedDates = [];
 
                                               if (to != null) {
-                                                // select all dates between from and to, which are present in allAttendanceData
-                                                // DateTime date = from;
+                                                
+                                                
                                                 int totalDays =
                                                     to!.difference(from).inDays;
-                                                debugPrint('$totalDays');
                                                 for (int i = 0;
                                                     i <= totalDays;
                                                     i++) {
@@ -799,10 +794,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     DateFormat('yyyy-MM-dd')
                                                         .format(from));
                                               }
-                                              debugPrint(
-                                                  'Selected Dates: $selectedDates');
 
-                                              // // export to excel
                                               final Excel excel =
                                                   Excel.createExcel();
                                               final Sheet sheet =
@@ -815,9 +807,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                 final DateTime date =
                                                     DateTime.parse(
                                                         selectedDates[i]);
-                                                // final int year = date.year;
-                                                // final int month = date.month;
-                                                // final int day = date.day;
+                                                
+                                                
+                                                
                                                 await setupDataListener(date);
                                                 sheet
                                                         .cell(
@@ -833,12 +825,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                             'A$row'))
                                                     .cellStyle = CellStyle(
                                                   bold:
-                                                      true, // Apply bold formatting
-                                                  // You can also customize other style properties here
+                                                      true, 
+                                                  
                                                 );
                                                 row++;
 
-                                                // attendance data
+                                                
                                                 if (sortedPresentStudents
                                                     .isNotEmpty) {
                                                   sheet
@@ -916,7 +908,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     String days =
                                                         user['daysString'] ??
                                                             '';
-                                                    // check if 'home' is true
+                                                    
                                                     bool isHome =
                                                         sortedPresentStudents[
                                                                     index]
@@ -947,7 +939,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     final int realBalance =
                                                         user['realBalance'] ??
                                                             0;
-                                                    // final String id = user['id'];
+                                                    
 
                                                     final String phone =
                                                         user['phone']
@@ -997,7 +989,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   }
                                                 }
                                                 if (clubFees.isNotEmpty)
-                                                // club fees data
+                                                
                                                 {
                                                   sheet
                                                           .cell(CellIndex
@@ -1117,7 +1109,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   }
                                                 }
 
-                                                // home program data
+                                                
                                                 if (homeProgram.isNotEmpty) {
                                                   sheet
                                                           .cell(CellIndex
@@ -1225,7 +1217,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   }
                                                 }
 
-                                                // products history data
+                                                
                                                 if (productsHistory
                                                     .isNotEmpty) {
                                                   sheet
@@ -1293,7 +1285,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                           productsHistory
                                                               .length;
                                                       index++) {
-                                                    // select key
+                                                    
                                                     final String
                                                         productPaymentId =
                                                         productsHistory.keys
@@ -1363,7 +1355,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                               product[
                                                                   'payments']);
                                                       final int totalPayments =
-                                                          // add every 'amount' in payments
+                                                          
                                                           productPayments
                                                               .entries
                                                               .map((e) =>
@@ -1437,10 +1429,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                 row++;
                                               }
 
-                                              // export excel
+                                              
                                               Directory? directory =
                                                   await getExternalStorageDirectory();
-                                              // create directory if not exists
+                                              
                                               const String directoryx =
                                                   '/storage/emulated/0/CoachZenExcel';
                                               final Directory dir =
@@ -1458,7 +1450,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
                                               final String path =
                                                   '$directoryx/$filename.xlsx';
-                                              debugPrint('Path: $path');
                                               final File file = File(path);
                                               file.writeAsBytes(
                                                   excel.encode()!);
@@ -1539,7 +1530,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   color: Colors.grey,
                 ),
                 onPressed: () {
-                  //  open history page
+                  
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -1558,7 +1549,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   );
                 },
               ),
-              // edit button
+              
               IconButton(
                 icon: Icon(
                   isEdit ? Icons.edit_off_rounded : Icons.edit_rounded,
@@ -1570,7 +1561,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   });
                 },
               ),
-              // add new present student
+              
               IconButton(
                 icon: const Icon(
                   Icons.person_add_alt_rounded,
@@ -1591,7 +1582,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
           ),
           body: Column(
             children: [
-              // 1. search for the user
+              
               Padding(
                 padding: EdgeInsets.only(
                   left: screenWidth * 0.02,
@@ -1608,11 +1599,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         contentPadding: EdgeInsets.symmetric(
                           vertical: screenWidth * 0.01,
                           horizontal:
-                              screenWidth * 0.02, // Add horizontal padding
+                              screenWidth * 0.02, 
                         ),
                         isDense: true,
                         labelText: 'Student Name',
-                        // border color grey
+                        
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
                             color: studentBox,
@@ -1635,7 +1626,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     ),
                     minCharsForSuggestions: 1,
                     hideOnEmpty: true,
-                    // Suggestions callback for TypeAheadField
+                    
                     suggestionsCallback: (pattern) {
                       if (users.isNotEmpty) {
                         return users
@@ -1671,14 +1662,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     onSuggestionSelected: (suggestion) async {
                       String selectedUserId = suggestion['id'];
 
-                      // bool doubleShake = false;
+                      
                       if (presentStudentsUID.keys.contains(selectedUserId)) {
                         final user = users
                             .firstWhere((user) => user['id'] == selectedUserId);
-                        // check if user is in home program today
+                        
                         if (user['onHomeProgram'] &&
                             user['days'][formattedDate]['shakes'] == 1) {
-                          // confirm if double shake
+                          
                           bool? result = await showDialog(
                               context: context,
                               builder: (BuildContext context) {
@@ -1713,7 +1704,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         return;
                       }
                       changeSubmitted(true);
-                      // add to firebase
+                      
                       try {
                         final DatabaseReference dbRef = coachDb.child(cid);
                         const time = ServerValue.timestamp;
@@ -1802,7 +1793,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                         size: ColumnSize.S,
                       ),
                   ],
-                  // check why sortedPresentStudents is regenerating
+                  
                   rows: List<DataRow>.generate(sortedPresentStudents.length,
                       (index) {
                     final String id = sortedPresentStudents[index]['id'];
@@ -1813,7 +1804,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                     String planName = user['planName'];
                     bool onHomeProgram = user['onHomeProgram'];
                     String sno = (index + 1).toString();
-                    // check if 'home' is true
+                    
                     bool isHome = sortedPresentStudents[index]['home'] != null;
                     bool isSecond =
                         sortedPresentStudents[index]['second'] != null;
@@ -1847,10 +1838,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                           Text(sno),
                         ),
                         DataCell(
-                          // get name from users list
+                          
                           Text(name),
                           onLongPress: () {
-                            // 4. edit the user
+                            
                             showDialog(
                               context: context,
                               builder: (BuildContext context) {
@@ -1978,7 +1969,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   initalPlan = plans[0];
                                                 });
 
-                                                // open a new dialog to enter the cash amount
+                                                
                                                 Navigator.of(context).pop();
 
                                                 showDialog(
@@ -2005,7 +1996,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                               const EdgeInsets
                                                                   .all(16),
                                                           child: Material(
-                                                            // color: Colors.green,
+                                                            
                                                             shape: RoundedRectangleBorder(
                                                                 borderRadius:
                                                                     BorderRadius
@@ -2094,7 +2085,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   return null;
                                                                                 },
                                                                                 decoration: const InputDecoration(
-                                                                                  contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                  contentPadding: EdgeInsets.zero, 
                                                                                   isDense: true,
                                                                                   labelText: 'Amount (₹)',
                                                                                 ),
@@ -2103,11 +2094,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                             const SizedBox(
                                                                               width: 10,
                                                                             ),
-                                                                            // select plan dropdown
+                                                                            
                                                                             Expanded(
                                                                               child: DropdownButtonFormField<String>(
                                                                                 decoration: const InputDecoration(
-                                                                                  contentPadding: EdgeInsets.zero, // Remove any content padding
+                                                                                  contentPadding: EdgeInsets.zero, 
                                                                                   isDense: true,
                                                                                   labelText: 'Mode',
                                                                                 ),
@@ -2142,7 +2133,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 value: initalPlan,
                                                                                 items: planItemsx,
                                                                                 onChanged: (String? newValue) {
-                                                                                  debugPrint('New Value: $newValue');
                                                                                   setState(() {
                                                                                     initalPlan = newValue ?? '';
                                                                                   });
@@ -2201,7 +2191,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                               ),
                                                                           ],
                                                                         ),
-                                                                        // 2 buttons
+                                                                        
                                                                       ],
                                                                     ),
                                                                   ),
@@ -2232,15 +2222,15 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                             if (formKey.currentState!.validate() &&
                                                                                 !submitted) {
                                                                               changeSubmitted(true);
-                                                                              // save the data
-                                                                              // save to firebase
-                                                                              // add to firebase
+                                                                              
+                                                                              
+                                                                              
                                                                               try {
                                                                                 bool remaining = false;
                                                                                 if (initalPlan == 'Other') {
                                                                                   initalPlan = customPlan.text.trim();
                                                                                 } else {
-                                                                                  // all text before (
+                                                                                  
                                                                                   if (initalPlan.toLowerCase().contains('remaining')) {
                                                                                     if (prevPlanBalances.isNotEmpty) {
                                                                                       remaining = true;
@@ -2251,7 +2241,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   initalPlan = initalPlan.split(' (')[0];
                                                                                 }
                                                                                 initalPlan = initalPlan.toLowerCase();
-                                                                                // balance
+                                                                                
                                                                                 const time = ServerValue.timestamp;
                                                                                 final int payAmount = int.parse(amount.text.trim());
                                                                                 final DatabaseReference dbRef = coachDb.child(cid);
@@ -2300,7 +2290,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                       final sortAllKeys = userDays.keys.toList();
                                                                                       sortAllKeys.sort((a, b) => a.compareTo(b));
                                                                                       final int checkDay = tempAllPlanDays + 1;
-                                                                                      // check if sortAllKeys has the day
+                                                                                      
                                                                                       if (sortAllKeys.length > checkDay) {
                                                                                         planDate = sortAllKeys[checkDay];
                                                                                         existingPlan = false;
@@ -2313,7 +2303,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                     }
                                                                                   }
                                                                                 } else if (!wrongPlan) {
-                                                                                  // get 5th day of user and set the existing planDate
+                                                                                  
                                                                                   final Map<dynamic, dynamic> userDays = user['days'];
                                                                                   final sortAllKeys = userDays.keys.toList();
                                                                                   sortAllKeys.sort((a, b) => a.compareTo(b));
@@ -2330,7 +2320,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                   } else {
                                                                                     days = int.parse(customPlanDays.text.trim());
                                                                                   }
-                                                                                  // throw '$planDate';
+                                                                                  
                                                                                   totalBal = (days * shakePrice) - payAmount;
                                                                                   try {
                                                                                     final plansPaid = user['plansPaid'];
@@ -2348,12 +2338,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                     } else {
                                                                                       totalBal += 920;
                                                                                     }
-                                                                                  } catch (e) {
-                                                                                    debugPrint('Error: $e');
-                                                                                  }
+                                                                                  } catch (e) {}
                                                                                 }
                                                                                 Map<String, dynamic> updates = {
-                                                                                  // Set club fees
+                                                                                  
                                                                                   'attendance/$formattedDate/fees/$newPaymentId': {
                                                                                     'uid': id,
                                                                                     'program': initalPlan,
@@ -2364,7 +2352,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                     'planId': existingPlan || !wrongPlan ? planDate : null,
                                                                                     'advancedPayment': advancedPayment ? true : null,
                                                                                   },
-                                                                                  // Set user payments
+                                                                                  
                                                                                   'users/$id/payments/$formattedDate/$newPaymentId': {
                                                                                     'date': formattedDate,
                                                                                     'time': time,
@@ -2375,10 +2363,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                     'planId': existingPlan || !wrongPlan ? planDate : null,
                                                                                     'advancedPayment': advancedPayment ? true : null,
                                                                                   },
-                                                                                  // test remaining
+                                                                                  
                                                                                   'users/$id/payments/$formattedDate/totalAmount': ServerValue.increment(payAmount),
                                                                                   'users/$id/paid': ServerValue.increment(payAmount),
-                                                                                  // Increment user's total paid amount
+                                                                                  
                                                                                   'users/$id/plansPaid/$initalPlan': ServerValue.increment(payAmount),
                                                                                 };
 
@@ -2412,7 +2400,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                       throw 'Plan Date not null';
                                                                                     }
                                                                                   }
-                                                                                  // check if other plan
+                                                                                  
                                                                                 } else if (!wrongPlan) {
                                                                                   updates['users/$id/plans/$planDate'] = {
                                                                                     'time': time,
@@ -2481,7 +2469,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                           width: double.infinity,
                                           child: TextButton(
                                               onPressed:
-                                                  // snack bar
+                                                  
                                                   () {
                                                 Navigator.push(
                                                   context,
@@ -2506,7 +2494,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                           width: double.infinity,
                                           child: TextButton(
                                               onPressed: () {
-                                                // alert dialog
+                                                
                                                 dynamic formkey =
                                                     GlobalKey<FormState>();
                                                 TextEditingController
@@ -2585,7 +2573,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                             daysController.text) ??
                                                                         0;
 
-                                                                // confirm
+                                                                
                                                                 showDialog(
                                                                     context:
                                                                         context,
@@ -2626,14 +2614,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                                                 bool overwriteErr = false;
                                                                                 String errorDate = '';
                                                                                 if (advancedPaymentx && existingPlan) {
-                                                                                  // check if existing plan finishes and next day 1 comes
+                                                                                  
                                                                                   final int curDay = day - (tempAllPlanDays - planDays);
                                                                                   if ((curDay + tdays) > planDays) {
                                                                                     int remainingDays = planDays - curDay;
-                                                                                    // query to firebase to set plan
+                                                                                    
                                                                                     final Map<dynamic, dynamic> pid = user['advancedPayments']['pid'];
                                                                                     final int pidAmount = pid['amount'] as int;
-                                                                                    // remove amount from advanced payments
+                                                                                    
                                                                                     pid.remove('amount');
                                                                                     final String program = pid['program'];
                                                                                     final String paymentId = pid['payments'].keys.first;
@@ -2653,9 +2641,9 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
                                                                                 for (int i = 1; i <= tdays; i++) {
                                                                                   final String newDate = DateFormat('yyyy-MM-dd').format(selectedDate.add(Duration(days: i)));
-                                                                                  // check if already present
+                                                                                  
                                                                                   if (homeProg && user['homeProgram'][newDate] != null) {
-                                                                                    // error
+                                                                                    
                                                                                     error = true;
                                                                                     errorDate = newDate;
                                                                                     updates.clear();
@@ -2884,7 +2872,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                     scaffoldKey.currentContext!, cid)) {
                                   return;
                                 }
-                                // ask for confirmation
+                                
                                 String confirmMsg =
                                     'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?';
                                 if (isHome) {
@@ -2915,12 +2903,12 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                             }
                                             changeSubmitted(true);
 
-                                            // delete from firebase
+                                            
                                             final DatabaseReference dbRef =
                                                 coachDb.child(cid);
                                             Map<String, dynamic> updates = {};
                                             try {
-                                              // check if 'home' is true
+                                              
                                               if (isHome) {
                                                 updates = {
                                                   'attendance/$formattedDate/students/$id/shakes':
@@ -2952,11 +2940,11 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   user['plans'] != null &&
                                                   user['plans'].keys.length >
                                                       1) {
-                                                // get next plan
+                                                
                                                 final List sortedPlanKeys =
                                                     user['plans'].keys.toList();
                                                 sortedPlanKeys.sort();
-                                                // check if any plan exists after current plan
+                                                
                                                 if (sortedPlanKeys
                                                         .indexOf(planDate) <
                                                     sortedPlanKeys.length - 1) {
@@ -2971,7 +2959,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                           .keys
                                                           .toList();
                                                   userSortedDays.sort();
-                                                  // show dialog to not touvh screen
+                                                  
                                                   Navigator.of(scaffoldKey
                                                           .currentContext!)
                                                       .pop();
@@ -3004,7 +2992,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                         indexOfDateinUser =
                                                         userSortedDays.indexOf(
                                                             nextPlanDate);
-                                                    // check if next date is possible
+                                                    
                                                     int next = 0;
                                                     if (indexOfDateinUser <
                                                         userSortedDays.length -
@@ -3048,7 +3036,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                     message:
                                                         "${name.split(' ')[0]} has been removed from today's list. Please don't remove users from previous plans, it causes errors in the system",
                                                     icon: Icon(
-                                                      // alert icon
+                                                      
                                                       Icons
                                                           .error_outline_rounded,
                                                       size: 28.0,
@@ -3063,7 +3051,6 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                 }
                                               }
 
-                                              debugPrint('Updates: $updates');
                                               final bool popMsg = isHome;
                                               await dbRef.update(updates);
                                               Navigator.of(scaffoldKey
@@ -3082,7 +3069,7 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                                                   message:
                                                       "${name.split(' ')[0]} has been removed from today's list. But Remember home program all days are not deleted from given date. You can delete all list by going to the home program section on that day",
                                                   icon: Icon(
-                                                    // alert icon
+                                                    
                                                     Icons.error_outline_rounded,
                                                     size: 28.0,
                                                     color: Colors.orange[300],
@@ -3153,10 +3140,10 @@ class _DailyAttendanceState extends State<DailyAttendance> {
       plan = '0 day';
       day = '$days / 1';
     } else if (days >= 2 && days < 5) {
-      plan = '3 day'; // Change this value as needed
+      plan = '3 day'; 
       day = '${days - 1} / 3';
     } else {
-      plan = 'Paid'; // Change this value as needed
+      plan = 'Paid'; 
       day = '${days - 4} / ${days - 4}';
     }
     for (int i = 1; i < days; i++) {
@@ -3195,7 +3182,7 @@ class DailyDetails extends StatefulWidget {
 }
 
 class _DailyDetailsState extends State<DailyDetails> {
-// create date variable and set it to widget.selectedDate
+
   late DateTime selectedDate;
   late String formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
   bool isEdit = false;
@@ -3243,24 +3230,24 @@ class _DailyDetailsState extends State<DailyDetails> {
             ),
           ),
           onPressed: () {
-            //  open date picker
-            // showDatePicker(
-            //   context: context,
-            //   initialDate: widget.selectedDate,
-            //   firstDate: DateTime(2023),
-            //   lastDate: today,
-            // ).then((date) {
-            //   if (date != null) {
-            //     setState(() {
-            //       //  update the date
-            //       selectedDate = date;
-            //     });
-            //   }
-            // });
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
           },
         ),
         rightIcons: [
-          // export to excel button
+          
           IconButton(
             icon: const Icon(
               Icons.file_download_outlined,
@@ -3269,7 +3256,7 @@ class _DailyDetailsState extends State<DailyDetails> {
             onPressed: () {},
           ),
 
-          // edit button
+          
           IconButton(
             icon: Icon(
               isEdit ? Icons.edit_off_rounded : Icons.edit_rounded,
@@ -3293,7 +3280,7 @@ class _DailyDetailsState extends State<DailyDetails> {
             horizontal: MediaQuery.of(context).size.width * 0.04,
             vertical: MediaQuery.of(context).size.width * 0.02,
           ),
-          // max width: 80% of screen
+          
           width: double.infinity,
           child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
@@ -3485,7 +3472,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                       scaffoldKey.currentContext!, cid)) {
                                     return;
                                   }
-                                  // ask for confirmation
+                                  
                                   showDialog(
                                     context: scaffoldKey.currentContext!,
                                     builder: (BuildContext context) {
@@ -3507,7 +3494,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                 return;
                                               }
                                               changeSubmitted(true);
-                                              // get payment id
+                                              
                                               try {
                                                 final DatabaseReference dbRef =
                                                     coachDb.child(cid);
@@ -3527,9 +3514,9 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     .firstWhere((element) =>
                                                         element['id'] == uid);
 
-                                                // delete from firebase
+                                                
                                                 Map<String, dynamic> updates = {
-                                                  // delete from club fees
+                                                  
                                                   'attendance/$formattedDate/fees/$paymentId':
                                                       null,
                                                   'users/$uid/paid':
@@ -3551,23 +3538,23 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                       ServerValue.increment(
                                                           -int.parse(amount));
                                                 }
-                                                // delete from plans
+                                                
                                                 if ((user['plans'] != null) &&
                                                     planId != null &&
                                                     planId.isNotEmpty) {
-                                                  // get planId
+                                                  
 
                                                   if (user['plans']
                                                           .keys
                                                           .length >
                                                       1) {
-                                                    // get next plan
+                                                    
                                                     final List sortedPlanKeys =
                                                         user['plans']
                                                             .keys
                                                             .toList();
                                                     sortedPlanKeys.sort();
-                                                    // check if any plan exists after current plan
+                                                    
                                                     if (sortedPlanKeys
                                                             .indexOf(planId) <
                                                         sortedPlanKeys.length -
@@ -4128,7 +4115,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                       scaffoldKey.currentContext!, cid)) {
                                     return;
                                   }
-                                  // ask for confirmation
+                                  
                                   showDialog(
                                     context: scaffoldKey.currentContext!,
                                     builder: (BuildContext context) {
@@ -4150,7 +4137,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                 return;
                                               }
                                               changeSubmitted(true);
-                                              // get payment id
+                                              
                                               try {
                                                 final DatabaseReference dbRef =
                                                     coachDb.child(cid);
@@ -4160,7 +4147,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                     widget.homeProgram[index]
                                                         ['homeProgramID'];
 
-                                                // delete from firebase
+                                                
                                                 final Map<String, dynamic>
                                                     updates = {};
                                                 final user = widget.users
@@ -4178,7 +4165,7 @@ class _DailyDetailsState extends State<DailyDetails> {
                                                               .add(Duration(
                                                                   days: i)));
 
-                                                  // check if shakes is 2
+                                                  
                                                   if (user['homeProgram'] !=
                                                           null &&
                                                       user['homeProgram']
@@ -4301,7 +4288,7 @@ class GradientBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        // add 3d look
+        
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),

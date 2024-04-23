@@ -5,7 +5,7 @@ import '../ui/card.dart';
 class FormFields extends StatelessWidget {
   final List<Map<String, dynamic>> fields;
   final List<DateTime>? disabledDates;
-  // validator
+  
   final Function validator;
 
   final DateTime? selectedDate;
@@ -113,7 +113,7 @@ class FormFields extends StatelessWidget {
                                 .contains('phone')
                             ? 10
                             : null,
-                        // hide max length 0/10
+                        
 
                         keyboardType:
                             field['label'].toString().contains('Email')
@@ -162,7 +162,7 @@ class _MedicalHistoryState extends State<MedicalHistory> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(widget.title),
-            // checkbox
+            
             Checkbox(
               value: MedicalHistory.show,
               onChanged: (value) {

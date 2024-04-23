@@ -25,10 +25,10 @@ class AddWeight extends StatefulWidget {
 class _AddWeightState extends State<AddWeight> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-  // DateTime selectedDate = DateTime.now();
+  
   double weight = 60.0;
 
-// todays date not time
+
   final TextEditingController _dateController = TextEditingController();
 
   @override
@@ -43,12 +43,12 @@ class _AddWeightState extends State<AddWeight> {
       if (!await Method.checkInternetConnection(context)) {
         return;
       }
-      // parse date
+      
       DateTime date = DateTime.now();
       try {
         final DateFormat format = DateFormat('dd-MM-yyyy');
         date = format.parseStrict(_dateController.text);
-        // check in widget.measurements if duplicate date exists
+        
         for (int i = 0; i < widget.measurements.length; i++) {
           if (DateTime.fromMillisecondsSinceEpoch(
                   widget.measurements[i]['date']) ==
@@ -119,7 +119,7 @@ class _AddWeightState extends State<AddWeight> {
           leftBarIndicatorColor: Colors.green[300],
         ).show(scaffoldKey.currentContext!);
       } catch (e) {
-        // SnackBar
+        
         Flushbar(
           margin: const EdgeInsets.all(7),
           borderRadius: BorderRadius.circular(15),
@@ -145,11 +145,11 @@ class _AddWeightState extends State<AddWeight> {
   @override
   void initState() {
     super.initState();
-    // disable dates
+    
     for (int i = 0; i < widget.measurements.length; i++) {
       DateTime date =
           DateTime.fromMillisecondsSinceEpoch(widget.measurements[i]['date']);
-      // remove time if exists
+      
       date = DateTime(date.year, date.month, date.day);
       disabledDates.add(date);
     }
@@ -190,13 +190,13 @@ class _AddWeightState extends State<AddWeight> {
                 onTap: () {
                   showDatePicker(
                     context: context,
-                    // set initialDate which is not in disabledDates
+                    
                     initialDate: selectedDate,
                     firstDate: DateTime(DateTime.now().year - 13),
                     lastDate: DateTime.now(),
-                    // selectableDayPredicate: (DateTime date) {
-                    //   return !disabledDates.contains(date);
-                    // },
+                    
+                    
+                    
                     selectableDayPredicate: (DateTime date) {
                       if (disabledDates.isEmpty) {
                         return true;
@@ -217,8 +217,8 @@ class _AddWeightState extends State<AddWeight> {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a date';
                   }
-                  // check if it is a date
-                  // check if it is a date
+                  
+                  
                   final DateFormat format = DateFormat('dd-MM-yyyy');
                   try {
                     format.parseStrict(value);

@@ -78,7 +78,7 @@ class _CustNewFormState extends State<CustNewForm> {
                       lastDate: DateTime.now(),
                     ).then((date) {
                       if (date != null) {
-                        // show time picker
+                        
                         showTimePicker(
                           context: context,
                           initialTime: TimeOfDay.now(),
@@ -182,7 +182,7 @@ class _CustNewFormState extends State<CustNewForm> {
                   labelText: 'Height',
                   suffixText: 'cm',
                   keyboardType: TextInputType.number,
-                  // max cahracters 3
+                  
                   maxLength: 3,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -256,16 +256,16 @@ class _CustNewFormState extends State<CustNewForm> {
         child: FloatingActionButton(
           onPressed: () async {
             if (!isFabEnabled) {
-              return; // Ignore button press if it's already disabled
+              return; 
             }
 
             setState(() {
               autoValidate = true;
-              isFabEnabled = false; // Disable the button on press
+              isFabEnabled = false; 
             });
 
             if (_formKey.currentState!.validate()) {
-              // get all the values
+              
               try {
                 final DateFormat format = DateFormat('dd-MM-yyyy - hh:mm a');
                 DateTime created = format.parse(_dateController.text);
@@ -307,7 +307,7 @@ class _CustNewFormState extends State<CustNewForm> {
                     "1970-01-04": {"shakes": 1, "time": 259200000},
                     "1970-01-05": {"shakes": 1, "time": 345600000},
                   };
-                  // random generated string
+                  
                   final String payId =
                       FirebaseDatabase.instance.ref().push().key!;
                   final String payId2 =
@@ -360,10 +360,10 @@ class _CustNewFormState extends State<CustNewForm> {
                   });
                   return;
                 }
-                // check if user already exists by phone
+                
                 try {
-                  //  try putting number in phone collection
-                  // if it fails, then user already exists
+                  
+                  
                   await FirebaseDatabase.instance
                       .ref()
                       .child('Coaches')
@@ -449,7 +449,6 @@ class _CustNewFormState extends State<CustNewForm> {
                   isFabEnabled = true;
                 });
               } catch (e) {
-                debugPrint(e.toString());
                 Flushbar(
                   margin: const EdgeInsets.all(7),
                   borderRadius: BorderRadius.circular(15),
@@ -470,7 +469,7 @@ class _CustNewFormState extends State<CustNewForm> {
                 return;
               }
             } else {
-              // Enable the button if form validation failed
+              
               setState(() {
                 isFabEnabled = true;
               });
@@ -540,7 +539,7 @@ class CustomTextFormField extends StatelessWidget {
             keyboardType: keyboardType,
             maxLength: maxLength,
             onTap: onTap,
-            // change font family
+            
             style: GoogleFonts.raleway(
               fontSize: height * 0.02,
               fontWeight: FontWeight.w500,
@@ -554,7 +553,7 @@ class CustomTextFormField extends StatelessWidget {
                 horizontal: height * 0.007,
                 vertical: height * 0.01,
               ),
-              // full round border
+              
             ),
             validator: validator,
           ),

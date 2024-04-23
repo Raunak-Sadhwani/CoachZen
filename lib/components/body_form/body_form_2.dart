@@ -59,7 +59,7 @@ class BodyForm2 extends StatefulWidget {
       "controller": TextEditingController(),
     }
   ];
-  // create a bool wantKeepAlive with getter and setter
+  
 
   static bool wantKeepAlive = true;
   static List<Map<String, dynamic>> get allFields => BodyForm2.fields;
