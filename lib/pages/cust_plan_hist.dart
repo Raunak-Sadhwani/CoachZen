@@ -34,11 +34,25 @@ class CustPlanHist extends StatelessWidget {
       plans.removeWhere((key, value) => key == '1970-01-05');
     }
 
-    List dateKeys = days.keys.toList()..sort();
+    final List allExtra =
+        days.keys.where((date) => days[date]['shakes'] > 1).toList();
 
-    List sortedKeys = Set<dynamic>.from({...dateKeys, ...plans.keys}).toList()
-      ..sort((a, b) => b.compareTo(a));
-    // also add plans to the sorted keys, which are not in days
+    List allDatesAttended = [...days.keys, ...allExtra]..sort();
+
+    List sortedKeys = [
+      ...<dynamic>{...days.keys, ...plans.keys},
+      ...allExtra
+    ]..sort();
+
+    final ScrollController? scrollControllerx =
+        allExtra.isNotEmpty ? ScrollController() : null;
+    if (allExtra.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scrollControllerx!.jumpTo(scrollControllerx.position.maxScrollExtent);
+      });
+    } else {
+      sortedKeys.sort((a, b) => b.compareTo(a));
+    }
 
     return Scaffold(
         appBar: MyAppBar(
@@ -54,25 +68,40 @@ class CustPlanHist extends StatelessWidget {
           width: width,
           child: sortedKeys.isNotEmpty
               ? ListView.builder(
+                  controller: allExtra.isNotEmpty ? scrollControllerx : null,
+                  reverse: allExtra.isNotEmpty ? true : false,
                   itemCount: sortedKeys.length,
                   itemBuilder: (context, index) {
                     String key = sortedKeys[index];
                     String joined = 'Absent';
+                    String? joinedExtra;
 
                     if (days[key] != null) {
-                      String actualDay = "Day ${(dateKeys.indexOf(key) + 1)}";
+                      String actualDay =
+                          "Day ${(allDatesAttended.indexOf(key) + 1)}";
                       // dynamic values = days.values.elementAt(index);
                       DateTime joinedTime = DateTime.fromMillisecondsSinceEpoch(
                           days[key]['time'] ?? 0);
                       joined =
-                          "$actualDay Joined on: ${DateFormat.jm().format(joinedTime)}";
+                          "$actualDay, Joined on: ${DateFormat.jm().format(joinedTime)}";
                       if (homeProgram.containsKey(key)) {
-                        joined = "$actualDay Took in Home";
+                        if ((days[key]['shakes'] > 1)) {
+                          joinedExtra =
+                              "$actualDay, Joined on: ${DateFormat.jm().format(joinedTime)}";
+                          actualDay =
+                              "Day ${(allDatesAttended.indexOf(key) + 2)}";
+                        }
+                        joined = "$actualDay, Took in Home";
                       }
                     }
 
                     Map<dynamic, dynamic> plan = {};
                     if (plans.containsKey(key)) {
+                      if (allExtra.contains(key) &&
+                          (index + 1 < sortedKeys.length) &&
+                          (sortedKeys[index + 1] != key)) {
+                        return Container();
+                      }
                       // remove the key from the map
                       if (plans[key].containsKey('totalAmount')) {
                         plans[key].remove('totalAmount');
@@ -102,12 +131,25 @@ class CustPlanHist extends StatelessWidget {
                             height: height,
                             date: date,
                           ),
+                          if (allExtra.contains(key) &&
+                              (index + 1 < sortedKeys.length) &&
+                              (sortedKeys[index + 1] == key))
+                            textWidget(
+                              joinedExtra ?? '',
+                              joinedFontSize,
+                            ),
                           textWidget(
                             joined,
                             joinedFontSize,
                           ),
                           ...paymentCards,
                         ],
+                      );
+                    } else if ((index + 1 < sortedKeys.length) &&
+                        (sortedKeys[index + 1] == key)) {
+                      return textWidget(
+                        joinedExtra!,
+                        joinedFontSize,
                       );
                     }
                     return Column(

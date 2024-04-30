@@ -204,6 +204,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
             }
           }
 
+          debugPrint('Rerun: $rerun');
+
           final gotPlan = getPlan(day);
           int totalBalance = gotPlan['balance'];
           int realBalance = totalBalance - amountPaidTillNow;
@@ -284,7 +286,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
                   if (planPaymentDates.isNotEmpty) {
                     for (String key in planPaymentDates.keys) {
-                      final DateTime planPaymentDate = DateTime.parse(planPaymentDates[key]);
+                      final DateTime planPaymentDate =
+                          DateTime.parse(planPaymentDates[key]);
                       if (planPaymentDate.isBefore(selectedDate) ||
                           planPaymentDate.isAtSameMomentAs(selectedDate)) {
                         final paymentId = key;
@@ -314,10 +317,27 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   if (!existingPlan &&
                       presentStudents.containsKey(id) &&
                       ((day - 1) <= tempAllPlanDays)) {
-                    final program = plan['program'];
+                    int? oldPlanDays;
+                    String program = plan['program'];
                     final int cDay = (day - 1) - (tempAllPlanDays - planDays);
-                    final gotNewPlan = getPlan(cDay,
-                        assignedPlanDays: planDays, planName: program);
+                    debugPrint('cDay: $cDay');
+                    if (cDay == 0) {
+                      // get previous program name
+                      try {
+                        final List allPlans = userData['plans'].keys.toList()
+                          ..sort();
+                        final String prevPlanKey =
+                            allPlans[allPlans.length - 2];
+                        final oldPlan = userData['plans'][prevPlanKey];
+                        program = oldPlan['program'];
+                        oldPlanDays = oldPlan['days'] as int;
+                      } catch (e) {
+                        debugPrint('${e}dssd');
+                      }
+                    }
+                    final gotNewPlan = getPlan(oldPlanDays ?? cDay,
+                        assignedPlanDays: oldPlanDays ?? planDays,
+                        planName: program);
                     sortedPresentStudentsx[reRunIndex]['days'] =
                         gotNewPlan['day'];
                     sortedPresentStudentsx[reRunIndex]['plan'] =
@@ -381,13 +401,8 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 }
               }
 
-              if (rerun && reRunIndex != null) {
-                final int currentDay = (day - 1) - tempAllPlanDays;
-                sortedPresentStudentsx[reRunIndex]['days'] =
-                    '$currentDay / $currentDay';
-              }
-
               if (!existingPlan) {
+                debugPrint(user['name'].toString());
                 final int currentDay = day - tempAllPlanDays;
                 if (currentDay == 1 && advancedPaymentx) {
                   final DatabaseReference dbRef = coachDb.child(cid);
@@ -430,7 +445,18 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                 };
               }
             } else {
-              final int currentDay = day - tempAllPlanDays;
+              int currentDay = day - tempAllPlanDays;
+              // check if user present
+              if (presentStudents.containsKey(key)) {
+                for (Map<dynamic, dynamic> student in sortedPresentStudentsx) {
+                  bool isHome = student['home'] != null;
+                  if ((student['id'] == key && isHome)) {
+                    final int tempday = currentDay - 1;
+                    sortedPresentStudentsx[sortedPresentStudentsx
+                        .indexOf(student)]['days'] = '$tempday / $tempday';
+                  }
+                }
+              }
               days = '$currentDay / $currentDay';
 
               allBalances['Extra ${currentDay}days'] = currentDay * shakePrice;
@@ -1515,7 +1541,14 @@ class _DailyAttendanceState extends State<DailyAttendance> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const NewCustWrapper(
+                      builder: (context) => NewCustWrapper(
+                        created: DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          today.hour,
+                          today.minute,
+                        ),
                         attendance: true,
                       ),
                     ),
@@ -2791,12 +2824,16 @@ class _DailyAttendanceState extends State<DailyAttendance> {
 
                                 String confirmMsg =
                                     'Are you sure you want to delete "${name.split(' ')[0]}" from the attendance list?';
-                                if (isHome) {
+                                if (onHomeProgram && !isSecond) {
                                   confirmMsg +=
-                                      'It will delete Home program of today, But Remember the issued home program all days are not deleted from given issue date';
+                                      ' It will delete Home program of today, But Remember the issued home program all days are not deleted from given issue date ';
+                                  if (isHome) {
+                                    confirmMsg +=
+                                        'Please delete the other name shake or else it may cause errors in the system';
+                                  }
                                 } else if (isSecond) {
                                   confirmMsg +=
-                                      'It will delete the second shake of "${name.split(' ')[0]}" from the attendance list';
+                                      ' It will delete the second shake of "${name.split(' ')[0]}" from the attendance list';
                                 }
                                 showDialog(
                                   context: scaffoldKey.currentContext!,

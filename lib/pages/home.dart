@@ -742,8 +742,11 @@ class HomeButton extends StatelessWidget {
 
 class NewCustWrapper extends StatefulWidget {
   final bool? attendance;
+  final DateTime? created;
+
   const NewCustWrapper({
     Key? key,
+    this.created,
     this.attendance,
   }) : super(key: key);
 
@@ -811,7 +814,9 @@ class _NewCustWrapperState extends State<NewCustWrapper> {
               HomeButton(
                   height: height,
                   width: width,
-                  page: const CustNewForm(),
+                  page: CustNewForm(
+                    created: widget.created,
+                  ),
                   imgPath: 'lib/assets/new_cust.png',
                   openColor: Colors.green.shade800,
                   label1: 'Simple',

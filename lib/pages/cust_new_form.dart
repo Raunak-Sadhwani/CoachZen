@@ -9,7 +9,8 @@ import 'package:firebase_database/firebase_database.dart';
 import '../components/ui/appbar.dart';
 
 class CustNewForm extends StatefulWidget {
-  const CustNewForm({Key? key}) : super(key: key);
+  final DateTime? created;
+  const CustNewForm({this.created, Key? key}) : super(key: key);
 
   @override
   State<CustNewForm> createState() => _CustNewFormState();
@@ -18,8 +19,9 @@ class CustNewForm extends StatefulWidget {
 class _CustNewFormState extends State<CustNewForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-  final TextEditingController _dateController = TextEditingController(
-    text: DateFormat('dd-MM-yyyy - hh:mm a').format(DateTime.now()),
+  late final TextEditingController _dateController = TextEditingController(
+    text: DateFormat('dd-MM-yyyy - hh:mm a')
+        .format(widget.created == null ? DateTime.now() : widget.created!),
   );
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
