@@ -1,4 +1,4 @@
-# slimtrap
+# coachzen
 
 A new Flutter project.
 
