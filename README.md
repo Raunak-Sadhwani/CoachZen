@@ -28,7 +28,7 @@ CoachZen is tailored to meet the unique needs of health and wellness coaches, of
 Here are a few screenshots of CoachZen:
 
 ### Splash Screen
-![Splash Screen](screenshots/splash.jpg)
+![Splash Screen](screenshots/Splash.jpg)
 
 ### Getting Started <small>(Old Title)</small>
 ![Getting Started](screenshots/get_started.jpg)
@@ -72,7 +72,7 @@ I welcome your feedback and suggestions. Please feel free to reach out to me at 
 
 ## License
 
-This project is strictly only for educational purposes and not for commercial use. All rights reserved by the owner of this project.
+This project is strictly only for educational purposes and not for commercial use. All rights reserved by the [owner](https://www.raunak.me) of this project.
 
 ```
 Thank you for using CoachZen! 🙏🏼
